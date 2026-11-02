@@ -1,0 +1,28 @@
+{
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "logoAlt": "NoWash",
+    "copyright": "© {{year}} NoWash. All rights reserved."
+  },
+  "login": {
+    "pageTitle": "NW Track | Sign In",
+    "pageDescription": "Sign in to NW Track for real-time production analytics and performance insights.",
+    "welcome": "Welcome to",
+    "productName": "NW <highlight>Track</highlight>",
+    "description": "Real-time production analytics and performance insights at your fingertips.",
+    "signIn": "Sign In",
+    "username": "Username",
+    "password": "Password",
+    "usernamePlaceholder": "Enter your username",
+    "passwordPlaceholder": "Enter your password",
+    "forgot": "Forgot password?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "notices": {
+      "unavailable": "Demo login page — authentication backend is not connected.",
+      "recovery": "Password recovery is not configured yet.",
+      "required": "Enter your username and password."
+    }
+  }
+}
