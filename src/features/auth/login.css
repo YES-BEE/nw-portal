@@ -69,33 +69,26 @@
   max-width: 350px;
 }
 .auth-chart {
+  display: block;
+  width: 100%;
   height: 170px;
   max-width: 540px;
   opacity: 0.72;
-}
-.auth-chart svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+  object-fit: fill;
 }
 .auth-form-section {
   width: 52%;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 490px);
+  grid-template-rows: auto 1fr;
+  gap: 24px;
   align-items: center;
   justify-content: center;
-  padding: 85px 50px;
+  padding: 32px 50px 85px;
   z-index: 1;
 }
 .auth-language {
-  position: absolute;
-  right: 5%;
-  top: 32px;
-  color: #e3eaf8;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-  z-index: 2;
+  justify-self: end;
 }
 .auth-card.MuiPaper-root {
   width: min(100%, 490px);
@@ -126,24 +119,18 @@
   text-align: left;
   margin-bottom: 23px;
 }
-.auth-field label {
+.auth-field .MuiFormLabel-root {
   font-size: 13px;
   font-weight: 700;
   display: block;
   margin-bottom: 10px;
 }
 .auth-field .MuiInputAdornment-root {
-  font-size: 17px;
   color: #6e7b90;
-}
-.auth-field .MuiIconButton-root {
-  font-size: 19px;
 }
 .auth-extras {
   display: flex;
   justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
   margin: 1px 0 26px;
 }
 .auth-extras .MuiLink-root {
@@ -189,11 +176,7 @@
     display: none;
   }
   .auth-form-section {
-    padding: 35px 20px 50px;
-  }
-  .auth-language {
-    top: 34px;
-    right: 25px;
+    padding: 24px 20px 50px;
   }
   .auth-card.MuiPaper-root {
     padding: 30px 25px 18px;
@@ -202,8 +185,5 @@
 @media (max-width: 360px) {
   .auth-card.MuiPaper-root {
     padding-inline: 18px;
-  }
-  .auth-extras {
-    flex-wrap: wrap;
   }
 }

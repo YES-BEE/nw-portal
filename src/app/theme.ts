@@ -6,9 +6,39 @@ export const theme = createTheme({
     text: { primary: '#091832', secondary: '#65718a' },
     background: { default: '#00102d', paper: '#ffffff' },
   },
-  typography: { fontFamily: 'Arial, Helvetica, sans-serif' },
+  typography: { fontFamily: '"Inter Variable", Arial, Helvetica, sans-serif' },
   shape: { borderRadius: 5 },
   components: {
+    MuiSelect: {
+      defaultProps: { displayEmpty: true },
+    },
+    MuiTableCell: {
+      styleOverrides: { head: { textTransform: 'capitalize' } },
+    },
+    MuiTextField: {
+      defaultProps: { variant: 'outlined' },
+    },
+    MuiFormHelperText: {
+      styleOverrides: { root: { marginLeft: 0, marginRight: 0 } },
+    },
+    MuiInputLabel: {
+      defaultProps: { shrink: true },
+      styleOverrides: {
+        root: ({ theme }) => ({
+          position: 'static',
+          transform: 'none',
+          maxWidth: '100%',
+          marginBottom: 10,
+          fontSize: 13,
+          fontWeight: 700,
+          color: theme.palette.text.primary,
+          pointerEvents: 'auto',
+          '&.MuiInputLabel-shrink': { transform: 'none', maxWidth: '100%' },
+          '&.Mui-focused': { color: theme.palette.text.primary },
+          '&.Mui-error': { color: theme.palette.error.main },
+        }),
+      },
+    },
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
@@ -16,13 +46,31 @@ export const theme = createTheme({
       },
     },
     MuiOutlinedInput: {
+      defaultProps: { notched: false },
       styleOverrides: {
         root: {
           height: 47,
+          '&.MuiInputBase-sizeSmall': { height: 'auto' },
           fontSize: 13,
           '& .MuiOutlinedInput-notchedOutline': { borderColor: '#d9dfe9' },
           '&.Mui-focused': { boxShadow: '0 0 0 3px #1461f51c' },
         },
+      },
+    },
+  },
+});
+
+export const configurationTheme = createTheme(theme, {
+  palette: {
+    background: { default: '#f5f7fb', paper: '#ffffff' },
+    text: { primary: '#17243b', secondary: '#697b96' },
+    divider: '#e1e7f0',
+  },
+  components: {
+    MuiButton: { styleOverrides: { root: { minHeight: 40 } } },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: { '&.MuiInputBase-multiline': { height: 'auto' } },
       },
     },
   },

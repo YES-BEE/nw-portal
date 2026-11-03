@@ -4,24 +4,38 @@ import { Trans, useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
+  FormLabel,
   IconButton,
   InputAdornment,
   Link,
+  MenuItem,
   Paper,
+  Select,
   TextField,
   Typography,
 } from '@mui/material';
 import logo from '../../assets/logo.png';
-import { LineIcon } from '../../components/LineIcon';
+import LanguageIcon from '@mui/icons-material/Language';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { ProductionChart } from './ProductionChart';
 import './login.css';
 
-type Notice = 'unavailable' | 'recovery' | 'required';
+type Notice = 'unavailable' | 'recovery';
 
 export function LoginPage() {
   const { t, i18n } = useTranslation('translation');
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [credentials, setCredentials] = useState({
+    username: '',
+    password: '',
+  });
+  const [submitted, setSubmitted] = useState(false);
+  const usernameError = submitted && !credentials.username.trim();
+  const passwordError = submitted && !credentials.password;
 
   useEffect(() => {
     document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
@@ -36,7 +50,13 @@ export function LoginPage() {
     const data = new FormData(event.currentTarget);
     const username = String(data.get('username') ?? '').trim();
     const password = String(data.get('password') ?? '');
-    setNotice(username && password ? 'unavailable' : 'required');
+    setCredentials({ username, password });
+    setSubmitted(true);
+    setNotice(username && password ? 'unavailable' : null);
+    if (!username || !password)
+      event.currentTarget
+        .querySelector<HTMLInputElement>(!username ? '#username' : '#password')
+        ?.focus();
   }
 
   return (
@@ -46,14 +66,15 @@ export function LoginPage() {
         className="auth-brand"
         aria-labelledby="welcome-heading"
       >
-        <img
+        <Box
+          component="img"
           className="auth-logo"
           src={logo}
           alt={t('common.logoAlt')}
           width="112"
           height="105"
         />
-        <div className="auth-welcome">
+        <Box className="auth-welcome">
           <Typography component="p" className="auth-eyebrow">
             {t('login.welcome')}
           </Typography>
@@ -61,48 +82,84 @@ export function LoginPage() {
             <Trans
               ns="translation"
               i18nKey="login.productName"
-              components={{ highlight: <span /> }}
+              components={{ highlight: <Box component="span" /> }}
             />
           </Typography>
-          <div className="auth-rule" />
+          <Box className="auth-rule" aria-hidden="true" />
           <Typography component="p" className="auth-description">
             {t('login.description')}
           </Typography>
-        </div>
+        </Box>
         <ProductionChart />
-      </Box>
-      <Box className="auth-language">
-        <LineIcon name="globe" />
-        <Typography
-          component="span"
-          aria-label={t('common.language')}
-          sx={{ fontSize: 13 }}
-        >
-          {t('common.english')}
-        </Typography>
       </Box>
       <Box
         component="section"
         className="auth-form-section"
         aria-labelledby="sign-in-heading"
       >
+        <Box className="auth-language">
+          <Select
+            value="en"
+            onChange={(event) => {
+              void i18n.changeLanguage(event.target.value);
+            }}
+            size="small"
+            inputProps={{ 'aria-label': t('common.language') }}
+            startAdornment={
+              <InputAdornment position="start" sx={{ color: 'inherit' }}>
+                <LanguageIcon fontSize="small" />
+              </InputAdornment>
+            }
+            sx={{
+              color: '#e3eaf8',
+              '& .MuiSelect-icon': { color: 'inherit' },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(227,234,248,0.4)',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#e3eaf8',
+              },
+            }}
+          >
+            <MenuItem value="en">{t('common.english')}</MenuItem>
+          </Select>
+        </Box>
         <Paper
           component="form"
           className="auth-card"
           onSubmit={handleSubmit}
+          noValidate
           elevation={0}
         >
           <Box className="auth-lock">
-            <LineIcon name="lock" />
+            <LockOutlinedIcon fontSize="inherit" />
           </Box>
           <Typography component="h2" id="sign-in-heading">
             {t('login.signIn')}
           </Typography>
-          <div className="auth-field">
-            <label htmlFor="username">{t('login.username')}</label>
+          <Box className="auth-field">
+            <FormLabel
+              htmlFor="username"
+              error={usernameError}
+              sx={{ color: usernameError ? 'error.main' : 'text.primary' }}
+            >
+              {t('login.username')}
+            </FormLabel>
             <TextField
               id="username"
               name="username"
+              value={credentials.username}
+              onChange={(event) => {
+                setCredentials({
+                  ...credentials,
+                  username: event.target.value,
+                });
+                setNotice(null);
+              }}
+              error={usernameError}
+              helperText={
+                usernameError ? t('login.errors.usernameRequired') : undefined
+              }
               placeholder={t('login.usernamePlaceholder')}
               autoComplete="username"
               required
@@ -111,18 +168,36 @@ export function LoginPage() {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LineIcon name="user" />
+                      <PersonOutlineIcon fontSize="small" />
                     </InputAdornment>
                   ),
                 },
               }}
             />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="password">{t('login.password')}</label>
+          </Box>
+          <Box className="auth-field">
+            <FormLabel
+              htmlFor="password"
+              error={passwordError}
+              sx={{ color: passwordError ? 'error.main' : 'text.primary' }}
+            >
+              {t('login.password')}
+            </FormLabel>
             <TextField
               id="password"
               name="password"
+              value={credentials.password}
+              onChange={(event) => {
+                setCredentials({
+                  ...credentials,
+                  password: event.target.value,
+                });
+                setNotice(null);
+              }}
+              error={passwordError}
+              helperText={
+                passwordError ? t('login.errors.passwordRequired') : undefined
+              }
               type={showPassword ? 'text' : 'password'}
               placeholder={t('login.passwordPlaceholder')}
               autoComplete="current-password"
@@ -132,7 +207,7 @@ export function LoginPage() {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LineIcon name="lock" />
+                      <LockOutlinedIcon fontSize="small" />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -149,14 +224,18 @@ export function LoginPage() {
                         edge="end"
                         size="small"
                       >
-                        <LineIcon name={showPassword ? 'eyeOff' : 'eye'} />
+                        {showPassword ? (
+                          <VisibilityOffOutlinedIcon fontSize="small" />
+                        ) : (
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        )}
                       </IconButton>
                     </InputAdornment>
                   ),
                 },
               }}
             />
-          </div>
+          </Box>
           <Box className="auth-extras">
             <Link
               component="button"

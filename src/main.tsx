@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import '@fontsource-variable/inter';
 import App from './App';
 import { theme } from './app/theme';
 import './i18n';

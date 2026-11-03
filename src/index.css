@@ -2,9 +2,3 @@ html {
   min-width: 320px;
   background: #00102d;
 }
-body {
-  margin: 0;
-}
-* {
-  box-sizing: border-box;
-}

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
@@ -53,11 +53,15 @@ describe('LoginPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/^$/);
   });
 
-  it('shows English without unsupported language options or removed controls', () => {
-    setup();
+  it('offers only English in the MUI language selector and keeps removed controls absent', async () => {
+    const { user } = setup();
 
     expect(screen.getByText('English')).toBeVisible();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('combobox', { name: 'Language' }));
+    const options = within(screen.getByRole('listbox')).getAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent('English');
+    await user.keyboard('{Escape}');
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Access your Track dashboard'),
@@ -134,19 +138,29 @@ describe('LoginPage', () => {
       expect(
         screen.getByLabelText(invalidLabel, { exact: true }),
       ).toBeInvalid();
+      expect(
+        screen.getByLabelText(invalidLabel, { exact: true }),
+      ).toHaveAccessibleDescription(
+        invalidLabel === 'Username'
+          ? 'Enter your username.'
+          : 'Enter your password.',
+      );
       expect(screen.getByRole('status')).toHaveTextContent(/^$/);
     },
   );
 
-  it('rejects whitespace-only usernames after native required validation passes', async () => {
+  it('shows a field error for whitespace-only usernames', async () => {
     const { user, username, password, submit } = setup();
     await user.type(username, '   ');
     await user.type(password, 'test-password');
     await user.click(submit);
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Enter your username and password.',
-    );
+    expect(username).toHaveAccessibleDescription('Enter your username.');
+    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
+    await user.clear(username);
+    await user.type(username, 'operator');
+    expect(username).not.toHaveAttribute('aria-invalid', 'true');
+    expect(username).not.toHaveAccessibleDescription('Enter your username.');
   });
 
   it('reports that authentication is unavailable for a completed form', async () => {
