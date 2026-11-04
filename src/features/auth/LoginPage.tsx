@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -22,7 +22,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { ProductionChart } from './ProductionChart';
-import { getLoginDestination, signIn } from './session';
+import { getLandingPath, signIn } from './session';
 import type { SignInError } from './session';
 import { useSession } from './useSession';
 import './login.css';
@@ -32,7 +32,6 @@ type Notice = 'recovery';
 export function LoginPage() {
   const { t, i18n } = useTranslation('translation');
   const session = useSession();
-  const location = useLocation();
   const [signInError, setSignInError] = useState<SignInError | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -71,16 +70,7 @@ export function LoginPage() {
     setSignInError(signIn(username, password));
   }
 
-  if (session)
-    return (
-      <Navigate
-        to={getLoginDestination(
-          session,
-          (location.state as { from?: unknown } | null)?.from,
-        )}
-        replace
-      />
-    );
+  if (session) return <Navigate to={getLandingPath(session)} replace />;
 
   return (
     <Box component="main" className="auth-page">

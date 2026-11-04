@@ -3,7 +3,6 @@ import { ACCESS_STORAGE_KEY, loadAccessData } from '../access/accessData';
 import {
   demoAccounts,
   getLandingPath,
-  getLoginDestination,
   getModuleForPath,
   readSession,
   SESSION_STORAGE_KEY,
@@ -110,19 +109,21 @@ describe('permission-aware destinations', () => {
     expect(getModuleForPath('/users-other')).toBeNull();
   });
 
-  it('restores allowed deep links with query/hash, rejects external and unauthorized targets', () => {
+  it('uses the first permitted sidebar destination, with a fallback for roles without modules', () => {
     const session = readSession()!;
+    expect(getLandingPath(session)).toBe('/dashboard');
+    expect(getLandingPath({ ...session, modules: ['reports'] })).toBe(
+      '/reports',
+    );
     expect(
-      getLoginDestination(
-        session,
-        '/configurations/processes/demo-1?tab=devices#table',
-      ),
-    ).toBe('/configurations/processes/demo-1?tab=devices#table');
-    expect(getLoginDestination(session, '//example.com')).toBe('/dashboard');
-    expect(getLoginDestination(session, '/login')).toBe('/dashboard');
-    expect(
-      getLoginDestination({ ...session, modules: ['reports'] }, '/users'),
-    ).toBe('/reports');
+      getLandingPath({ ...session, modules: ['styles', 'roles', 'newstyle'] }),
+    ).toBe('/new-style');
+    expect(getLandingPath({ ...session, modules: ['styles', 'process'] })).toBe(
+      '/configurations/processes',
+    );
+    expect(getLandingPath({ ...session, modules: ['styles', 'tags'] })).toBe(
+      '/configurations/tags',
+    );
     expect(getLandingPath({ ...session, modules: [] })).toBe('/workspace');
     expect(getLandingPath({ ...session, modules: ['newstyle'] })).toBe(
       '/new-style',

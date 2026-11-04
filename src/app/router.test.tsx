@@ -128,7 +128,6 @@ describe('application routing', () => {
       await screen.findByRole('heading', { name: 'Sign In', level: 2 }),
     ).toBeVisible();
     expect(window.location.pathname).toBe('/login');
-    expect(router.state.location.state).toEqual({ from: path });
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   });
 
@@ -173,10 +172,20 @@ describe('application routing', () => {
       ).toBeVisible();
       expect(readSession()?.user.username).toBe(username);
       expect(router.state.historyAction).toBe('REPLACE');
+      await user.click(
+        screen.getByRole('button', { name: 'Open navigation menu' }),
+      );
+      const links = within(
+        screen.getByRole('navigation', { name: 'Main navigation' }),
+      ).queryAllByRole('link');
+      if (links.length) {
+        expect(links[0]).toHaveAttribute('aria-current', 'page');
+        expect(links[0]).toHaveClass('Mui-selected');
+      } else expect(window.location.pathname).toBe('/workspace');
     },
   );
 
-  it('returns to an authorized deep link after login and retains the session after remounting', async () => {
+  it('opens the first menu after login even when sign-in started from an authorized deep link', async () => {
     signOut();
     const user = userEvent.setup();
     await router.navigate('/configurations/processes/demo-2?tab=devices#list');
@@ -192,17 +201,61 @@ describe('application routing', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Washing' }),
+      await screen.findByRole('heading', { level: 1, name: 'Dashboard' }),
     ).toBeVisible();
     expect(
       window.location.pathname + window.location.search + window.location.hash,
-    ).toBe('/configurations/processes/demo-2?tab=devices#list');
+    ).toBe('/dashboard');
     view.unmount();
     renderWithProviders(<App />);
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Washing' }),
+      await screen.findByRole('heading', { level: 1, name: 'Dashboard' }),
     ).toBeVisible();
   });
+
+  it.each([
+    {
+      modules: ['styles', 'roles', 'newstyle'] as const,
+      path: '/new-style',
+      title: 'New Style',
+    },
+    {
+      modules: ['styles', 'tags'] as const,
+      path: '/configurations/tags',
+      title: 'Tag Management',
+    },
+    {
+      modules: ['styles'] as const,
+      path: '/styles',
+      title: 'Style Management',
+    },
+  ])(
+    'keeps the first visible menu selected for customized permissions at $path',
+    async ({ modules, path, title }) => {
+      const records = loadAccessData().records;
+      records.roles.find((role) => role.name === 'Supervisor')!.modules = [
+        ...modules,
+      ];
+      localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
+      signIn('supervisor', 'Super@2026demo');
+      const user = userEvent.setup();
+      await router.navigate('/login');
+      renderWithProviders(<App />);
+      expect(
+        await screen.findByRole('heading', { level: 1, name: title }),
+      ).toBeVisible();
+      expect(window.location.pathname).toBe(path);
+      await user.click(
+        screen.getByRole('button', { name: 'Open navigation menu' }),
+      );
+      const links = within(
+        screen.getByRole('navigation', { name: 'Main navigation' }),
+      ).getAllByRole('link');
+      expect(links[0]).toHaveAttribute('href', path);
+      expect(links[0]).toHaveAttribute('aria-current', 'page');
+      expect(links[0]).toHaveClass('Mui-selected');
+    },
+  );
 
   it('denies direct unauthorized URLs and hides inaccessible sidebar items', async () => {
     signIn('supervisor', 'Super@2026demo');

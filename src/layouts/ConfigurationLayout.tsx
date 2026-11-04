@@ -33,18 +33,19 @@ import { configurationTheme, theme } from '../app/theme';
 import logo from '../assets/logo.png';
 import { signOut } from '../features/auth/session';
 import { useSession } from '../features/auth/useSession';
+import {
+  mainNavigationItems,
+  configurationNavigationItems as configurationItems,
+} from '../app/navigation';
 
 const toolbarStyles = { minHeight: '68px !important', flexShrink: 0 };
-const configurationItems = [
-  {
-    key: 'processes',
-    permission: 'process',
-    path: '/configurations/processes',
-  },
-  { key: 'storage', permission: 'storage', path: '/configurations/storages' },
-  { key: 'tags', permission: 'tags', path: '/configurations/tags' },
-  { key: 'styles', permission: 'styles', path: '/styles' },
-] as const;
+const navigationIcons = {
+  dashboard: DashboardOutlinedIcon,
+  reports: AssessmentOutlinedIcon,
+  users: PeopleOutlineIcon,
+  newstyle: AddCircleOutlinedIcon,
+  roles: AdminPanelSettingsOutlinedIcon,
+};
 
 export function ConfigurationLayout() {
   const { t } = useTranslation('translation');
@@ -122,28 +123,9 @@ export function ConfigurationLayout() {
       </Toolbar>
       <Divider sx={{ borderColor: '#304361' }} />
       <List component="nav" aria-label={t('navigation.main')} disablePadding>
-        {(
-          [
-            {
-              key: 'dashboard',
-              path: '/dashboard',
-              Icon: DashboardOutlinedIcon,
-            },
-            { key: 'reports', path: '/reports', Icon: AssessmentOutlinedIcon },
-            { key: 'users', path: '/users', Icon: PeopleOutlineIcon },
-            {
-              key: 'newstyle',
-              path: '/new-style',
-              Icon: AddCircleOutlinedIcon,
-            },
-            {
-              key: 'roles',
-              path: '/roles',
-              Icon: AdminPanelSettingsOutlinedIcon,
-            },
-          ] as const
-        )
-          .filter((item) => allowed(item.key))
+        {mainNavigationItems
+          .filter((item) => allowed(item.permission))
+          .map((item) => ({ ...item, Icon: navigationIcons[item.key] }))
           .map(({ key, path, Icon }) => (
             <ListItemButton
               key={key}

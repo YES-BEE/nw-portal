@@ -1,5 +1,4 @@
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderWithProviders } from '../../test/render';
@@ -28,7 +27,7 @@ function renderDetails(mode: StyleMode, id = 'sty-1') {
 }
 
 describe('shared style details', () => {
-  it('shows read-only details with an ordered process/station table and a return link', () => {
+  it('shows read-only details with a connected lot route and a return link', () => {
     renderDetails('management');
     expect(
       screen.getByRole('heading', { level: 1, name: 'STY-1001' }),
@@ -36,12 +35,15 @@ describe('shared style details', () => {
     expect(screen.getByText('100 kg')).toBeVisible();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     const rows = within(
-      screen.getByRole('table', { name: 'Production Process Sequence' }),
-    ).getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('Lot Preparation');
-    expect(rows[1]).toHaveTextContent('01');
-    expect(rows[2]).toHaveTextContent('Washing');
-    expect(rows[2]).toHaveTextContent('03');
+      screen.getByRole('list', { name: 'Lot Route' }),
+    ).getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Lot Preparation');
+    expect(rows[0]).toHaveTextContent('Station 01');
+    expect(rows[1]).toHaveTextContent('Washing');
+    expect(rows[1]).toHaveTextContent('Station 03');
+    expect(
+      screen.getByText('All 20 lots follow this route in the order shown.'),
+    ).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Back to Styles' }),
     ).toHaveAttribute('href', '/styles');
@@ -61,7 +63,9 @@ describe('shared style details', () => {
       'not available to your account',
     );
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Lot Route' }),
+    ).not.toBeInTheDocument();
   });
 
   it('allows creators to view their style and handles missing process references explicitly', () => {
@@ -82,7 +86,7 @@ describe('shared style details', () => {
     ).toHaveAttribute('href', '/new-style');
   });
 
-  it('paginates long production sequences without dropping or reordering steps', async () => {
+  it('shows every step of a long production sequence in its original order', () => {
     localStorage.setItem(
       STYLE_STORAGE_KEY,
       JSON.stringify([
@@ -94,19 +98,13 @@ describe('shared style details', () => {
         },
       ]),
     );
-    const user = userEvent.setup();
     renderDetails('management');
-    const table = screen.getByRole('table', {
-      name: 'Production Process Sequence',
-    });
-    expect(within(table).getAllByRole('rowheader')).toHaveLength(10);
-    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
-    expect(within(table).getAllByRole('rowheader')[0]).toHaveTextContent('11');
-    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
-    expect(within(table).getAllByRole('rowheader')).toHaveLength(5);
-    expect(
-      screen.getByRole('button', { name: 'Go to next page' }),
-    ).toBeDisabled();
+    const route = screen.getByRole('list', { name: 'Lot Route' });
+    const steps = within(route).getAllByRole('listitem');
+    expect(steps).toHaveLength(25);
+    expect(steps[0]).toHaveAccessibleName('Step 1: Lot Preparation');
+    expect(steps[10]).toHaveAccessibleName('Step 11: Lot Preparation');
+    expect(steps[24]).toHaveAccessibleName('Step 25: Lot Preparation');
   });
 
   it('handles a missing style with a return link', () => {

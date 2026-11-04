@@ -5,14 +5,7 @@ import { useSession } from './useSession';
 export function ProtectedRoute() {
   const session = useSession();
   const location = useLocation();
-  if (!session)
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={{ from: location.pathname + location.search + location.hash }}
-      />
-    );
+  if (!session) return <Navigate to="/login" replace />;
   const required = getModuleForPath(location.pathname);
   if (required && !session.modules.includes(required))
     return <Navigate to="/access-denied" replace />;

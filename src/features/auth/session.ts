@@ -1,5 +1,6 @@
 import { ACCESS_STORAGE_KEY, loadAccessData } from '../access/accessData';
 import type { AccessUser, ModuleKey } from '../access/accessData';
+import { orderedNavigationItems } from '../../app/navigation';
 
 export const SESSION_STORAGE_KEY = 'nw-track-session-v1';
 const sessionChangeEvent = 'nw-track-session-change';
@@ -27,18 +28,6 @@ export const demoAccounts = [
     password: 'Style@2026demo',
   },
 ] as const;
-
-export const modulePaths = {
-  dashboard: '/dashboard',
-  reports: '/reports',
-  users: '/users',
-  roles: '/roles',
-  process: '/configurations/processes',
-  storage: '/configurations/storages',
-  tags: '/configurations/tags',
-  styles: '/styles',
-  newstyle: '/new-style',
-} as const satisfies Partial<Record<ModuleKey, string>>;
 
 export interface AuthSession {
   user: AccessUser;
@@ -115,31 +104,18 @@ export function readSession(): AuthSession | null {
 export function getModuleForPath(pathname: string): ModuleKey | null {
   if (pathname === '/configurations' || pathname === '/configurations/')
     return 'process';
-  for (const [key, path] of Object.entries(modulePaths)) {
-    if (pathname === path || pathname.startsWith(path + '/'))
-      return key as ModuleKey;
+  for (const { permission, path } of orderedNavigationItems) {
+    if (pathname === path || pathname.startsWith(path + '/')) return permission;
   }
   return null;
 }
 
 export function getLandingPath(session: AuthSession) {
   return (
-    Object.entries(modulePaths).find(([key]) =>
-      session.modules.includes(key as ModuleKey),
-    )?.[1] ?? '/workspace'
+    orderedNavigationItems.find((item) =>
+      session.modules.includes(item.permission),
+    )?.path ?? '/workspace'
   );
-}
-
-export function getLoginDestination(session: AuthSession, attempted: unknown) {
-  if (
-    typeof attempted === 'string' &&
-    attempted.startsWith('/') &&
-    !attempted.startsWith('//')
-  ) {
-    const module = getModuleForPath(attempted.split(/[?#]/)[0]);
-    if (module && session.modules.includes(module)) return attempted;
-  }
-  return getLandingPath(session);
 }
 
 export function getSessionSnapshot() {

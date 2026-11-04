@@ -1,13 +1,19 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { signIn } from '../auth/session';
 import { loadStyles, sampleStyles, STYLE_STORAGE_KEY } from './styleData';
 import { StyleWorkspacePage } from './StyleWorkspacePage';
+import { StyleDetailsPage } from './StyleDetailsPage';
+import {
+  dragProcessToEnd,
+  mockProcessDragLayout,
+} from '../../test/processDrag';
 
 beforeEach(() => {
+  mockProcessDragLayout();
   localStorage.clear();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
@@ -87,69 +93,113 @@ describe('shared style workspace', () => {
     expect(screen.getByText('No styles found.')).toBeVisible();
   });
 
-  it('creates an owned style from New Style and offers only read-only access afterward', async () => {
-    signIn('style.configurator', 'Style@2026demo');
-    const user = userEvent.setup();
-    renderWithProviders(
-      <MemoryRouter>
-        <StyleWorkspacePage mode="own" />
-      </MemoryRouter>,
-    );
-    expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'New Style' }));
-    await user.type(
-      screen.getByRole('textbox', { name: /Style Number/ }),
-      'OWN-001',
-    );
-    fireEvent.change(screen.getByLabelText(/Date of Creation/), {
-      target: { value: '2026-11-01' },
-    });
-    await user.type(
-      screen.getByRole('textbox', { name: /Client/ }),
-      'Client B',
-    );
-    await user.type(
-      screen.getByRole('spinbutton', { name: /Number of Garments/ }),
-      '200',
-    );
-    await user.type(
-      screen.getByRole('spinbutton', { name: /Number of Lots/ }),
-      '2',
-    );
-    await user.type(
-      screen.getByRole('spinbutton', { name: /Weight per Lot/ }),
-      '50',
-    );
-    await user.type(
-      screen.getByRole('spinbutton', { name: /Average Garment Weight/ }),
-      '0.5',
-    );
-    fireEvent.change(screen.getByLabelText(/Delivery Date/), {
-      target: { value: '2026-12-01' },
-    });
-    await user.click(screen.getByRole('button', { name: 'Add Process' }));
-    await user.click(screen.getByRole('combobox', { name: /Process/ }));
-    await user.click(screen.getByRole('option', { name: 'Washing' }));
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(screen.getByRole('rowheader', { name: 'OWN-001' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'View OWN-001' })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/^\/new-style\//),
-    );
-    expect(
-      screen.queryByRole('button', { name: /^Edit / }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^Delete / }),
-    ).not.toBeInTheDocument();
-    expect(loadStyles().records[0]).toMatchObject({
-      createdBy: 'style.configurator',
-      createdById: 'user-7',
-      avg: 0.5,
-      steps: ['demo-2'],
-    });
-    expect(loadStyles().records).toHaveLength(2);
-  }, 15000);
+  it.each([
+    {
+      mode: 'own' as const,
+      username: 'style.configurator',
+      password: 'Style@2026demo',
+      userId: 'user-7',
+      base: '/new-style',
+      action: 'New Style',
+      back: 'Back to My Styles',
+    },
+    {
+      mode: 'management' as const,
+      username: 'nw.admin',
+      password: 'NW@2026demo',
+      userId: 'user-1',
+      base: '/styles',
+      action: 'Create Style',
+      back: 'Back to Styles',
+    },
+  ])(
+    'shows the lot route immediately after creation in $mode mode',
+    async ({ mode, username, password, userId, base, action, back }) => {
+      signIn(username, password);
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={[base]}>
+          <Routes>
+            <Route path={base} element={<StyleWorkspacePage mode={mode} />} />
+            <Route
+              path={`${base}/:styleId`}
+              element={<StyleDetailsPage mode={mode} />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+      if (mode === 'own')
+        expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: action }));
+      await user.type(
+        screen.getByRole('textbox', { name: /Style Number/ }),
+        'OWN-001',
+      );
+      fireEvent.change(screen.getByLabelText(/Date of Creation/), {
+        target: { value: '2026-11-01' },
+      });
+      await user.type(
+        screen.getByRole('textbox', { name: /Client/ }),
+        'Client B',
+      );
+      await user.type(
+        screen.getByRole('spinbutton', { name: /Number of Garments/ }),
+        '200',
+      );
+      await user.type(
+        screen.getByRole('spinbutton', { name: /Number of Lots/ }),
+        '2',
+      );
+      await user.type(
+        screen.getByRole('spinbutton', { name: /Weight per Lot/ }),
+        '50',
+      );
+      await user.type(
+        screen.getByRole('spinbutton', { name: /Average Garment Weight/ }),
+        '0.5',
+      );
+      fireEvent.change(screen.getByLabelText(/Delivery Date/), {
+        target: { value: '2026-12-01' },
+      });
+      await dragProcessToEnd(user, 'Washing');
+      await user.click(screen.getByRole('button', { name: 'Save Style' }));
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'OWN-001' }),
+      ).toBeVisible();
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Style created successfully.',
+      );
+      expect(
+        within(screen.getByRole('list', { name: 'Lot Route' })).getByText(
+          'Washing',
+        ),
+      ).toBeVisible();
+      expect(
+        screen.getByText('All 2 lots follow this route in the order shown.'),
+      ).toBeVisible();
+      await user.click(screen.getByRole('link', { name: back }));
+      expect(screen.getByRole('rowheader', { name: 'OWN-001' })).toBeVisible();
+      expect(
+        screen.getByRole('link', { name: 'View OWN-001' }),
+      ).toHaveAttribute('href', expect.stringContaining(`${base}/`));
+      if (mode === 'own') {
+        expect(
+          screen.queryByRole('button', { name: /^Edit / }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole('button', { name: /^Delete / }),
+        ).not.toBeInTheDocument();
+      }
+      expect(loadStyles().records[0]).toMatchObject({
+        createdBy: username,
+        createdById: userId,
+        avg: 0.5,
+        steps: ['demo-2'],
+      });
+      expect(loadStyles().records).toHaveLength(2);
+    },
+    15000,
+  );
 
   it('keeps edits intact after a failed write', async () => {
     const user = userEvent.setup();

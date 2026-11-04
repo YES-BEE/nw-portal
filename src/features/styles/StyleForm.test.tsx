@@ -2,14 +2,63 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
+import {
+  dragProcessToEnd,
+  mockProcessDragLayout,
+} from '../../test/processDrag';
 import { PROCESS_STORAGE_KEY } from '../processes/processData';
 import { emptyStyle, sampleStyles, toStyleDraft } from './styleData';
 import { StyleForm } from './StyleForm';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  mockProcessDragLayout();
+});
 
-describe('shared style form and process sequence editor', () => {
-  it('shows inline field errors, process placeholders, and clears process errors after selection', async () => {
+describe('shared style form and drag-only process sequence', () => {
+  it('saves dragged processes with the same style fields and provides no process editing controls', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderWithProviders(
+      <StyleForm
+        initial={{
+          ...toStyleDraft(sampleStyles[0]),
+          id: 'new',
+          number: 'STY-DRAG-001',
+          steps: [],
+        }}
+        editing={false}
+        onSave={onSave}
+        onClose={vi.fn()}
+      />,
+    );
+    await dragProcessToEnd(user, 'Washing');
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+        'Washing',
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Dropdowns' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).queryByRole(
+        'textbox',
+      ),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save Style' }));
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        number: 'STY-DRAG-001',
+        steps: ['demo-2'],
+        garments: 2000,
+        avg: 1,
+      }),
+    );
+  });
+
+  it('shows inline field errors and clears the required-sequence error after a valid drag', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     renderWithProviders(
@@ -30,23 +79,21 @@ describe('shared style form and process sequence editor', () => {
     expect(
       screen.getByText('Add at least one process to the production sequence.'),
     ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Add Process' }));
-    const process = screen.getByRole('combobox', { name: /Process/ });
-    expect(process).toHaveTextContent('Select a process');
-    expect(process).toHaveAccessibleDescription('Select an available process.');
-    await user.click(process);
-    await user.click(screen.getByRole('option', { name: 'Washing' }));
-    expect(process).not.toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('textbox', { name: 'Linked Station' })).toHaveValue(
-      '03',
-    );
+    await dragProcessToEnd(user, 'Washing');
     expect(
-      screen.getByRole('textbox', { name: 'Linked Station' }),
-    ).toHaveAttribute('readonly');
+      screen.queryByText(
+        'Add at least one process to the production sequence.',
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+        'Station 03',
+      ),
+    ).toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('moves and removes steps, preserves a manually entered average, and submits normalized data', async () => {
+  it('reorders with keyboard dragging, removes steps, and preserves manually entered average weight', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     const initial = {
@@ -64,18 +111,17 @@ describe('shared style form and process sequence editor', () => {
         onClose={vi.fn()}
       />,
     );
+    await user.click(
+      screen.getByRole('button', { name: 'Drag Step 2 to reorder' }),
+    );
+    await user.keyboard('[Space]');
+    await user.keyboard('[ArrowUp]');
+    await user.keyboard('[Space]');
     expect(
-      screen.getByRole('button', { name: 'Move step 1 up' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Move step 2 down' }),
-    ).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Move step 2 up' }));
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByRole(
-        'combobox',
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+        'Washing',
       ),
-    ).toHaveTextContent('Washing');
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Remove step 2' }));
     await user.click(screen.getByRole('button', { name: 'Save Style' }));
     expect(onSave).toHaveBeenCalledExactlyOnceWith(
@@ -113,7 +159,7 @@ describe('shared style form and process sequence editor', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('shows unavailable process references and prevents saving until they are replaced', async () => {
+  it('requires unavailable process references to be removed and replaced by dragging an available process', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     renderWithProviders(
@@ -124,14 +170,25 @@ describe('shared style form and process sequence editor', () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole('combobox')).toHaveTextContent(
-      'Unavailable process (removed)',
-    );
+    expect(screen.getByText('Unavailable process (removed)')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(screen.getByRole('combobox')).toHaveAccessibleDescription(
-      'Select an available process.',
+    expect(
+      screen.getByText(
+        'Remove this step and drag an available process into the sequence.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('region', { name: 'Step 1' }),
+    ).toHaveAccessibleDescription(
+      'Remove this step and drag an available process into the sequence.',
     );
     expect(onSave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove step 1' }));
+    await dragProcessToEnd(user, 'Washing');
+    await user.click(screen.getByRole('button', { name: 'Save Style' }));
+    expect(onSave).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ steps: ['demo-2'] }),
+    );
   });
 
   it('prevents saves when process configurations cannot be verified and cancels without saving', async () => {

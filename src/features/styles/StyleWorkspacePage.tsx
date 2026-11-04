@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -48,6 +48,7 @@ import { usePageMetadata } from '../../app/usePageMetadata';
 export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
   const { t } = useTranslation('translation');
   const session = useSession();
+  const navigate = useNavigate();
   const [data, setData] = useState(loadStyles);
   const [form, setForm] = useState<{
     initial: StyleDraft;
@@ -93,8 +94,10 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
       setError(null);
       setForm(null);
       setSaved(true);
+      return true;
     } catch {
       setError('storageError');
+      return false;
     }
   }
 
@@ -128,7 +131,11 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
       setError('changedRecords');
       return;
     }
-    write(records);
+    if (write(records) && !form.editing) {
+      void navigate(`${basePath}/${encodeURIComponent(record.id)}`, {
+        state: { createdStyleId: record.id },
+      });
+    }
   }
 
   return (
