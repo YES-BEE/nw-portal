@@ -23,15 +23,44 @@ import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LogoutIcon from '@mui/icons-material/Logout';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutlined';
+import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import type { ModuleKey } from '../features/access/accessData';
 import { configurationTheme, theme } from '../app/theme';
 import logo from '../assets/logo.png';
+import { signOut } from '../features/auth/session';
+import { useSession } from '../features/auth/useSession';
 
 const toolbarStyles = { minHeight: '68px !important', flexShrink: 0 };
+const configurationItems = [
+  {
+    key: 'processes',
+    permission: 'process',
+    path: '/configurations/processes',
+  },
+  { key: 'storage', permission: 'storage', path: '/configurations/storages' },
+  { key: 'tags', permission: 'tags', path: '/configurations/tags' },
+  { key: 'styles', permission: 'styles', path: '/styles' },
+] as const;
 
 export function ConfigurationLayout() {
   const { t } = useTranslation('translation');
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const session = useSession();
+  const allowed = (key: ModuleKey) => session?.modules.includes(key) ?? false;
+  const visibleConfigurationItems = configurationItems.filter((item) =>
+    allowed(item.permission),
+  );
+  const hasConfigurations = visibleConfigurationItems.length > 0;
+  const isActive = (path: string) =>
+    pathname === path || pathname.startsWith(path + '/');
+  const configurationActive = visibleConfigurationItems.some((item) =>
+    isActive(item.path),
+  );
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -93,87 +122,159 @@ export function ConfigurationLayout() {
       </Toolbar>
       <Divider sx={{ borderColor: '#304361' }} />
       <List component="nav" aria-label={t('navigation.main')} disablePadding>
-        <ListItemButton
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          aria-controls="configuration-submenu"
-          sx={{ minHeight: 48, color: '#fff' }}
-        >
-          <ListItemIcon sx={{ minWidth: 40, color: '#b6c8e4' }}>
-            <SettingsOutlinedIcon />
-          </ListItemIcon>
-          <ListItemText
-            primary={t('navigation.configurations')}
-            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 600 } } }}
-          />
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </ListItemButton>
-        <Collapse
-          in={expanded}
-          timeout="auto"
-          unmountOnExit
-          id="configuration-submenu"
-        >
-          <List
-            component="div"
-            disablePadding
-            aria-label={t('navigation.submenu')}
-          >
-            {(
-              [
-                { key: 'processes', path: '/configurations/processes' },
-                { key: 'storage', path: '/configurations/storages' },
-                { key: 'tags', path: '/configurations/tags' },
-              ] as const
-            ).map((item) => (
-              <ListItemButton
-                key={item.key}
-                component={NavLink}
-                to={item.path}
-                onClick={() => setMobileOpen(false)}
-                selected={
-                  pathname === item.path || pathname.startsWith(item.path + '/')
-                }
-                sx={{
-                  pl: 7,
-                  minHeight: 44,
-                  boxShadow:
-                    pathname === item.path ||
-                    pathname.startsWith(item.path + '/')
-                      ? 'inset 3px 0 0 #73a7ff'
-                      : 'none',
-                  color:
-                    pathname === item.path ||
-                    pathname.startsWith(item.path + '/')
-                      ? '#fff'
-                      : 'inherit',
-                  '&.Mui-selected': { bgcolor: 'rgba(64,123,225,.18)' },
-                  '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+        {(
+          [
+            {
+              key: 'dashboard',
+              path: '/dashboard',
+              Icon: DashboardOutlinedIcon,
+            },
+            { key: 'reports', path: '/reports', Icon: AssessmentOutlinedIcon },
+            { key: 'users', path: '/users', Icon: PeopleOutlineIcon },
+            {
+              key: 'newstyle',
+              path: '/new-style',
+              Icon: AddCircleOutlinedIcon,
+            },
+            {
+              key: 'roles',
+              path: '/roles',
+              Icon: AdminPanelSettingsOutlinedIcon,
+            },
+          ] as const
+        )
+          .filter((item) => allowed(item.key))
+          .map(({ key, path, Icon }) => (
+            <ListItemButton
+              key={key}
+              component={NavLink}
+              to={path}
+              selected={pathname === path || pathname.startsWith(path + '/')}
+              onClick={() => setMobileOpen(false)}
+              sx={{
+                minHeight: 48,
+                '&.Mui-selected': {
+                  bgcolor: 'rgba(64,123,225,.18)',
+                  color: '#fff',
+                },
+                '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                <Icon />
+              </ListItemIcon>
+              <ListItemText
+                primary={t(`navigation.${key}`)}
+                slotProps={{
+                  primary: {
+                    sx: {
+                      fontSize: 14,
+                      fontWeight:
+                        pathname === path || pathname.startsWith(path + '/')
+                          ? 600
+                          : 400,
+                    },
+                  },
                 }}
-              >
-                <ListItemText
-                  primary={t(`navigation.${item.key}`)}
-                  slotProps={{
-                    primary: {
-                      sx: {
-                        fontSize: 13,
-                        fontWeight:
-                          pathname === item.path ||
-                          pathname.startsWith(item.path + '/')
-                            ? 600
-                            : 400,
-                      },
+              />
+            </ListItemButton>
+          ))}
+        {hasConfigurations && (
+          <ListItemButton
+            onClick={() => setExpanded((value) => !value)}
+            selected={configurationActive}
+            aria-expanded={expanded}
+            aria-controls="configuration-submenu"
+            sx={{
+              minHeight: 48,
+              color: configurationActive ? '#fff' : 'inherit',
+              '&.Mui-selected': { bgcolor: 'rgba(64,123,225,.18)' },
+              '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+              <SettingsOutlinedIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={t('navigation.configurations')}
+              slotProps={{
+                primary: {
+                  sx: {
+                    fontSize: 14,
+                    fontWeight: configurationActive ? 600 : 400,
+                  },
+                },
+              }}
+            />
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </ListItemButton>
+        )}
+        {hasConfigurations && (
+          <Collapse
+            in={expanded}
+            timeout="auto"
+            unmountOnExit
+            id="configuration-submenu"
+          >
+            <List
+              component="div"
+              disablePadding
+              aria-label={t('navigation.submenu')}
+            >
+              {visibleConfigurationItems.map((item) => (
+                <ListItemButton
+                  key={item.key}
+                  component={NavLink}
+                  to={item.path}
+                  onClick={() => setMobileOpen(false)}
+                  selected={
+                    pathname === item.path ||
+                    pathname.startsWith(item.path + '/')
+                  }
+                  sx={{
+                    pl: 7,
+                    minHeight: 44,
+                    boxShadow:
+                      pathname === item.path ||
+                      pathname.startsWith(item.path + '/')
+                        ? 'inset 3px 0 0 #73a7ff'
+                        : 'none',
+                    color:
+                      pathname === item.path ||
+                      pathname.startsWith(item.path + '/')
+                        ? '#fff'
+                        : 'inherit',
+                    '&.Mui-selected': { bgcolor: 'rgba(64,123,225,.18)' },
+                    '&.Mui-selected:hover': {
+                      bgcolor: 'rgba(64,123,225,.27)',
                     },
                   }}
-                />
-              </ListItemButton>
-            ))}
-          </List>
-        </Collapse>
+                >
+                  <ListItemText
+                    primary={t(`navigation.${item.key}`)}
+                    slotProps={{
+                      primary: {
+                        sx: {
+                          fontSize: 13,
+                          fontWeight:
+                            pathname === item.path ||
+                            pathname.startsWith(item.path + '/')
+                              ? 600
+                              : 400,
+                        },
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </Collapse>
+        )}
       </List>
       <List disablePadding sx={{ mt: 'auto', px: 1, pt: 3 }}>
         <ListItemButton
           onClick={() => {
+            signOut();
             setMobileOpen(false);
             void navigate('/login', { replace: true });
           }}
@@ -265,6 +366,34 @@ export function ConfigurationLayout() {
                 {t('configuration.tagline')}
               </Typography>
             </Box>
+            {session && (
+              <Box
+                role="group"
+                aria-label={t('configuration.signedInUser')}
+                sx={{
+                  ml: 'auto',
+                  minWidth: 0,
+                  maxWidth: { xs: '45%', sm: 280 },
+                  flexShrink: 0,
+                  textAlign: 'right',
+                }}
+              >
+                <Typography
+                  noWrap
+                  title={session.user.username}
+                  sx={{ fontSize: 13, fontWeight: 600 }}
+                >
+                  {session.user.username}
+                </Typography>
+                <Typography
+                  noWrap
+                  title={session.user.role}
+                  sx={{ fontSize: 12, color: '#b6c8e4' }}
+                >
+                  {session.user.role}
+                </Typography>
+              </Box>
+            )}
           </Toolbar>
         </AppBar>
         <Toolbar aria-hidden="true" sx={toolbarStyles} />

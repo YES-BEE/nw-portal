@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. `/` redirects to `/login`. Configuration routes are `/configurations/processes`, `/configurations/storages`, and `/configurations/tags`; `/configurations` redirects to processes. Unknown paths redirect to `/login`.
+Open the local URL printed by Vite. `/` redirects to `/login`. The workspace includes `/dashboard`, `/reports`, `/users`, `/roles`, `/styles`, and `/new-style`. Configuration routes are `/configurations/processes`, `/configurations/storages`, and `/configurations/tags`; `/configurations` redirects to processes. Unknown paths redirect to `/login`.
 
 ## Commands
 
@@ -32,10 +32,13 @@ src/
   app/                # Application router and shared MUI theme
   assets/             # Supplied brand assets
   features/
+    access/           # User and role records, module permissions, management forms
     auth/             # Login page, styling, decorative chart
     configurations/   # Shared NFC registry, details header, and summary components
+    overview/         # Dashboard and Reports coming-soon pages
     processes/        # Process list, editor, validation, local demo records
     storages/         # Storage list, editor, validation, local records
+    styles/           # Shared style list, editor, ordered process route, and details
     tags/             # Tag management, assignment lookup, validation
   layouts/            # Responsive configuration shell and collapsible navigation
   i18n/               # i18next setup, typed keys, English JSON strings
@@ -62,15 +65,31 @@ Process details show the saved tracking settings and a device table for device-l
 
 The page includes required username/password fields, a password visibility toggle, and recovery feedback. Only English is supported. All application UI text is stored in `src/i18n/locales/en.json` and accessed through `react-i18next`, with typed translation keys, English fallback, and copyright year interpolation. The document language, title, and description are set from the same resources. The MUI language selector offers English only. It shares a grid column with the sign-in card so their right edges align across screen sizes.
 
-Authentication and password recovery are demonstration interactions, matching the reference. Submission displays a backend-not-connected message. Credentials are never persisted. Connect these controls to an authentication service before enabling actual sign-in.
+Sign-in uses the seven demo credentials from the role-based reference. Usernames are case-insensitive; passwords are exact. Inactive or deleted accounts cannot sign in. Authentication reads current user records, and permissions come from the user's current saved role. Invalid credentials and unavailable storage are reported through password-field helper text. Password recovery remains unconfigured.
+
+| Role               | Username             | Demo password      |
+| ------------------ | -------------------- | ------------------ |
+| NW                 | `nw.admin`           | `NW@2026demo`      |
+| IT Admin           | `it.admin`           | `IT@2026demo`      |
+| Top Manager        | `top.manager`        | `Top@2026demo`     |
+| Production Manager | `production.manager` | `Prod@2026demo`    |
+| Supervisor         | `supervisor`         | `Super@2026demo`   |
+| Process Manager    | `process.manager`    | `Process@2026demo` |
+| Style Configurator | `style.configurator` | `Style@2026demo`   |
+
+Only the user ID is stored in `sessionStorage` under `nw-track-session-v1`; passwords are not written to browser storage. The session survives refresh in the current tab and is cleared by Logout. Renaming a reference user retains that account's demo password. Newly created management records do not have demo passwords and cannot sign in until credential provisioning is added.
+
+Every workspace route, including configuration and style details, requires a session and the relevant module permission. Anonymous deep links redirect to sign-in, then return to the requested URL if the role permits it. Other sign-ins open the first available module. Unauthorized URLs show Access denied; inaccessible sidebar links are hidden. Roles without implemented modules land at `/workspace` with a No modules available message. This includes Process Manager with its reference permissions; Style Configurator lands at `/new-style`. Permission and user-status changes take effect in open screens; deactivated sessions must sign in again after reactivation. Invalid saved access data fails closed for authentication.
+
+This is browser-only demo authentication with credentials included in the client source. Production security requires a backend identity service and server-side authorization.
 
 ## Process configurations
 
-The configuration routes follow `NW_Track_Configurations_MUI_v8.html`. They share a full-height persistent MUI drawer on desktop with a header toggle and shifting AppBar/content, a temporary drawer on mobile, and a collapsible Configurations submenu. Process Configurations, Storage Configurations, and Tag Management are available, and the active route is highlighted. Logout sits at the bottom of the sidebar, independently of the collapsible submenu, and returns to `/login` using history replacement. Backend session termination is not implemented.
+The configuration routes follow `NW_Track_Configurations_MUI_v8.html`. They share a full-height persistent MUI drawer on desktop with a header toggle and shifting AppBar/content, a temporary drawer on mobile, and a collapsible Configurations submenu. Authorized navigation items are shown and the active route is highlighted. Logout sits at the bottom of the sidebar, independently of the collapsible submenu, clears the session, and returns to `/login` using history replacement.
 
 Processes support process-level or device-level tracking, device counts from 0 to 50 (at least one is required to save device-level tracking), required-field validation, unique registered NFC assignments, delete confirmation dialogs, and save notifications. Inactive NFC data is cleared on save. The shared tag registry includes available process/device/storage tags for new records. Storage tag assignments are read from actual saved storage records. Sample record names and identifiers are domain data; interface strings remain in the English translation resource. Table headings use title case through the shared MUI theme.
 
-Records persist in browser storage under `nw-track-process-config-v3`, compatible with the process records in the HTML sample. Invalid saved data falls back to sample records with a warning. A failed write keeps the current records and editor intact. No backend or authentication is connected.
+Records persist in browser storage under `nw-track-process-config-v3`, compatible with the process records in the HTML sample. Invalid saved data falls back to sample records with a warning. A failed write keeps the current records and editor intact. No backend is connected.
 
 ## Storage configurations
 
@@ -84,11 +103,33 @@ Storage numbers must be unique regardless of case, and NFC tags must be register
 
 Tag names and NFC IDs must be unique regardless of case. Assigned tags can be renamed, but their physical IDs cannot change and they cannot be deleted until unassigned. Delete confirmation rechecks assignments before writing. When assignment records cannot be loaded, existing NFC ID changes and deletions are locked. Failed writes preserve the registry and editor. No backend is connected.
 
+## User and role management
+
+`/users` and `/roles` follow `NW_Track_Role_Based_Modules_v21.html`, using MUI throughout. The shared sidebar also links to `/dashboard` and `/reports`, each with a Coming soon message. Existing configuration URLs remain available.
+
+Seven reference users are seeded: `nw.admin` (NW), `it.admin` (IT Admin), `top.manager` (Top Manager), `production.manager` (Production Manager), `supervisor` (Supervisor), `process.manager` (Process Manager), and `style.configurator` (Style Configurator). All start Active. User management supports search, pagination, add/edit, status changes, and confirmed deletion. New users select a role from the current role registry. Usernames must be unique regardless of case.
+
+Role management seeds the reference permissions, including no access for Process Manager and New Style access for Style Configurator. Add roles and edit module checkboxes; existing role names remain fixed. Built-in roles cannot be deleted, and custom roles must be unassigned before deletion. Deletion rechecks current assignments at confirmation. Style Management and New Style are separate module permissions.
+
+User and role records persist together under `nw-track-access-v1` so assignments stay consistent. Reads validate the saved schema, with a warning and reference-record fallback for invalid data. Failed writes preserve the editor. Saved roles and account status control the demo session, route access, and sidebar visibility.
+
+## Style Management and New Style
+
+`/styles` supports creating, viewing, editing, and deleting garment styles for users with Style Management access (NW, IT Admin, and Production Manager by default). `/new-style` uses the same workspace, form, process editor, and details components in an ownership-restricted mode: users can create styles and view only their own saved styles, without editing or deleting them. Style Configurator has this permission by default. Module permissions, rather than role names, determine route access.
+
+Both modules capture style number, creation date, description, client, garment count, lot count, weight per lot, manually entered average garment weight, and delivery date. Style numbers are unique regardless of case. Counts must be positive whole numbers; weights must be finite and positive; delivery must be on or after creation. Field validation uses MUI helper text.
+
+The shared process editor selects saved Process Configurations and shows linked station numbers automatically. Processes can be added, moved up/down, removed, and repeated in the route. Every style needs at least one available process. Removed process references remain visible in read-only details and must be replaced before saving an edit. Unverifiable process records block saves.
+
+Search and pagination are available in both lists. View opens `/styles/:styleId` or `/new-style/:styleId` with read-only details and a paginated ordered process table. The list shows process counts; the detail page shows each step and linked station. Own-mode detail URLs check ownership before rendering any record data. Creator IDs preserve ownership when usernames change; legacy `createdBy` records and style `code` fields from the click dummy are supported. Legacy records without a creator remain visible only in Style Management.
+
+Records persist under the reference key `nw-track-demo-styles-v1`. New records capture the authenticated creator, and management edits preserve that creator. Mutation handlers recheck current permissions and saved records. Failed writes keep the form intact, and malformed style storage blocks writes until restored.
+
 ## Tests
 
 Vitest runs in jsdom with React Testing Library and user-event, with two workers to limit concurrent DOM load. Tests cover login interactions and translations, form callbacks and field errors, process/storage validation and shared NFC assignments, storage recovery, creation/reload, cancelled edits, device mode, delete confirmation, failed writes, route navigation, sidebar logout, and the expandable MUI submenu. Detail-component tests cover read-only summaries, heading focus, return links, and device searching and pagination, including list changes. The decorative chart is checked for accessibility. Tests also guard against reintroducing removed controls.
 
-Test files live beside the features they cover. Shared setup and the themed render helper are in `src/test/`. DOM tests do not verify browser layout or real authentication services.
+Authentication tests cover all seven accounts, exact passwords, session persistence and logout, malformed storage, inactive/deleted users, permitted deep-link restoration, unauthorized direct URLs, hidden navigation, and live permission changes. Test files live beside the features they cover. Shared setup and the themed render helper are in `src/test/`. DOM tests do not verify browser layout or real authentication services.
 
 ## Deployment
 

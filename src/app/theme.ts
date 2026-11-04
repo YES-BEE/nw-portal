@@ -10,23 +10,30 @@ export const theme = createTheme({
   shape: { borderRadius: 5 },
   components: {
     MuiSelect: {
-      defaultProps: { displayEmpty: true },
+      defaultProps: { displayEmpty: true, notched: false },
     },
     MuiTableCell: {
       styleOverrides: { head: { textTransform: 'capitalize' } },
     },
     MuiTextField: {
-      defaultProps: { variant: 'outlined' },
+      defaultProps: {
+        variant: 'outlined',
+        slotProps: {
+          inputLabel: { shrink: true, disableAnimation: true },
+          input: { notched: false },
+        },
+      },
     },
     MuiFormHelperText: {
       styleOverrides: { root: { marginLeft: 0, marginRight: 0 } },
     },
     MuiInputLabel: {
-      defaultProps: { shrink: true },
+      defaultProps: { shrink: true, disableAnimation: true },
       styleOverrides: {
         root: ({ theme }) => ({
           position: 'static',
           transform: 'none',
+          transition: 'none',
           maxWidth: '100%',
           marginBottom: 10,
           fontSize: 13,
@@ -48,6 +55,10 @@ export const theme = createTheme({
     MuiOutlinedInput: {
       defaultProps: { notched: false },
       styleOverrides: {
+        notchedOutline: {
+          top: 0,
+          '& legend': { display: 'none' },
+        },
         root: {
           height: 47,
           '&.MuiInputBase-sizeSmall': { height: 'auto' },

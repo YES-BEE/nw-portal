@@ -1,15 +1,111 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/render';
 import { ConfigurationLayout } from './ConfigurationLayout';
+import { signIn } from '../features/auth/session';
+import {
+  ACCESS_STORAGE_KEY,
+  loadAccessData,
+} from '../features/access/accessData';
+
+beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
+  signIn('nw.admin', 'NW@2026demo');
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe('persistent desktop navigation', () => {
+  it.each([
+    { path: '/dashboard', active: false },
+    { path: '/reports', active: false },
+    { path: '/styles', active: true },
+    { path: '/styles/sty-1', active: true },
+    { path: '/configurations/processes/demo-1', active: true },
+  ])(
+    'highlights Configurations only for its child routes at $path',
+    async ({ path, active }) => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={[path]}>
+          <ConfigurationLayout />
+        </MemoryRouter>,
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Open navigation menu' }),
+      );
+      const group = screen.getByRole('button', { name: 'Configurations' });
+      expect(group.classList.contains('Mui-selected')).toBe(active);
+      const submenu = screen.getByLabelText('Configurations submenu');
+      const styleLink = within(submenu).getByRole('link', {
+        name: 'Style Management',
+      });
+      expect(
+        screen.getAllByRole('link', { name: 'Style Management' }),
+      ).toHaveLength(1);
+      expect(styleLink.classList.contains('Mui-selected')).toBe(
+        path.startsWith('/styles'),
+      );
+      if (path.startsWith('/styles'))
+        expect(styleLink).toHaveAttribute('aria-current', 'page');
+    },
+  );
+
+  it('shows Configurations for a user with only Style Management permission', async () => {
+    const records = loadAccessData().records;
+    records.roles.find((role) => role.name === 'Supervisor')!.modules = [
+      'styles',
+    ];
+    localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
+    signIn('supervisor', 'Super@2026demo');
+    const user = userEvent.setup();
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/styles']}>
+        <ConfigurationLayout />
+      </MemoryRouter>,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Configurations' }),
+    ).toBeVisible();
+    const submenu = screen.getByLabelText('Configurations submenu');
+    expect(
+      within(submenu).getByRole('link', { name: 'Style Management' }),
+    ).toBeVisible();
+    expect(within(submenu).getAllByRole('link')).toHaveLength(1);
+  });
+
+  it.each([
+    { username: 'nw.admin', password: 'NW@2026demo', role: 'NW' },
+    {
+      username: 'production.manager',
+      password: 'Prod@2026demo',
+      role: 'Production Manager',
+    },
+  ])(
+    'shows $username and their role in the AppBar',
+    ({ username, password, role }) => {
+      signIn(username, password);
+      renderWithProviders(
+        <MemoryRouter>
+          <ConfigurationLayout />
+        </MemoryRouter>,
+      );
+      const identity = within(screen.getByRole('banner')).getByRole('group', {
+        name: 'Signed-in user',
+      });
+      expect(within(identity).getByText(username)).toBeVisible();
+      expect(within(identity).getByText(role)).toBeVisible();
+    },
+  );
+
   it('keeps Logout in the sidebar when the configuration submenu is collapsed', async () => {
     const user = userEvent.setup();
     renderWithProviders(

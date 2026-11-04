@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { Navigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -21,12 +22,18 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
 import { ProductionChart } from './ProductionChart';
+import { getLoginDestination, signIn } from './session';
+import type { SignInError } from './session';
+import { useSession } from './useSession';
 import './login.css';
 
-type Notice = 'unavailable' | 'recovery';
+type Notice = 'recovery';
 
 export function LoginPage() {
   const { t, i18n } = useTranslation('translation');
+  const session = useSession();
+  const location = useLocation();
+  const [signInError, setSignInError] = useState<SignInError | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [credentials, setCredentials] = useState({
@@ -35,7 +42,8 @@ export function LoginPage() {
   });
   const [submitted, setSubmitted] = useState(false);
   const usernameError = submitted && !credentials.username.trim();
-  const passwordError = submitted && !credentials.password;
+  const passwordError =
+    (submitted && !credentials.password) || signInError !== null;
 
   useEffect(() => {
     document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
@@ -52,12 +60,27 @@ export function LoginPage() {
     const password = String(data.get('password') ?? '');
     setCredentials({ username, password });
     setSubmitted(true);
-    setNotice(username && password ? 'unavailable' : null);
-    if (!username || !password)
+    setNotice(null);
+    setSignInError(null);
+    if (!username || !password) {
       event.currentTarget
         .querySelector<HTMLInputElement>(!username ? '#username' : '#password')
         ?.focus();
+      return;
+    }
+    setSignInError(signIn(username, password));
   }
+
+  if (session)
+    return (
+      <Navigate
+        to={getLoginDestination(
+          session,
+          (location.state as { from?: unknown } | null)?.from,
+        )}
+        replace
+      />
+    );
 
   return (
     <Box component="main" className="auth-page">
@@ -155,6 +178,7 @@ export function LoginPage() {
                   username: event.target.value,
                 });
                 setNotice(null);
+                setSignInError(null);
               }}
               error={usernameError}
               helperText={
@@ -193,10 +217,15 @@ export function LoginPage() {
                   password: event.target.value,
                 });
                 setNotice(null);
+                setSignInError(null);
               }}
               error={passwordError}
               helperText={
-                passwordError ? t('login.errors.passwordRequired') : undefined
+                submitted && !credentials.password
+                  ? t('login.errors.passwordRequired')
+                  : signInError
+                    ? t(`auth.errors.${signInError}`)
+                    : undefined
               }
               type={showPassword ? 'text' : 'password'}
               placeholder={t('login.passwordPlaceholder')}

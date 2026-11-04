@@ -2,11 +2,16 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
+import { MemoryRouter } from 'react-router-dom';
 import { LoginPage } from './LoginPage';
 
 function setup() {
   const user = userEvent.setup();
-  renderWithProviders(<LoginPage />);
+  renderWithProviders(
+    <MemoryRouter>
+      <LoginPage />
+    </MemoryRouter>,
+  );
   return {
     user,
     username: screen.getByRole('textbox', { name: 'Username' }),
@@ -21,6 +26,8 @@ describe('LoginPage', () => {
   let description: HTMLMetaElement;
 
   beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
     originalTitle = document.title;
     originalLanguage = document.documentElement.lang;
     description = document.createElement('meta');
@@ -163,15 +170,15 @@ describe('LoginPage', () => {
     expect(username).not.toHaveAccessibleDescription('Enter your username.');
   });
 
-  it('reports that authentication is unavailable for a completed form', async () => {
+  it('rejects incorrect credentials using password helper text without saving a session', async () => {
     const storeValue = vi.spyOn(Storage.prototype, 'setItem');
     const { user, username, password, submit } = setup();
     await user.type(username, 'operator');
     await user.type(password, 'test-password');
     await user.click(submit);
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Demo login page — authentication backend is not connected.',
+    expect(password).toHaveAccessibleDescription(
+      'Invalid username or password, or the account is inactive.',
     );
     expect(storeValue).not.toHaveBeenCalled();
   });
@@ -186,8 +193,8 @@ describe('LoginPage', () => {
     await user.type(username, 'operator');
     await user.type(password, 'test-password{Enter}');
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Demo login page — authentication backend is not connected.',
+    expect(password).toHaveAccessibleDescription(
+      'Invalid username or password, or the account is inactive.',
     );
     expect(screen.getByRole('status')).not.toHaveTextContent(
       'Password recovery',
