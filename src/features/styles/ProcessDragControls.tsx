@@ -91,8 +91,6 @@ export function ProcessPalette({
         minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
-        position: { md: 'sticky' },
-        top: { md: 84 },
         bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
         borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
       }}

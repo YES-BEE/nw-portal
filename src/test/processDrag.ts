@@ -6,8 +6,25 @@ export function mockProcessDragLayout() {
   // jsdom has no layout, so provide separate library, sequence, and append-target rectangles.
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
     function (this: HTMLElement) {
+      if (this.hasAttribute('data-process-drag-preview')) {
+        const activeRow = document
+          .querySelector('button[aria-pressed="true"]')
+          ?.closest('[data-step-id]');
+        if (activeRow) {
+          const index = Array.from(
+            document.querySelectorAll('[data-step-id]'),
+          ).indexOf(activeRow);
+          return new DOMRect(400, 120 + index * 220, 600, 200);
+        }
+        return new DOMRect(0, 100, 300, 100);
+      }
       if (this.style.position === 'fixed') {
-        return new DOMRect(parseFloat(this.style.left) || 0, parseFloat(this.style.top) || 0, parseFloat(this.style.width) || 100, parseFloat(this.style.height) || 30);
+        return new DOMRect(
+          parseFloat(this.style.left) || 0,
+          parseFloat(this.style.top) || 0,
+          parseFloat(this.style.width) || 100,
+          parseFloat(this.style.height) || 30,
+        );
       }
       const rows = Array.from(document.querySelectorAll('[data-step-id]'));
       const row = this.closest('[data-step-id]');

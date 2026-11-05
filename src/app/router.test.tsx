@@ -272,7 +272,9 @@ describe('application routing', () => {
       screen.getByRole('button', { name: 'Open navigation menu' }),
     );
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(within(nav).getByRole('link', { name: 'Reports' })).toBeVisible();
+    expect(
+      within(nav).getByRole('link', { name: 'Reports/Analysis' }),
+    ).toBeVisible();
     expect(
       within(nav).queryByRole('link', { name: 'User Management' }),
     ).not.toBeInTheDocument();
@@ -309,7 +311,7 @@ describe('application routing', () => {
     signIn('supervisor', 'Super@2026demo');
     await router.navigate('/reports');
     renderWithProviders(<App />);
-    await screen.findByRole('heading', { name: 'Reports', level: 1 });
+    await screen.findByRole('heading', { name: 'Reports/Analysis', level: 1 });
     const records = loadAccessData().records;
     records.roles.find((role) => role.name === 'Supervisor')!.modules = [];
     act(() => {
@@ -350,7 +352,7 @@ describe('application routing', () => {
   });
   it.each([
     { path: '/dashboard', title: 'Dashboard' },
-    { path: '/reports', title: 'Reports' },
+    { path: '/reports', title: 'Reports/Analysis' },
     { path: '/users', title: 'User Management' },
     { path: '/roles', title: 'Role Management' },
   ])(

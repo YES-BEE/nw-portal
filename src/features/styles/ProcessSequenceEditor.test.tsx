@@ -36,6 +36,39 @@ function Editor({
 beforeEach(mockProcessDragLayout);
 
 describe('process drag-and-drop option', () => {
+  it('ignores portions of steps hidden outside the scrollable route viewport', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithProviders(
+      <Editor
+        initial={[{ id: 'existing', processId: 'demo-1' }]}
+        onChange={onChange}
+      />,
+    );
+    const pane = screen.getByRole('region', {
+      name: 'Scrollable production sequence',
+    });
+    vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(400, 200, 600, 400),
+    );
+    const handle = screen.getByRole('button', { name: 'Drag Washing' });
+    await user.pointer({
+      target: handle,
+      keys: '[MouseLeft>]',
+      coords: { clientX: 40, clientY: 140 },
+    });
+    await user.pointer({
+      target: handle,
+      coords: { clientX: 65, clientY: 140 },
+    });
+    await user.pointer({
+      target: pane,
+      coords: { clientX: 450, clientY: 150 },
+    });
+    await user.pointer({ keys: '[/MouseLeft]' });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('keeps append beside the library for long routes and reveals the new last step without scrolling the page', async () => {
     const initial = Array.from({ length: 50 }, (_, index) => ({
       id: `step-${index}`,

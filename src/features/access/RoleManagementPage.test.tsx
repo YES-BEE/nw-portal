@@ -22,7 +22,9 @@ describe('role management', () => {
     expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveAttribute(
       'readonly',
     );
-    expect(screen.getByRole('checkbox', { name: 'New Style' })).toBeChecked();
+    expect(
+      screen.queryByRole('checkbox', { name: 'New Style' }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
     expect(
       loadAccessData().records.roles.find(
@@ -35,6 +37,9 @@ describe('role management', () => {
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);
     await user.click(screen.getByRole('button', { name: 'Create New Role' }));
+    expect(
+      screen.queryByRole('checkbox', { name: 'New Style' }),
+    ).not.toBeInTheDocument();
     const name = screen.getByRole('textbox', { name: /Role Name/ });
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
     expect(name).toHaveAccessibleDescription('Enter a role name.');

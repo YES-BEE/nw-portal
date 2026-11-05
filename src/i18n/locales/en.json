@@ -20,7 +20,7 @@
     "styles": "Style Management",
     "newstyle": "New Style",
     "dashboard": "Dashboard",
-    "reports": "Reports",
+    "reports": "Reports/Analysis",
     "users": "User Management",
     "roles": "Role Management",
     "main": "Main navigation",
@@ -40,7 +40,7 @@
   "overview": {
     "comingSoon": "Coming soon",
     "dashboard": "The Dashboard module is currently under development.",
-    "reports": "The Reports module is currently under development."
+    "reports": "The Reports/Analysis module is currently under development."
   },
   "styles": {
     "pageDescription": "Configure garment styles and their ordered production routes.",
@@ -91,7 +91,7 @@
     "scrollableSequence": "Scrollable production sequence",
     "stepCount_one": "{{count}} step",
     "stepCount_other": "{{count}} steps",
-    "emptySequenceHint": "Drag a process into the append area beside the library to start the route.",
+    "emptySequenceHint": "Drag a process from Available Processes into the drop area to add the first step of the route.",
     "searchProcesses": "Search processes",
     "noProcessMatches": "No available processes match your search.",
     "stationValue": "Station {{station}}",

@@ -43,8 +43,24 @@ import {
   SortableProcessStep,
 } from './ProcessDragControls';
 
-const sequenceCollision: CollisionDetection = (args) =>
-  args.pointerCoordinates ? pointerWithin(args) : closestCenter(args);
+const sequenceCollision: CollisionDetection = (args) => {
+  const pointer = args.pointerCoordinates;
+  if (!pointer) return closestCenter(args);
+  return pointerWithin(args).filter((collision) => {
+    const node = args.droppableContainers.find(
+      (item) => item.id === collision.id,
+    )?.node.current;
+    const pane = node?.closest('[data-sequence-scroll]');
+    if (!pane) return true;
+    const bounds = pane.getBoundingClientRect();
+    return (
+      pointer.x >= bounds.left &&
+      pointer.x <= bounds.right &&
+      pointer.y >= bounds.top &&
+      pointer.y <= bounds.bottom
+    );
+  });
+};
 const sequenceKeyboardCoordinates: KeyboardCoordinateGetter = (event, args) => {
   if (
     args.context.active?.data.current?.kind === 'process' &&
@@ -360,6 +376,7 @@ export function ProcessSequenceEditor({
       <DragOverlay dropAnimation={null}>
         {activeName ? (
           <Paper
+            data-process-drag-preview
             variant="outlined"
             sx={{ p: 2, boxShadow: 4, borderColor: 'primary.main' }}
           >

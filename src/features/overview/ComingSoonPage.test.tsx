@@ -6,7 +6,7 @@ import { ComingSoonPage } from './ComingSoonPage';
 describe('upcoming modules', () => {
   it.each([
     { module: 'dashboard', title: 'Dashboard' },
-    { module: 'reports', title: 'Reports' },
+    { module: 'reports', title: 'Reports/Analysis' },
   ] as const)(
     'identifies $title and shows its coming-soon message',
     ({ module, title }) => {
