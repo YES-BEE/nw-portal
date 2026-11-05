@@ -68,8 +68,10 @@ function ProcessTile({ process }: { process: ProcessConfiguration }) {
 
 export function ProcessPalette({
   processes,
+  appendTarget,
 }: {
   processes: ProcessConfiguration[];
+  appendTarget: ReactNode;
 }) {
   const { t } = useTranslation('translation');
   const [query, setQuery] = useState('');
@@ -85,6 +87,12 @@ export function ProcessPalette({
       sx={{
         p: 2,
         alignSelf: 'start',
+        height: { xs: 440, sm: '100%' },
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        position: { md: 'sticky' },
+        top: { md: 84 },
         bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
         borderColor: (theme) => alpha(theme.palette.primary.main, 0.2),
       }}
@@ -92,11 +100,15 @@ export function ProcessPalette({
       <Typography
         id="process-palette-heading"
         component="h4"
-        sx={{ fontWeight: 600, mb: 1, color: 'primary.dark' }}
+        sx={{ fontWeight: 600, mb: 1, color: 'primary.dark', flexShrink: 0 }}
       >
         {t('styles.availableProcesses')}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ mb: 2, flexShrink: 0 }}
+      >
         {t('styles.dragHint')}
       </Typography>
       <TextField
@@ -108,10 +120,22 @@ export function ProcessPalette({
         fullWidth
         sx={{
           mb: 2,
+          flexShrink: 0,
           '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' },
         }}
       />
-      <Stack spacing={1} sx={{ maxHeight: 420, overflowY: 'auto' }}>
+      <Box sx={{ flexShrink: 0, mb: 2 }}>{appendTarget}</Box>
+      <Stack
+        data-process-library-scroll
+        spacing={1}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          pr: 0.5,
+        }}
+      >
         {visible.map((process) => (
           <ProcessTile key={process.id} process={process} />
         ))}
@@ -202,7 +226,7 @@ export function SortableProcessStep({
   );
 }
 
-export function SequenceDropTarget() {
+export function SequenceDropTarget({ nextStep }: { nextStep: number }) {
   const { t } = useTranslation('translation');
   const { setNodeRef, isOver } = useDroppable({
     id: 'sequence-end',
@@ -214,19 +238,18 @@ export function SequenceDropTarget() {
       component="section"
       aria-label={t('styles.dropTarget')}
       sx={{
-        minHeight: 88,
-        p: 3,
-        mt: 2,
+        minHeight: 64,
+        p: 1.5,
         border: 2,
         borderStyle: 'dashed',
         borderColor: isOver ? 'primary.main' : 'divider',
-        bgcolor: isOver ? 'action.selected' : 'transparent',
+        bgcolor: isOver ? 'action.selected' : 'background.paper',
         borderRadius: 1,
         textAlign: 'center',
       }}
     >
-      <Typography color={isOver ? 'primary' : 'text.secondary'}>
-        {t('styles.dropHint')}
+      <Typography variant="body2" color={isOver ? 'primary' : 'text.secondary'}>
+        {t('styles.dropHint', { position: nextStep })}
       </Typography>
     </Box>
   );

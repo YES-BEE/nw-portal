@@ -36,6 +36,56 @@ function Editor({
 beforeEach(mockProcessDragLayout);
 
 describe('process drag-and-drop option', () => {
+  it('keeps append beside the library for long routes and reveals the new last step without scrolling the page', async () => {
+    const initial = Array.from({ length: 50 }, (_, index) => ({
+      id: `step-${index}`,
+      processId: 'demo-1',
+    }));
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const pageScroll = vi
+      .spyOn(window, 'scrollTo')
+      .mockImplementation(() => {});
+    renderWithProviders(<Editor initial={initial} onChange={onChange} />);
+    const library = screen.getByRole('region', { name: 'Available Processes' });
+    const target = within(library).getByRole('region', {
+      name: 'End of production sequence',
+    });
+    expect(target).toHaveTextContent('Drop here to append as step 51.');
+    const pane = screen.getByRole('region', {
+      name: 'Scrollable production sequence',
+    });
+    const paneScroll = vi.fn();
+    Object.defineProperty(pane, 'scrollTo', {
+      configurable: true,
+      value: paneScroll,
+    });
+    Object.defineProperty(pane, 'scrollHeight', {
+      configurable: true,
+      value: 12000,
+    });
+    expect(pane).toHaveStyle({ overflowY: 'auto' });
+    const handle = screen.getByRole('button', { name: 'Drag Washing' });
+    await user.pointer({
+      target: handle,
+      keys: '[MouseLeft>]',
+      coords: { clientX: 40, clientY: 140 },
+    });
+    await user.pointer({
+      target: handle,
+      coords: { clientX: 65, clientY: 140 },
+    });
+    await user.pointer({ target, coords: { clientX: 40, clientY: 240 } });
+    await user.pointer({ keys: '[/MouseLeft]' });
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const latest = onChange.mock.lastCall![0] as ProcessStep[];
+    expect(latest.slice(0, 50)).toEqual(initial);
+    expect(latest[50].processId).toBe('demo-2');
+    expect(paneScroll).toHaveBeenCalledWith({ top: 12000, behavior: 'auto' });
+    expect(pageScroll).not.toHaveBeenCalled();
+    expect(target).toHaveTextContent('Drop here to append as step 52.');
+  }, 15000);
+
   it('shows only drag controls and allows repeated processes with independent identities', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -88,7 +138,7 @@ describe('process drag-and-drop option', () => {
       target: handle,
       coords: { clientX: 65, clientY: 140 },
     });
-    await user.pointer({ target, coords: { clientX: 450, clientY: 155 } });
+    await user.pointer({ target, coords: { clientX: 40, clientY: 240 } });
     await user.pointer({ keys: '[/MouseLeft]' });
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(onChange.mock.lastCall![0]).toEqual([

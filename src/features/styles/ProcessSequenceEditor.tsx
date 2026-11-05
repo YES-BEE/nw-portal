@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   closestCenter,
@@ -25,13 +25,16 @@ import {
 } from '@dnd-kit/sortable';
 import {
   Box,
+  Chip,
   FormHelperText,
   IconButton,
   Paper,
   Stack,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import type { ProcessConfiguration } from '../processes/types';
 import {
@@ -76,6 +79,17 @@ export function ProcessSequenceEditor({
 }) {
   const { t } = useTranslation('translation');
   const [activeName, setActiveName] = useState<string | null>(null);
+  const theme = useTheme();
+  const sideBySide = useMediaQuery(theme.breakpoints.up('sm'));
+  const sequencePane = useRef<HTMLDivElement>(null);
+  const revealEnd = useRef(false);
+  useEffect(() => {
+    if (revealEnd.current) {
+      const pane = sequencePane.current;
+      pane?.scrollTo?.({ top: pane.scrollHeight, behavior: 'auto' });
+      revealEnd.current = false;
+    }
+  }, [steps]);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -98,6 +112,7 @@ export function ProcessSequenceEditor({
   }
   function drop({ active, over }: DragEndEvent) {
     setActiveName(null);
+    revealEnd.current = false;
     if (!over) return;
     const targetIndex =
       over.id === 'sequence-end'
@@ -114,17 +129,30 @@ export function ProcessSequenceEditor({
         id: crypto.randomUUID(),
         processId: source.processId,
       });
+      revealEnd.current = over.id === 'sequence-end';
       onChange(next);
     } else if (source?.kind === 'step') {
       const from = steps.findIndex((step) => step.id === source.stepId);
       const to = Math.min(targetIndex, steps.length - 1);
-      if (from >= 0 && from !== to) onChange(arrayMove(steps, from, to));
+      if (from >= 0 && from !== to) {
+        revealEnd.current = over.id === 'sequence-end';
+        onChange(arrayMove(steps, from, to));
+      }
     }
   }
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={sequenceCollision}
+      autoScroll={{
+        canScroll: (element) =>
+          element.hasAttribute('data-sequence-scroll') ||
+          element.hasAttribute('data-process-library-scroll') ||
+          (!sideBySide &&
+            element ===
+              (document.scrollingElement ?? document.documentElement)),
+        threshold: { x: 0.1, y: 0.15 },
+      }}
       onDragStart={({ active }) => setActiveName(dragName(active))}
       onDragEnd={drop}
       onDragCancel={() => setActiveName(null)}
@@ -165,96 +193,165 @@ export function ProcessSequenceEditor({
             display: 'grid',
             gridTemplateColumns: {
               xs: '1fr',
+              sm: 'minmax(200px, 260px) minmax(0, 1fr)',
               lg: 'minmax(240px, 300px) minmax(0, 1fr)',
             },
+            height: { sm: 'clamp(440px, 65dvh, 640px)' },
+            alignItems: 'start',
             gap: 2.5,
           }}
         >
-          <ProcessPalette processes={processes} />
-          <Box sx={{ minWidth: 0 }}>
-            <SortableContext
-              items={steps.map((step) => `step:${step.id}`)}
-              strategy={verticalListSortingStrategy}
+          <ProcessPalette
+            processes={processes}
+            appendTarget={<SequenceDropTarget nextStep={steps.length + 1} />}
+          />
+          <Paper
+            component="section"
+            aria-labelledby="selected-processes-heading"
+            variant="outlined"
+            sx={{
+              minWidth: 0,
+              minHeight: 0,
+              height: { xs: 440, sm: '100%' },
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              borderRadius: 1,
+            }}
+          >
+            <Stack
+              direction="row"
+              sx={{
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+                p: 2,
+                borderBottom: 1,
+                borderColor: 'divider',
+                flexShrink: 0,
+              }}
             >
-              <Stack spacing={2}>
-                {steps.map((step, index) => {
-                  const process = processes.find(
-                    (record) => record.id === step.processId,
-                  );
-                  const label = t('styles.step', { count: index + 1 });
-                  return (
-                    <SortableProcessStep
-                      key={step.id}
-                      stepId={step.id}
-                      label={label}
-                      errorId={
-                        errors[index]
-                          ? `sequence-step-error-${step.id}`
-                          : undefined
-                      }
-                    >
-                      <Stack
-                        direction="row"
-                        sx={{
-                          gap: 2,
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          p: 1.5,
-                          bgcolor: 'background.paper',
-                          border: 1,
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                        }}
+              <Typography
+                id="selected-processes-heading"
+                component="h4"
+                sx={{ fontWeight: 600 }}
+              >
+                {t('styles.selectedProcesses')}
+              </Typography>
+              <Chip
+                size="small"
+                label={t('styles.stepCount', { count: steps.length })}
+              />
+            </Stack>
+            <Box
+              ref={sequencePane}
+              role="region"
+              aria-label={t('styles.scrollableSequence')}
+              data-sequence-scroll
+              tabIndex={0}
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                overscrollBehavior: 'contain',
+                p: 2,
+                position: 'relative',
+                scrollPadding: 16,
+                '&:focus-visible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: -2,
+                },
+              }}
+            >
+              {!steps.length && (
+                <Typography variant="body2" color="text.secondary">
+                  {t('styles.emptySequenceHint')}
+                </Typography>
+              )}
+              <SortableContext
+                items={steps.map((step) => `step:${step.id}`)}
+                strategy={verticalListSortingStrategy}
+              >
+                <Stack spacing={2}>
+                  {steps.map((step, index) => {
+                    const process = processes.find(
+                      (record) => record.id === step.processId,
+                    );
+                    const label = t('styles.step', { count: index + 1 });
+                    return (
+                      <SortableProcessStep
+                        key={step.id}
+                        stepId={step.id}
+                        label={label}
+                        errorId={
+                          errors[index]
+                            ? `sequence-step-error-${step.id}`
+                            : undefined
+                        }
                       >
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography
-                            sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}
-                          >
-                            {process?.name ??
-                              t('styles.unavailableProcess', {
-                                id: step.processId,
+                        <Stack
+                          direction="row"
+                          sx={{
+                            gap: 2,
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            p: 1.5,
+                            bgcolor: 'background.paper',
+                            border: 1,
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}
+                            >
+                              {process?.name ??
+                                t('styles.unavailableProcess', {
+                                  id: step.processId,
+                                })}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {t('styles.stationValue', {
+                                station:
+                                  process?.station ?? t('common.notProvided'),
                               })}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {t('styles.stationValue', {
-                              station:
-                                process?.station ?? t('common.notProvided'),
-                            })}
-                          </Typography>
-                        </Box>
-                        <Tooltip
-                          title={t('styles.removeStep', { count: index + 1 })}
-                        >
-                          <IconButton
-                            color="error"
-                            aria-label={t('styles.removeStep', {
-                              count: index + 1,
-                            })}
-                            onClick={() =>
-                              onChange(
-                                steps.filter((item) => item.id !== step.id),
-                              )
-                            }
+                            </Typography>
+                          </Box>
+                          <Tooltip
+                            title={t('styles.removeStep', { count: index + 1 })}
                           >
-                            <DeleteOutlinedIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                      {errors[index] && (
-                        <FormHelperText
-                          id={`sequence-step-error-${step.id}`}
-                          error
-                        >
-                          {t('styles.errors.processRequired')}
-                        </FormHelperText>
-                      )}
-                    </SortableProcessStep>
-                  );
-                })}
-              </Stack>
-            </SortableContext>
-            <SequenceDropTarget />
-          </Box>
+                            <IconButton
+                              color="error"
+                              aria-label={t('styles.removeStep', {
+                                count: index + 1,
+                              })}
+                              onClick={() =>
+                                onChange(
+                                  steps.filter((item) => item.id !== step.id),
+                                )
+                              }
+                            >
+                              <DeleteOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                        {errors[index] && (
+                          <FormHelperText
+                            id={`sequence-step-error-${step.id}`}
+                            error
+                          >
+                            {t('styles.errors.processRequired')}
+                          </FormHelperText>
+                        )}
+                      </SortableProcessStep>
+                    );
+                  })}
+                </Stack>
+              </SortableContext>
+            </Box>
+          </Paper>
         </Box>
         <Typography color="text.secondary" variant="body2" sx={{ mt: 2 }}>
           {t('styles.routeHint')}
