@@ -69,7 +69,7 @@ describe('process drag-and-drop option', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('keeps append beside the library for long routes and reveals the new last step without scrolling the page', async () => {
+  it('keeps append at the top of selected processes for long routes and reveals the new last step without scrolling the page', async () => {
     const initial = Array.from({ length: 50 }, (_, index) => ({
       id: `step-${index}`,
       processId: 'demo-1',
@@ -80,8 +80,8 @@ describe('process drag-and-drop option', () => {
       .spyOn(window, 'scrollTo')
       .mockImplementation(() => {});
     renderWithProviders(<Editor initial={initial} onChange={onChange} />);
-    const library = screen.getByRole('region', { name: 'Available Processes' });
-    const target = within(library).getByRole('region', {
+    const selected = screen.getByRole('region', { name: /Selected Processes/ });
+    const target = within(selected).getByRole('region', {
       name: 'End of production sequence',
     });
     expect(target).toHaveTextContent('Drop here to append as step 51.');
@@ -89,6 +89,7 @@ describe('process drag-and-drop option', () => {
       name: 'Scrollable production sequence',
     });
     const paneScroll = vi.fn();
+    expect(pane.contains(target)).toBe(false);
     Object.defineProperty(pane, 'scrollTo', {
       configurable: true,
       value: paneScroll,
@@ -148,10 +149,16 @@ describe('process drag-and-drop option', () => {
       screen.queryByRole('button', { name: 'Move step 1 up' }),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+      within(screen.getByRole('region', { name: 'Step 1' })).queryByText(
         'Station 03',
       ),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText('Washing'),
     ).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).queryByText('Industrial washing process'),
+    ).not.toBeInTheDocument();
   });
 
   it('drags a process from the palette into an empty sequence using the real mouse sensor', async () => {

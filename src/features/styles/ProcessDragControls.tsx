@@ -68,10 +68,8 @@ function ProcessTile({ process }: { process: ProcessConfiguration }) {
 
 export function ProcessPalette({
   processes,
-  appendTarget,
 }: {
   processes: ProcessConfiguration[];
-  appendTarget: ReactNode;
 }) {
   const { t } = useTranslation('translation');
   const [query, setQuery] = useState('');
@@ -122,7 +120,6 @@ export function ProcessPalette({
           '& .MuiOutlinedInput-root': { bgcolor: 'background.paper' },
         }}
       />
-      <Box sx={{ flexShrink: 0, mb: 2 }}>{appendTarget}</Box>
       <Stack
         data-process-library-scroll
         spacing={1}

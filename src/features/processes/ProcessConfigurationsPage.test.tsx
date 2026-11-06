@@ -7,6 +7,7 @@ import { configurationTheme } from '../../app/theme';
 import { renderWithProviders } from '../../test/render';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
 import { PROCESS_STORAGE_KEY } from './processData';
+import { defaultTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
 
 function setup() {
   return {
@@ -26,6 +27,23 @@ beforeEach(() => {
 });
 
 describe('process configurations', () => {
+  it('shows the registered tag name instead of its NFC ID in the existing processes table', () => {
+    localStorage.setItem(
+      TAG_STORAGE_KEY,
+      JSON.stringify(
+        defaultTags.map((tag) =>
+          tag.actual === 'NFC-PROC-001'
+            ? { ...tag, name: 'Preparation Reader' }
+            : tag,
+        ),
+      ),
+    );
+    setup();
+    const row = screen.getByRole('row', { name: /Lot Preparation/ });
+    expect(within(row).getByText('Preparation Reader')).toBeVisible();
+    expect(within(row).queryByText('NFC-PROC-001')).not.toBeInTheDocument();
+  });
+
   it('shows all required process errors on their fields and clears corrected errors', async () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Create Process' }));

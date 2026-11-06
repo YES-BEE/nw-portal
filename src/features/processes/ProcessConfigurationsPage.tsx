@@ -36,12 +36,16 @@ import {
 } from './processData';
 import type { ProcessConfiguration } from './types';
 import { ProcessForm } from './ProcessForm';
+import { loadTags } from '../configurations/tagRegistry';
 
 type Toast = 'saved' | 'deleted';
 
 export function ProcessConfigurationsPage() {
   const { t } = useTranslation('translation');
   const [data, setData] = useState(loadProcesses);
+  const tagNames = new Map(
+    loadTags().records.map((tag) => [tag.actual, tag.name]),
+  );
   const [form, setForm] = useState<{
     initial: ProcessConfiguration;
     editing: boolean;
@@ -225,7 +229,7 @@ export function ProcessConfigurationsPage() {
                   </TableCell>
                   <TableCell>
                     {record.mode === 'process' ? (
-                      record.processTag
+                      (tagNames.get(record.processTag) ?? record.processTag)
                     ) : (
                       <Typography sx={{ fontSize: 14 }}>
                         {t('processes.deviceCount', {

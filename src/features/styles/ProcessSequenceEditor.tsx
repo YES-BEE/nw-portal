@@ -217,10 +217,7 @@ export function ProcessSequenceEditor({
             gap: 2.5,
           }}
         >
-          <ProcessPalette
-            processes={processes}
-            appendTarget={<SequenceDropTarget nextStep={steps.length + 1} />}
-          />
+          <ProcessPalette processes={processes} />
           <Paper
             component="section"
             aria-labelledby="selected-processes-heading"
@@ -259,6 +256,9 @@ export function ProcessSequenceEditor({
                 label={t('styles.stepCount', { count: steps.length })}
               />
             </Stack>
+            <Box sx={{ p: 2, pb: 0, flexShrink: 0 }}>
+              <SequenceDropTarget nextStep={steps.length + 1} />
+            </Box>
             <Box
               ref={sequencePane}
               role="region"
@@ -327,29 +327,6 @@ export function ProcessSequenceEditor({
                                 t('styles.unavailableProcess', {
                                   id: step.processId,
                                 })}
-                            </Typography>
-                            {process?.description && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: 'block',
-                                  overflowWrap: 'anywhere',
-                                  mt: 0.5,
-                                }}
-                              >
-                                {process.description}
-                              </Typography>
-                            )}
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ mt: 1 }}
-                            >
-                              {t('styles.stationValue', {
-                                station:
-                                  process?.station ?? t('common.notProvided'),
-                              })}
                             </Typography>
                           </Box>
                           <Tooltip
