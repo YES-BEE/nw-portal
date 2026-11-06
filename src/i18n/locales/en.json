@@ -179,6 +179,11 @@
       "edit": "Edit User",
       "save": "Save User",
       "search": "Search users",
+      "associatedProcesses": "Associated Processes",
+      "selectProcesses": "Select processes",
+      "processHint": "Associate this process manager with at least one process.",
+      "noProcesses": "No processes available.",
+      "processLoadWarning": "Saved processes could not be loaded. Reference processes are shown.",
       "empty": "No users match your search."
     },
     "roles": {
@@ -205,6 +210,7 @@
       "roleRequired": "Select a valid role.",
       "roleNameRequired": "Enter a role name.",
       "statusRequired": "Select a status.",
+      "processesRequired": "Select at least one process.",
       "roleDuplicate": "This role already exists."
     }
   },

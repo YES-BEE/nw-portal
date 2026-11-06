@@ -13,6 +13,19 @@ import {
 beforeEach(() => localStorage.clear());
 
 describe('reference users and roles', () => {
+  it('accepts optional process associations and rejects malformed or duplicate process IDs', () => {
+    const records = loadAccessData().records;
+    expect(isAccessData(records)).toBe(true);
+    records.users[5].processIds = ['demo-1', 'demo-2'];
+    expect(isAccessData(records)).toBe(true);
+    records.users[5].processIds = ['demo-1', 'demo-1'];
+    expect(isAccessData(records)).toBe(false);
+    records.users[5].processIds = [''];
+    expect(isAccessData(records)).toBe(false);
+    records.users[5].processIds = [42] as unknown as string[];
+    expect(isAccessData(records)).toBe(false);
+  });
+
   it('loads seven active accounts with the exact reference role assignments without writing storage', () => {
     const { records, unavailable } = loadAccessData();
     expect(unavailable).toBe(false);

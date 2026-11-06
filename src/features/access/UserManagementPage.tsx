@@ -22,7 +22,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import type { AccessUser } from './accessData';
+import type { AccessUser, UserDraft } from './accessData';
 import { useAccessData } from './useAccessData';
 import { UserForm } from './UserForm';
 import { DeleteAccessDialog, ManagementHeader } from './ManagementScaffold';
@@ -31,7 +31,7 @@ export function UserManagementPage() {
   const { t } = useTranslation('translation');
   const { data, error, persist, setError } = useAccessData();
   const [form, setForm] = useState<{
-    initial: AccessUser;
+    initial: UserDraft;
     editing: boolean;
   } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AccessUser | null>(null);
@@ -59,7 +59,7 @@ export function UserManagementPage() {
               id: crypto.randomUUID(),
               username: '',
               role: '',
-              status: 'Active',
+              status: '',
             },
             editing: false,
           });

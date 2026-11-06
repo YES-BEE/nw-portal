@@ -8,6 +8,88 @@ import { UserManagementPage } from './UserManagementPage';
 beforeEach(() => localStorage.clear());
 
 describe('user management', () => {
+  it('positions the user form without animation and keeps the role menu open until selection', async () => {
+    const scrollIntoView = vi.fn();
+    const previousScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const user = userEvent.setup();
+      renderWithProviders(<UserManagementPage />);
+      await user.click(screen.getByRole('button', { name: 'Add User' }));
+      expect(scrollIntoView).toHaveBeenCalledWith({
+        behavior: 'instant',
+        block: 'start',
+      });
+      const role = screen.getByRole('combobox', { name: /Role/ });
+      await user.click(role);
+      expect(role).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('listbox')).toBeVisible();
+      await user.click(screen.getByRole('option', { name: 'Process Manager' }));
+      expect(role).toHaveTextContent('Process Manager');
+      expect(role).toHaveAttribute('aria-expanded', 'false');
+    } finally {
+      HTMLElement.prototype.scrollIntoView = previousScroll;
+    }
+  });
+
+  it('saves multiple process associations, restores them on edit, and clears them for another role', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UserManagementPage />);
+    await user.click(screen.getByRole('button', { name: 'Add User' }));
+    expect(
+      screen.queryByRole('combobox', { name: 'Associated Processes' }),
+    ).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole('textbox', { name: /Username/ }),
+      'new.manager',
+    );
+    await user.click(screen.getByRole('combobox', { name: /Role/ }));
+    await user.click(screen.getByRole('option', { name: 'Process Manager' }));
+    await user.click(screen.getByRole('combobox', { name: /Status/ }));
+    await user.click(screen.getByRole('option', { name: 'Active' }));
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    const selector = screen.getByRole('combobox', {
+      name: /Associated Processes/,
+    });
+    expect(selector).toHaveAccessibleDescription(
+      'Select at least one process.',
+    );
+    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
+    await user.click(selector);
+    await user.click(screen.getByRole('option', { name: /Lot Preparation/ }));
+    await user.click(screen.getByRole('option', { name: /Washing/ }));
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    const savedUser = () =>
+      loadAccessData().records.users.find(
+        (record) => record.username === 'new.manager',
+      );
+    expect(savedUser()?.processIds).toEqual(['demo-1', 'demo-2']);
+    await user.click(screen.getByRole('button', { name: 'Edit new.manager' }));
+    const form = screen.getByRole('region', { name: 'Edit User' });
+    expect(within(form).getByText(/Lot Preparation/)).toBeVisible();
+    expect(within(form).getByText(/Washing/)).toBeVisible();
+    const washingChip = within(form)
+      .getByText(/Washing/)
+      .closest('.MuiChip-root');
+    expect(washingChip).not.toBeNull();
+    await user.click(
+      within(washingChip as HTMLElement).getByTestId('CancelIcon'),
+    );
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(within(form).queryByText(/Washing/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    expect(savedUser()?.processIds).toEqual(['demo-1']);
+    await user.click(screen.getByRole('button', { name: 'Edit new.manager' }));
+    await user.click(screen.getByRole('combobox', { name: /Role/ }));
+    await user.click(screen.getByRole('option', { name: 'Supervisor' }));
+    expect(
+      screen.queryByRole('combobox', { name: 'Associated Processes' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    expect(savedUser()?.processIds).toEqual([]);
+  });
+
   it('shows the reference accounts and searches usernames and roles without case sensitivity', async () => {
     const user = userEvent.setup();
     renderWithProviders(<UserManagementPage />);
@@ -33,6 +115,9 @@ describe('user management', () => {
     expect(screen.getByRole('combobox', { name: /Role/ })).toHaveTextContent(
       'Select a role',
     );
+    expect(screen.getByRole('combobox', { name: /Status/ })).toHaveTextContent(
+      'Select a status',
+    );
     await user.click(screen.getByRole('button', { name: 'Save User' }));
     expect(
       screen.getByRole('textbox', { name: /Username/ }),
@@ -40,12 +125,17 @@ describe('user management', () => {
     expect(
       screen.getByRole('combobox', { name: /Role/ }),
     ).toHaveAccessibleDescription('Select a valid role.');
+    expect(
+      screen.getByRole('combobox', { name: /Status/ }),
+    ).toHaveAccessibleDescription('Select a status.');
     await user.type(
       screen.getByRole('textbox', { name: /Username/ }),
       ' factory.audit ',
     );
     await user.click(screen.getByRole('combobox', { name: /Role/ }));
     await user.click(screen.getByRole('option', { name: 'Supervisor' }));
+    await user.click(screen.getByRole('combobox', { name: /Status/ }));
+    await user.click(screen.getByRole('option', { name: 'Active' }));
     await user.click(screen.getByRole('button', { name: 'Save User' }));
     expect(
       screen.getByRole('rowheader', { name: 'factory.audit' }),

@@ -21,11 +21,15 @@ export interface AccessUser {
   username: string;
   role: string;
   status: 'Active' | 'Inactive';
+  processIds?: string[];
 }
 export interface AccessData {
   users: AccessUser[];
   roles: AccessRole[];
 }
+export type UserDraft = Omit<AccessUser, 'status'> & {
+  status: AccessUser['status'] | '';
+};
 
 const fullModules: ModuleKey[] = [
   'dashboard',
@@ -107,7 +111,13 @@ export function isAccessData(value: unknown): value is AccessData {
         user.username.trim() &&
         user.username.length <= 80 &&
         roles.some((role) => role.name === user.role) &&
-        ['Active', 'Inactive'].includes(user.status),
+        ['Active', 'Inactive'].includes(user.status) &&
+        (user.processIds === undefined ||
+          (Array.isArray(user.processIds) &&
+            user.processIds.every(
+              (id: unknown) => typeof id === 'string' && id.trim(),
+            ) &&
+            new Set(user.processIds).size === user.processIds.length)),
     ) &&
     unique(users.map((user) => user.username)) &&
     unique(users.map((user) => user.id))
@@ -137,14 +147,15 @@ export function loadAccessData(): {
   }
 }
 
-export function getUserErrors(user: AccessUser, data: AccessData) {
+export function getUserErrors(user: UserDraft, data: AccessData) {
   const errors: Partial<
     Record<
-      'username' | 'role' | 'status',
+      'username' | 'role' | 'status' | 'processIds',
       | 'usernameRequired'
       | 'usernameDuplicate'
       | 'roleRequired'
       | 'statusRequired'
+      | 'processesRequired'
     >
   > = {};
   if (!user.username.trim()) errors.username = 'usernameRequired';
@@ -160,6 +171,8 @@ export function getUserErrors(user: AccessUser, data: AccessData) {
     errors.role = 'roleRequired';
   if (!['Active', 'Inactive'].includes(user.status))
     errors.status = 'statusRequired';
+  if (user.role === 'Process Manager' && !user.processIds?.length)
+    errors.processIds = 'processesRequired';
   return errors;
 }
 
