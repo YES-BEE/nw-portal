@@ -58,9 +58,6 @@ function ProcessTile({ process }: { process: ProcessConfiguration }) {
         >
           {process.name}
         </Typography>
-        <Typography color="text.secondary" variant="caption">
-          {t('styles.stationValue', { station: process.station })}
-        </Typography>
       </Box>
     </Paper>
   );
@@ -180,7 +177,7 @@ export function SortableProcessStep({
       data-step-id={stepId}
       variant="outlined"
       sx={{
-        p: 2,
+        p: 1,
         bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
         position: 'relative',
         transform: CSS.Transform.toString(transform),
@@ -195,7 +192,7 @@ export function SortableProcessStep({
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
       }}
     >
-      <Stack direction="row" sx={{ alignItems: 'center', gap: 1, mb: 2 }}>
+      <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5, mb: 0.5 }}>
         <Tooltip title={t('styles.dragStep', { name: label })}>
           <IconButton
             ref={setActivatorNodeRef}
@@ -212,7 +209,7 @@ export function SortableProcessStep({
             <DragIndicatorIcon />
           </IconButton>
         </Tooltip>
-        <Typography sx={{ fontWeight: 600, color: 'primary.dark' }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'primary.dark' }}>
           {label}
         </Typography>
       </Stack>

@@ -37,6 +37,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import type { ProcessConfiguration } from '../processes/types';
+import { LotRouteStepper } from './LotRouteStepper';
 import {
   ProcessPalette,
   SequenceDropTarget,
@@ -210,9 +211,11 @@ export function ProcessSequenceEditor({
             gridTemplateColumns: {
               xs: '1fr',
               sm: 'minmax(280px, 360px) minmax(0, 1fr)',
-              lg: 'minmax(340px, 440px) minmax(0, 1fr)',
+              lg: 'minmax(280px, 1.1fr) minmax(280px, 1.3fr) minmax(240px, 1fr)',
             },
-            height: { sm: 'clamp(440px, 65dvh, 640px)' },
+            gridTemplateRows: {
+              sm: 'clamp(440px, 65dvh, 640px)',
+            },
             alignItems: 'start',
             gap: 2.5,
           }}
@@ -289,7 +292,7 @@ export function ProcessSequenceEditor({
                 items={steps.map((step) => `step:${step.id}`)}
                 strategy={verticalListSortingStrategy}
               >
-                <Stack spacing={2}>
+                <Stack spacing={1}>
                   {steps.map((step, index) => {
                     const process = processes.find(
                       (record) => record.id === step.processId,
@@ -309,10 +312,11 @@ export function ProcessSequenceEditor({
                         <Stack
                           direction="row"
                           sx={{
-                            gap: 2,
+                            gap: 1,
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            p: 1.5,
+                            px: 1,
+                            py: 0.5,
                             bgcolor: 'background.paper',
                             border: 1,
                             borderColor: 'divider',
@@ -362,6 +366,23 @@ export function ProcessSequenceEditor({
               </SortableContext>
             </Box>
           </Paper>
+          <Box
+            sx={{
+              minWidth: 0,
+              minHeight: 0,
+              height: { xs: 480, lg: '100%' },
+              gridColumn: { sm: '1 / -1', lg: 'auto' },
+            }}
+          >
+            <LotRouteStepper
+              title={t('styles.sequenceOverview')}
+              processIds={steps.map((step) => step.processId)}
+              processes={processes}
+              lots={1}
+              orientation="vertical"
+              fillHeight
+            />
+          </Box>
         </Box>
         <Typography color="text.secondary" variant="body2" sx={{ mt: 2 }}>
           {t('styles.routeHint')}

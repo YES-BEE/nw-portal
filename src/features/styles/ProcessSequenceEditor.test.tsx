@@ -80,7 +80,7 @@ describe('process drag-and-drop option', () => {
       .spyOn(window, 'scrollTo')
       .mockImplementation(() => {});
     renderWithProviders(<Editor initial={initial} onChange={onChange} />);
-    const selected = screen.getByRole('region', { name: /Selected Processes/ });
+    const selected = screen.getByRole('region', { name: 'Selected Processes' });
     const target = within(selected).getByRole('region', {
       name: 'End of production sequence',
     });
@@ -135,6 +135,9 @@ describe('process drag-and-drop option', () => {
     const latest = onChange.mock.lastCall![0] as ProcessStep[];
     expect(latest.map((step) => step.processId)).toEqual(['demo-2', 'demo-2']);
     expect(new Set(latest.map((step) => step.id)).size).toBe(2);
+    const overview = screen.getByRole('region', { name: 'Selected Processes Overview' });
+    expect(within(overview).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(overview).getAllByText('Washing')).toHaveLength(2);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Dropdowns' }),

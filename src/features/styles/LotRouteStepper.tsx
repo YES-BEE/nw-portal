@@ -1,49 +1,67 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
-  IconButton,
   Paper,
   Step,
   StepLabel,
   Stepper,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import CheckIcon from '@mui/icons-material/Check';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { ProcessConfiguration } from '../processes/types';
 
 export function LotRouteStepper({
   processIds,
   processes,
   lots,
+  title,
+  orientation,
+  fillHeight = false,
 }: {
   processIds: string[];
   processes: ProcessConfiguration[];
   lots: number;
+  title?: string;
+  orientation?: 'horizontal' | 'vertical';
+  fillHeight?: boolean;
 }) {
   const { t } = useTranslation('translation');
+  const headingId = useId();
   const theme = useTheme();
-  const horizontal = useMediaQuery(theme.breakpoints.up('md'));
+  const wide = useMediaQuery(theme.breakpoints.up('md'));
+  const horizontal = orientation ? orientation === 'horizontal' : wide;
   const byId = new Map(processes.map((process) => [process.id, process]));
   return (
     <Paper
       component="section"
-      aria-labelledby="lot-route-heading"
+      aria-labelledby={headingId}
       variant="outlined"
-      sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 2 }}
+      sx={{
+        p: { xs: 2, sm: 3 },
+        mb: fillHeight ? 0 : 3,
+        borderRadius: 2,
+        ...(fillHeight && {
+          height: '100%',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }),
+      }}
     >
-      <Typography id="lot-route-heading" component="h2" variant="h6">
-        {t('styles.lotRoute')}
+      <Typography id={headingId} component="h2" variant="h6">
+        {title ?? t('styles.lotRoute')}
       </Typography>
       <Typography
         color="text.secondary"
         variant="body2"
         sx={{ mt: 0.5, mb: 3 }}
       >
-        {t('styles.lotRouteDescription', { count: lots })}
+        {processIds.length
+          ? t('styles.lotRouteDescription', { count: lots })
+          : t('styles.emptyOverview')}
       </Typography>
       <Box
         role="region"
@@ -51,7 +69,8 @@ export function LotRouteStepper({
         tabIndex={0}
         sx={{
           overflow: 'auto',
-          maxHeight: { xs: 480, md: 'none' },
+          maxHeight: fillHeight ? 'none' : { xs: 480, md: 'none' },
+          ...(fillHeight && { flex: 1, minHeight: 0 }),
           p: 1,
           borderRadius: 1,
           '&:focus-visible': {
@@ -124,27 +143,7 @@ export function LotRouteStepper({
                     },
                   }}
                 >
-                  <Box
-                    component="span"
-                    sx={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                    }}
-                  >
-                    <Box component="span">{name}</Box>
-                    {process?.description && (
-                      <Tooltip title={process.description} describeChild arrow>
-                        <IconButton
-                          size="small"
-                          aria-label={t('styles.processInfo', { name })}
-                          sx={{ p: 0.25, color: 'text.secondary' }}
-                        >
-                          <InfoOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
+                  {name}
                 </StepLabel>
               </Step>
             );

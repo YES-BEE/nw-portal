@@ -1,5 +1,4 @@
 import { screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { sampleProcesses } from '../processes/processData';
@@ -39,24 +38,8 @@ describe('lot route stepper', () => {
     expect(
       container.querySelector('[aria-current="step"]'),
     ).not.toBeInTheDocument();
-    expect(within(route).getAllByRole('button')).toHaveLength(3);
-  });
-
-  it('shows the process description when hovering over its info icon', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <LotRouteStepper
-        processIds={['demo-2']}
-        processes={sampleProcesses}
-        lots={1}
-      />,
-    );
-    await user.hover(
-      screen.getByRole('button', { name: 'Description for Washing' }),
-    );
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'Industrial washing process',
-    );
+    expect(within(route).queryByRole('button')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="InfoOutlinedIcon"]')).not.toBeInTheDocument();
   });
 
   it('uses a horizontal connected route on wide screens', () => {
