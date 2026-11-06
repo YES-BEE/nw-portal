@@ -200,7 +200,10 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
             </Typography>
             <TextField
               type="search"
-              label={t('styles.search')}
+              slotProps={{
+                htmlInput: { 'aria-label': t('styles.search') },
+              }}
+              placeholder={t('styles.searchPlaceholder')}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -343,11 +346,12 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPendingDelete(null)}>
+          <Button variant="outlined" onClick={() => setPendingDelete(null)}>
             {t('access.cancel')}
           </Button>
           <Button
-            color="error"
+            color="primary"
+            variant="contained"
             onClick={() => {
               const latest = loadStyles();
               const current = readSession();

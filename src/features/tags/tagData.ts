@@ -4,7 +4,7 @@ import type { ProcessConfiguration } from '../processes/types';
 import { loadStorages } from '../storages/storageData';
 import type { StorageConfiguration } from '../storages/types';
 
-export interface TagAssignment {
+interface TagAssignment {
   type: 'process' | 'device' | 'storage';
   name: string;
   process?: string;
@@ -59,14 +59,14 @@ export function normalizeTag(tag: RegisteredTag): RegisteredTag {
   return { ...tag, name: tag.name.trim(), actual: tag.actual.trim() };
 }
 
-export type TagFieldError =
+type TagFieldError =
   | 'duplicateName'
   | 'duplicateId'
   | 'assignedId'
   | 'assignmentsUnavailable'
   | 'nameRequired'
   | 'actualRequired';
-export type TagFieldErrors = Partial<Record<'name' | 'actual', TagFieldError>>;
+type TagFieldErrors = Partial<Record<'name' | 'actual', TagFieldError>>;
 
 export function getTagFieldErrors(
   tag: RegisteredTag,

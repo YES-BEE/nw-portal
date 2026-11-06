@@ -125,7 +125,7 @@ export function normalizeProcess(
   };
 }
 
-export type ProcessFieldError =
+type ProcessFieldError =
   | 'processTag'
   | 'devicesRequired'
   | 'unregistered'
@@ -135,7 +135,7 @@ export type ProcessFieldError =
   | 'stationRequired'
   | 'deviceNameRequired'
   | 'deviceTagRequired';
-export type ProcessFieldErrors = Partial<Record<string, ProcessFieldError>>;
+type ProcessFieldErrors = Partial<Record<string, ProcessFieldError>>;
 
 export function getProcessFieldErrors(
   record: ProcessConfiguration,

@@ -209,8 +209,8 @@ export function ProcessSequenceEditor({
             display: 'grid',
             gridTemplateColumns: {
               xs: '1fr',
-              sm: 'minmax(200px, 260px) minmax(0, 1fr)',
-              lg: 'minmax(240px, 300px) minmax(0, 1fr)',
+              sm: 'minmax(280px, 360px) minmax(0, 1fr)',
+              lg: 'minmax(340px, 440px) minmax(0, 1fr)',
             },
             height: { sm: 'clamp(440px, 65dvh, 640px)' },
             alignItems: 'start',
@@ -328,7 +328,24 @@ export function ProcessSequenceEditor({
                                   id: step.processId,
                                 })}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary">
+                            {process?.description && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{
+                                  display: 'block',
+                                  overflowWrap: 'anywhere',
+                                  mt: 0.5,
+                                }}
+                              >
+                                {process.description}
+                              </Typography>
+                            )}
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ mt: 1 }}
+                            >
                               {t('styles.stationValue', {
                                 station:
                                   process?.station ?? t('common.notProvided'),

@@ -82,8 +82,10 @@ export function DeleteAccessDialog({
         </DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel}>{t('access.cancel')}</Button>
-        <Button color="error" onClick={onConfirm}>
+        <Button variant="outlined" onClick={onCancel}>
+          {t('access.cancel')}
+        </Button>
+        <Button color="primary" variant="contained" onClick={onConfirm}>
           {t('access.delete')}
         </Button>
       </DialogActions>

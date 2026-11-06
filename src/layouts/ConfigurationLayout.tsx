@@ -3,7 +3,9 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   AppBar,
+  Avatar,
   Box,
+  Chip,
   Collapse,
   Divider,
   Drawer,
@@ -39,6 +41,14 @@ import {
 } from '../app/navigation';
 
 const toolbarStyles = { minHeight: '68px !important', flexShrink: 0 };
+const selectedNavigationStyles = {
+  '&.Mui-selected': {
+    bgcolor: 'rgba(64,123,225,.18)',
+    color: '#fff',
+    boxShadow: 'inset 3px 0 0 #73a7ff',
+  },
+  '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+};
 const navigationIcons = {
   dashboard: DashboardOutlinedIcon,
   reports: AssessmentOutlinedIcon,
@@ -135,11 +145,7 @@ export function ConfigurationLayout() {
               onClick={() => setMobileOpen(false)}
               sx={{
                 minHeight: 48,
-                '&.Mui-selected': {
-                  bgcolor: 'rgba(64,123,225,.18)',
-                  color: '#fff',
-                },
-                '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+                ...selectedNavigationStyles,
               }}
             >
               <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
@@ -169,9 +175,7 @@ export function ConfigurationLayout() {
             aria-controls="configuration-submenu"
             sx={{
               minHeight: 48,
-              color: configurationActive ? '#fff' : 'inherit',
-              '&.Mui-selected': { bgcolor: 'rgba(64,123,225,.18)' },
-              '&.Mui-selected:hover': { bgcolor: 'rgba(64,123,225,.27)' },
+              ...selectedNavigationStyles,
             }}
           >
             <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
@@ -216,20 +220,7 @@ export function ConfigurationLayout() {
                   sx={{
                     pl: 7,
                     minHeight: 44,
-                    boxShadow:
-                      pathname === item.path ||
-                      pathname.startsWith(item.path + '/')
-                        ? 'inset 3px 0 0 #73a7ff'
-                        : 'none',
-                    color:
-                      pathname === item.path ||
-                      pathname.startsWith(item.path + '/')
-                        ? '#fff'
-                        : 'inherit',
-                    '&.Mui-selected': { bgcolor: 'rgba(64,123,225,.18)' },
-                    '&.Mui-selected:hover': {
-                      bgcolor: 'rgba(64,123,225,.27)',
-                    },
+                    ...selectedNavigationStyles,
                   }}
                 >
                   <ListItemText
@@ -358,22 +349,44 @@ export function ConfigurationLayout() {
                   maxWidth: { xs: '45%', sm: 280 },
                   flexShrink: 0,
                   textAlign: 'right',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
                 }}
               >
-                <Typography
-                  noWrap
-                  title={session.user.username}
-                  sx={{ fontSize: 13, fontWeight: 600 }}
-                >
-                  {session.user.username}
-                </Typography>
-                <Typography
-                  noWrap
+                <Chip
+                  label={session.user.role}
+                  variant="outlined"
+                  size="small"
                   title={session.user.role}
-                  sx={{ fontSize: 12, color: '#b6c8e4' }}
+                  sx={{
+                    minWidth: 0,
+                    height: 22,
+                    color: '#b6c8e4',
+                    borderColor: '#b6c8e4',
+                  }}
+                />
+                <Avatar
+                  aria-label={session.user.username}
+                  title={session.user.username}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    flexShrink: 0,
+                  }}
                 >
-                  {session.user.role}
-                </Typography>
+                  {session.user.username
+                    .split(/[\s._-]+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase()}
+                </Avatar>
               </Box>
             )}
           </Toolbar>

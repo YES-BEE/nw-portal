@@ -72,15 +72,13 @@ export function processTags(processes: ProcessConfiguration[]): string[] {
   );
 }
 
-export type StorageFieldError =
+type StorageFieldError =
   | 'duplicateNumber'
   | 'unregistered'
   | 'assignedTag'
   | 'numberRequired'
   | 'tagRequired';
-export type StorageFieldErrors = Partial<
-  Record<'number' | 'tag', StorageFieldError>
->;
+type StorageFieldErrors = Partial<Record<'number' | 'tag', StorageFieldError>>;
 
 export function getStorageFieldErrors(
   record: StorageConfiguration,

@@ -1,14 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import {
   Box,
+  IconButton,
   Paper,
   Step,
   StepLabel,
   Stepper,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import CheckIcon from '@mui/icons-material/Check';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import type { ProcessConfiguration } from '../processes/types';
 
 export function LotRouteStepper({
@@ -62,6 +66,9 @@ export function LotRouteStepper({
           activeStep={-1}
           orientation={horizontal ? 'horizontal' : 'vertical'}
           alternativeLabel={horizontal}
+          sx={{
+            '& .MuiStepConnector-alternativeLabel': { top: 36 },
+          }}
         >
           {processIds.map((id, index) => {
             const process = byId.get(id);
@@ -75,31 +82,69 @@ export function LotRouteStepper({
                 aria-label={t('styles.routeStep', { count: index + 1, name })}
                 sx={{ minWidth: horizontal ? 180 : undefined }}
               >
+                <Typography
+                  component="div"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    height: 24,
+                    textAlign: horizontal ? 'center' : 'left',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('styles.stationValue', {
+                    station: process?.station ?? t('common.notProvided'),
+                  })}
+                </Typography>
                 <StepLabel
                   error={!process}
-                  optional={
-                    <Typography
+                  icon={
+                    <Box
                       component="span"
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mt: 0.5 }}
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: process ? 'primary.main' : 'error.main',
+                        color: process
+                          ? 'primary.contrastText'
+                          : 'error.contrastText',
+                      }}
                     >
-                      {t('styles.stationValue', {
-                        station: process?.station ?? t('common.notProvided'),
-                      })}
-                    </Typography>
+                      <CheckIcon sx={{ fontSize: 18 }} />
+                    </Box>
                   }
                   sx={{
                     '& .MuiStepLabel-label': {
-                      fontWeight: 600,
+                      fontWeight: 700,
                       overflowWrap: 'anywhere',
-                    },
-                    '& .MuiStepIcon-root': {
-                      color: process ? 'primary.main' : 'error.main',
                     },
                   }}
                 >
-                  {name}
+                  <Box
+                    component="span"
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                    }}
+                  >
+                    <Box component="span">{name}</Box>
+                    {process?.description && (
+                      <Tooltip title={process.description} describeChild arrow>
+                        <IconButton
+                          size="small"
+                          aria-label={t('styles.processInfo', { name })}
+                          sx={{ p: 0.25, color: 'text.secondary' }}
+                        >
+                          <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
                 </StepLabel>
               </Step>
             );

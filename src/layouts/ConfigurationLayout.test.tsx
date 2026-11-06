@@ -41,6 +41,13 @@ describe('persistent desktop navigation', () => {
       );
       const group = screen.getByRole('button', { name: 'Configurations' });
       expect(group.classList.contains('Mui-selected')).toBe(active);
+      if (active)
+        expect(group).toHaveStyle({ boxShadow: 'inset 3px 0 0 #73a7ff' });
+      const selectedLinks = screen
+        .getAllByRole('link')
+        .filter((link) => link.classList.contains('Mui-selected'));
+      for (const link of selectedLinks)
+        expect(link).toHaveStyle({ boxShadow: 'inset 3px 0 0 #73a7ff' });
       const submenu = screen.getByLabelText('Configurations submenu');
       const styleLink = within(submenu).getByRole('link', {
         name: 'Style Management',
@@ -101,7 +108,7 @@ describe('persistent desktop navigation', () => {
       const identity = within(screen.getByRole('banner')).getByRole('group', {
         name: 'Signed-in user',
       });
-      expect(within(identity).getByText(username)).toBeVisible();
+      expect(within(identity).getByLabelText(username)).toBeVisible();
       expect(within(identity).getByText(role)).toBeVisible();
     },
   );

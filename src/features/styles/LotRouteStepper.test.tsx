@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { sampleProcesses } from '../processes/processData';
@@ -7,7 +8,7 @@ import { LotRouteStepper } from './LotRouteStepper';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('lot route stepper', () => {
-  it('shows numbered process and station labels in saved order without claiming completion', () => {
+  it('shows stations above check circles and process names in saved order', () => {
     const { container } = renderWithProviders(
       <LotRouteStepper
         processIds={['demo-2', 'demo-1', 'demo-2']}
@@ -23,12 +24,39 @@ describe('lot route stepper', () => {
       'Step 3: Washing',
     ]);
     expect(within(steps[0]).getByText('Station 03')).toBeVisible();
+    expect(within(steps[0]).getByTestId('CheckIcon')).toBeInTheDocument();
+    expect(
+      container.querySelector('.MuiStepIcon-text'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(steps[0])
+        .getByText('Station 03')
+        .compareDocumentPosition(within(steps[0]).getByTestId('CheckIcon')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(route).toHaveClass('MuiStepper-vertical');
     expect(container.querySelector('.Mui-completed')).not.toBeInTheDocument();
     expect(
       container.querySelector('[aria-current="step"]'),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(within(route).getAllByRole('button')).toHaveLength(3);
+  });
+
+  it('shows the process description when hovering over its info icon', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <LotRouteStepper
+        processIds={['demo-2']}
+        processes={sampleProcesses}
+        lots={1}
+      />,
+    );
+    await user.hover(
+      screen.getByRole('button', { name: 'Description for Washing' }),
+    );
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Industrial washing process',
+    );
   });
 
   it('uses a horizontal connected route on wide screens', () => {

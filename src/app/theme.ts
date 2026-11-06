@@ -9,6 +9,9 @@ export const theme = createTheme({
   typography: { fontFamily: '"Inter Variable", Arial, Helvetica, sans-serif' },
   shape: { borderRadius: 5 },
   components: {
+    MuiDialogContentText: {
+      defaultProps: { variant: 'body2' },
+    },
     MuiSelect: {
       defaultProps: { displayEmpty: true, notched: false },
     },

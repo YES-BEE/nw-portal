@@ -332,10 +332,14 @@ export function ProcessConfigurationsPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPendingDelete(null)} autoFocus>
+          <Button
+            variant="outlined"
+            onClick={() => setPendingDelete(null)}
+            autoFocus
+          >
             {t('processes.cancel')}
           </Button>
-          <Button onClick={confirm} color="error" variant="contained">
+          <Button onClick={confirm} color="primary" variant="contained">
             {t('processes.deleteAction')}
           </Button>
         </DialogActions>

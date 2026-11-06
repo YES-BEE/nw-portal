@@ -391,10 +391,14 @@ export function TagManagementPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPendingDelete(null)} autoFocus>
+          <Button
+            variant="outlined"
+            onClick={() => setPendingDelete(null)}
+            autoFocus
+          >
             {t('tags.cancel')}
           </Button>
-          <Button color="error" variant="contained" onClick={deleteTag}>
+          <Button color="primary" variant="contained" onClick={deleteTag}>
             {t('tags.deleteAction')}
           </Button>
         </DialogActions>

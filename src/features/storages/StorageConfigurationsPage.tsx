@@ -287,11 +287,15 @@ export function StorageConfigurationsPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPendingDelete(null)} autoFocus>
+          <Button
+            variant="outlined"
+            onClick={() => setPendingDelete(null)}
+            autoFocus
+          >
             {t('storages.cancel')}
           </Button>
           <Button
-            color="error"
+            color="primary"
             variant="contained"
             onClick={() => {
               if (pendingDelete)
