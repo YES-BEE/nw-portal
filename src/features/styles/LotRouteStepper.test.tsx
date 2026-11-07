@@ -7,7 +7,7 @@ import { LotRouteStepper } from './LotRouteStepper';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('lot route stepper', () => {
-  it('shows stations above check circles and process names in saved order', () => {
+  it('shows check circles and process names without station labels in vertical view', () => {
     const { container } = renderWithProviders(
       <LotRouteStepper
         processIds={['demo-2', 'demo-1', 'demo-2']}
@@ -22,24 +22,20 @@ describe('lot route stepper', () => {
       'Step 2: Lot Preparation',
       'Step 3: Washing',
     ]);
-    expect(within(steps[0]).getByText('Station 03')).toBeVisible();
+    expect(within(route).queryByText(/Station/)).not.toBeInTheDocument();
     expect(within(steps[0]).getByTestId('CheckIcon')).toBeInTheDocument();
     expect(
       container.querySelector('.MuiStepIcon-text'),
     ).not.toBeInTheDocument();
-    expect(
-      within(steps[0])
-        .getByText('Station 03')
-        .compareDocumentPosition(within(steps[0]).getByTestId('CheckIcon')) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
     expect(route).toHaveClass('MuiStepper-vertical');
     expect(container.querySelector('.Mui-completed')).not.toBeInTheDocument();
     expect(
       container.querySelector('[aria-current="step"]'),
     ).not.toBeInTheDocument();
     expect(within(route).queryByRole('button')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-testid="InfoOutlinedIcon"]')).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="InfoOutlinedIcon"]'),
+    ).not.toBeInTheDocument();
   });
 
   it('uses a horizontal connected route on wide screens', () => {

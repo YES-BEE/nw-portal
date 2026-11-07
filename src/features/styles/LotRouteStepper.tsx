@@ -101,20 +101,22 @@ export function LotRouteStepper({
                 aria-label={t('styles.routeStep', { count: index + 1, name })}
                 sx={{ minWidth: horizontal ? 180 : undefined }}
               >
-                <Typography
-                  component="div"
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    height: 24,
-                    textAlign: horizontal ? 'center' : 'left',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {t('styles.stationValue', {
-                    station: process?.station ?? t('common.notProvided'),
-                  })}
-                </Typography>
+                {horizontal && (
+                  <Typography
+                    component="div"
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      height: 24,
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {t('styles.stationValue', {
+                      station: process?.station ?? t('common.notProvided'),
+                    })}
+                  </Typography>
+                )}
                 <StepLabel
                   error={!process}
                   icon={
