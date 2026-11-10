@@ -1,18 +1,19 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   sampleProcesses,
-  getProcessFieldErrors,
-} from '../processes/processData';
+  sampleStorages,
+  seedTestData,
+} from '../../test/fixtures';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getProcessFieldErrors } from '../processes/processData';
 import {
   loadStorages,
   normalizeStorage,
-  sampleStorages,
   STORAGE_STORAGE_KEY,
   getStorageFieldErrors,
 } from './storageData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('storage validation', () => {
@@ -85,7 +86,7 @@ describe('storage persistence', () => {
     (stored) => {
       localStorage.setItem(STORAGE_STORAGE_KEY, stored);
       expect(loadStorages()).toEqual({
-        records: sampleStorages,
+        records: [],
         storageUnavailable: true,
       });
       expect(localStorage.getItem(STORAGE_STORAGE_KEY)).toBe(stored);
@@ -96,7 +97,7 @@ describe('storage persistence', () => {
       throw new Error('Storage denied');
     });
     expect(loadStorages()).toEqual({
-      records: sampleStorages,
+      records: [],
       storageUnavailable: true,
     });
   });

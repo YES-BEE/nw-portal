@@ -4,19 +4,7 @@ export interface RegisteredTag {
   actual: string;
 }
 
-export const TAG_STORAGE_KEY = 'nw-track-tags-v1';
-
-export const defaultTags: RegisteredTag[] = [
-  { name: 'Lot Preparation Tag', actual: 'NFC-PROC-001' },
-  { name: 'Washer 01 Tag', actual: 'NFC-DEV-001' },
-  { name: 'Washer 02 Tag', actual: 'NFC-DEV-002' },
-  { name: 'Storage Bay A Tag', actual: 'NFC-STORE-001' },
-  { name: 'Storage Bay B Tag', actual: 'NFC-STORE-002' },
-  { name: 'Storage Bay C Tag', actual: 'NFC-STORE-003' },
-  { name: 'Finishing Line Tag', actual: 'NFC-PROC-002' },
-  { name: 'Finisher 01 Tag', actual: 'NFC-DEV-003' },
-  { name: 'Finisher 02 Tag', actual: 'NFC-DEV-004' },
-].map((tag, index) => ({ ...tag, id: `tag-${index + 1}` }));
+export const TAG_STORAGE_KEY = 'nw-track-tags-v2';
 
 export function loadTags(): {
   records: RegisteredTag[];
@@ -49,10 +37,10 @@ export function loadTags(): {
       };
     }
     return {
-      records: structuredClone(defaultTags),
+      records: [],
       storageUnavailable: stored !== null,
     };
   } catch {
-    return { records: structuredClone(defaultTags), storageUnavailable: true };
+    return { records: [], storageUnavailable: true };
   }
 }

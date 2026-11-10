@@ -1,3 +1,8 @@
+import {
+  defaultTags,
+  sampleProcesses,
+  seedTestData,
+} from '../../test/fixtures';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,7 +12,7 @@ import { configurationTheme } from '../../app/theme';
 import { renderWithProviders } from '../../test/render';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
 import { PROCESS_STORAGE_KEY } from './processData';
-import { defaultTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
+import { TAG_STORAGE_KEY } from '../configurations/tagRegistry';
 
 function setup() {
   return {
@@ -23,7 +28,7 @@ function setup() {
 }
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('process configurations', () => {
@@ -162,7 +167,9 @@ describe('process configurations', () => {
       screen.getByRole('rowheader', { name: /Lot Preparation/ }),
     ).toBeVisible();
     expect(screen.queryByText('Unsaved name')).not.toBeInTheDocument();
-    expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(
+      JSON.stringify(sampleProcesses),
+    );
   });
 
   it('switches NFC modes and requires at least one device', async () => {

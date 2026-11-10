@@ -1,104 +1,170 @@
-import { ACCESS_STORAGE_KEY, loadAccessData } from '../access/accessData';
+import { moduleKeys } from '../access/accessData';
 import type { AccessUser, ModuleKey } from '../access/accessData';
 import { orderedNavigationItems } from '../../app/navigation';
+import { isLoginResponse, login, LoginError } from './loginApi';
+import type { LoginErrorCode } from './loginApi';
+import type { LoginClientType, LoginResponse, LoginUiError } from './types';
+import { clearDemoStorage } from './browserStorage';
 
-export const SESSION_STORAGE_KEY = 'nw-track-session-v1';
+export const SESSION_STORAGE_KEY = 'nw-track-session-v2';
 const sessionChangeEvent = 'nw-track-session-change';
-let revoked = false;
-
-// Reference credentials are for browser-only demo authentication.
-export const demoAccounts = [
-  { userId: 'user-1', username: 'nw.admin', password: 'NW@2026demo' },
-  { userId: 'user-2', username: 'it.admin', password: 'IT@2026demo' },
-  { userId: 'user-3', username: 'top.manager', password: 'Top@2026demo' },
-  {
-    userId: 'user-4',
-    username: 'production.manager',
-    password: 'Prod@2026demo',
-  },
-  { userId: 'user-5', username: 'supervisor', password: 'Super@2026demo' },
-  {
-    userId: 'user-6',
-    username: 'process.manager',
-    password: 'Process@2026demo',
-  },
-  {
-    userId: 'user-7',
-    username: 'style.configurator',
-    password: 'Style@2026demo',
-  },
-] as const;
+let currentSession: AuthSession | null = null;
+let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+let authAttempt = 0;
 
 export interface AuthSession {
   user: AccessUser;
   modules: ModuleKey[];
+  authentication?: LoginResponse;
+  expiresAt?: number;
 }
-export type SignInError =
-  'invalidCredentials' | 'recordsUnavailable' | 'sessionUnavailable';
+export type SignInError = LoginErrorCode | LoginUiError;
 
-export function notifySessionChange() {
+function notifySessionChange() {
   window.dispatchEvent(new Event(sessionChangeEvent));
 }
 
-export function signIn(username: string, password: string): SignInError | null {
-  const { records, unavailable } = loadAccessData();
-  if (unavailable) return 'recordsUnavailable';
-  const user = records.users.find(
-    (record) =>
-      record.username.toLowerCase() === username.trim().toLowerCase() &&
-      record.status === 'Active',
-  );
-  const account = demoAccounts.find((record) => record.userId === user?.id);
-  if (!user || !account || account.password !== password)
-    return 'invalidCredentials';
+export async function signIn(
+  username: string,
+  password: string,
+  signal?: AbortSignal,
+): Promise<SignInError | null> {
+  const attempt = ++authAttempt;
   try {
-    sessionStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ userId: user.id }),
+    const clientType = import.meta.env.VITE_AUTH_CLIENT_TYPE?.trim() || 'PC';
+    const authentication = await login(
+      {
+        username: username.trim(),
+        password,
+        // The backend validates the configured channel and returns fieldErrors.
+        clientType: clientType as LoginClientType,
+      },
+      signal,
     );
-    revoked = false;
-    notifySessionChange();
+    if (signal?.aborted || attempt !== authAttempt) return null;
+    setAuthenticatedSession(
+      createSession(
+        authentication,
+        Date.now() + authentication.expiresIn * 1000,
+      ),
+    );
     return null;
-  } catch {
-    return 'sessionUnavailable';
+  } catch (error) {
+    if (signal?.aborted || attempt !== authAttempt) return null;
+    signOut();
+    return error instanceof LoginError
+      ? error.failure
+      : {
+          kind: 'network',
+          message: error instanceof Error ? error.message : '',
+        };
   }
 }
 
-export function signOut() {
-  revoked = true;
+function createSession(
+  authentication: LoginResponse,
+  expiresAt: number,
+): AuthSession {
+  return {
+    user: {
+      // Login provides a canonical username but no user ID.
+      id: authentication.username,
+      username: authentication.username,
+      role: authentication.roles.join(', '),
+      status: 'Active',
+    },
+    modules: [
+      ...new Set(authentication.modules.map((module) => module.key)),
+    ].filter((key): key is ModuleKey => moduleKeys.includes(key as ModuleKey)),
+    authentication,
+    expiresAt,
+  };
+}
+
+// Restore only the backend response and original expiry, never local role mappings.
+export function initializeSession() {
+  clearDemoStorage();
   try {
-    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return;
+    const saved: unknown = JSON.parse(raw);
+    if (!saved || typeof saved !== 'object') throw new Error('Invalid session');
+    const record = saved as Record<string, unknown>;
+    if (
+      !isLoginResponse(record.authentication) ||
+      typeof record.expiresAt !== 'number' ||
+      !Number.isSafeInteger(record.expiresAt) ||
+      record.expiresAt <= Date.now()
+    ) {
+      throw new Error('Invalid or expired session');
+    }
+    setAuthenticatedSession(
+      createSession(record.authentication, record.expiresAt),
+    );
   } catch {
-    /* In-memory revocation still blocks access. */
+    signOut();
   }
+}
+
+// Persist the backend token and metadata, without passwords or local access records.
+export function setAuthenticatedSession(session: AuthSession | null) {
+  if (
+    session &&
+    (!session.user.id ||
+      !session.user.username ||
+      session.user.status !== 'Active' ||
+      !Array.isArray(session.modules) ||
+      !session.modules.every((key) => moduleKeys.includes(key)))
+  ) {
+    throw new Error('Invalid authenticated session');
+  }
+  if (session?.authentication && session.expiresAt !== undefined) {
+    try {
+      sessionStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          authentication: session.authentication,
+          expiresAt: session.expiresAt,
+        }),
+      );
+    } catch {
+      throw new LoginError('sessionUnavailable');
+    }
+  } else {
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch {
+      // In-memory logout must still complete if browser storage is blocked.
+    }
+  }
+  authAttempt++;
+  clearTimeout(expiryTimer);
+  currentSession = session ? structuredClone(session) : null;
+  if (session?.expiresAt !== undefined) scheduleExpiry();
   notifySessionChange();
 }
 
-export function readSession(): AuthSession | null {
-  if (revoked) return null;
-  try {
-    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const saved: unknown = JSON.parse(raw);
-    if (
-      !saved ||
-      typeof saved !== 'object' ||
-      !('userId' in saved) ||
-      typeof saved.userId !== 'string'
-    )
-      return null;
-    const { records, unavailable } = loadAccessData();
-    if (unavailable) return null;
-    const user = records.users.find(
-      (record) => record.id === saved.userId && record.status === 'Active',
-    );
-    if (!user || !demoAccounts.some((account) => account.userId === user.id))
-      return null;
-    const role = records.roles.find((record) => record.name === user.role);
-    return role ? { user, modules: role.modules } : null;
-  } catch {
-    return null;
+function scheduleExpiry() {
+  if (currentSession?.expiresAt === undefined) return;
+  const remaining = currentSession.expiresAt - Date.now();
+  if (remaining <= 0) {
+    signOut();
+    return;
   }
+  expiryTimer = setTimeout(scheduleExpiry, Math.min(remaining, 2_147_483_647));
+}
+
+export function signOut() {
+  setAuthenticatedSession(null);
+}
+
+export function readSession(): AuthSession | null {
+  if (
+    currentSession?.expiresAt !== undefined &&
+    currentSession.expiresAt <= Date.now()
+  )
+    return null;
+  return currentSession ? structuredClone(currentSession) : null;
 }
 
 export function getModuleForPath(pathname: string): ModuleKey | null {
@@ -119,15 +185,7 @@ export function getLandingPath(session: AuthSession) {
 }
 
 export function getSessionSnapshot() {
-  try {
-    return JSON.stringify([
-      revoked,
-      sessionStorage.getItem(SESSION_STORAGE_KEY),
-      localStorage.getItem(ACCESS_STORAGE_KEY),
-    ]);
-  } catch {
-    return '';
-  }
+  return JSON.stringify(readSession());
 }
 
 export function subscribeSession(listener: () => void) {

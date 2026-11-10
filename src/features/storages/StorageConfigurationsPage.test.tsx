@@ -1,3 +1,4 @@
+import { sampleStorages, seedTestData } from '../../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -21,7 +22,7 @@ function setup() {
   };
 }
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('storage configurations', () => {
@@ -86,7 +87,9 @@ describe('storage configurations', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('rowheader', { name: 'ST-001' })).toBeVisible();
-    expect(localStorage.getItem(STORAGE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(STORAGE_STORAGE_KEY)).toBe(
+      JSON.stringify(sampleStorages),
+    );
   });
   it('rejects missing fields and duplicate storage numbers', async () => {
     const { user } = setup();

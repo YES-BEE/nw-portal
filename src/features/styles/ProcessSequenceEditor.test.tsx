@@ -1,9 +1,10 @@
+import { sampleProcesses } from '../../test/fixtures';
 import { useState } from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { sampleProcesses } from '../processes/processData';
+
 import { ProcessSequenceEditor } from './ProcessSequenceEditor';
 import type { ProcessStep } from './ProcessSequenceEditor';
 import {
@@ -135,7 +136,9 @@ describe('process drag-and-drop option', () => {
     const latest = onChange.mock.lastCall![0] as ProcessStep[];
     expect(latest.map((step) => step.processId)).toEqual(['demo-2', 'demo-2']);
     expect(new Set(latest.map((step) => step.id)).size).toBe(2);
-    const overview = screen.getByRole('region', { name: 'Selected Processes Overview' });
+    const overview = screen.getByRole('region', {
+      name: 'Selected Processes Overview',
+    });
     expect(within(overview).getAllByRole('listitem')).toHaveLength(2);
     expect(within(overview).getAllByText('Washing')).toHaveLength(2);
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
@@ -157,10 +160,14 @@ describe('process drag-and-drop option', () => {
       ),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText('Washing'),
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+        'Washing',
+      ),
     ).toBeVisible();
     expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).queryByText('Industrial washing process'),
+      within(screen.getByRole('region', { name: 'Step 1' })).queryByText(
+        'Industrial washing process',
+      ),
     ).not.toBeInTheDocument();
   });
 

@@ -1,9 +1,22 @@
-import { screen, within } from '@testing-library/react';
+import axios from 'axios';
+import type { MockInstance } from 'vitest';
+import { loginResponse } from '../../test/auth';
+import { readSession } from './session';
+import { seedTestData } from '../../test/fixtures';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './LoginPage';
+
+let postMock: MockInstance<typeof axios.post>;
 
 function setup() {
   const user = userEvent.setup();
@@ -26,7 +39,19 @@ describe('LoginPage', () => {
   let description: HTMLMetaElement;
 
   beforeEach(() => {
-    localStorage.clear();
+    vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
+    postMock = vi.spyOn(axios, 'post');
+    postMock.mockResolvedValue({
+      status: 401,
+      data: {
+        type: 'about:blank',
+        title: 'Authentication failed',
+        status: 401,
+        detail: 'Bad credentials',
+        code: 'AUTHENTICATION_FAILED',
+      },
+    });
+    seedTestData();
     sessionStorage.clear();
     originalTitle = document.title;
     originalLanguage = document.documentElement.lang;
@@ -37,6 +62,8 @@ describe('LoginPage', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     description.remove();
     document.title = originalTitle;
     document.documentElement.lang = originalLanguage;
@@ -177,8 +204,8 @@ describe('LoginPage', () => {
     await user.type(password, 'test-password');
     await user.click(submit);
 
-    expect(password).toHaveAccessibleDescription(
-      'Invalid username or password, or the account is inactive.',
+    await waitFor(() =>
+      expect(password).toHaveAccessibleDescription('Bad credentials'),
     );
     expect(storeValue).not.toHaveBeenCalled();
   });
@@ -193,12 +220,179 @@ describe('LoginPage', () => {
     await user.type(username, 'operator');
     await user.type(password, 'test-password{Enter}');
 
-    expect(password).toHaveAccessibleDescription(
-      'Invalid username or password, or the account is inactive.',
+    await waitFor(() =>
+      expect(password).toHaveAccessibleDescription('Bad credentials'),
     );
     expect(screen.getByRole('status')).not.toHaveTextContent(
       'Password recovery',
     );
+  });
+
+  it.each([
+    { detail: 'Login denied by backend' },
+    { message: 'Invalid backend credentials' },
+    { title: 'Backend authentication failure' },
+  ])(
+    'displays backend 401 text without requiring an exact code or full Problem Detail body: %j',
+    async (body) => {
+      postMock.mockResolvedValue({ status: 401, data: body });
+      const { user, username, password, submit } = setup();
+      await user.type(username, 'admin');
+      await user.type(password, 'password');
+      await user.click(submit);
+      await waitFor(() =>
+        expect(password).toHaveAccessibleDescription(Object.values(body)[0]),
+      );
+      expect(
+        screen.queryByText(/Unable to sign in|Invalid username or password/),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('shows backend validation messages beside known fields and displays channel errors at form level', async () => {
+    postMock.mockResolvedValue({
+      status: 400,
+      data: JSON.stringify({
+        type: 'about:blank',
+        title: 'Bad Request',
+        status: 400,
+        detail: 'Request validation failed',
+        code: 'VALIDATION_FAILED',
+        fieldErrors: {
+          username: 'must not be blank',
+          password: 'Enter a valid password',
+          clientType: 'must match "PC|PAD"',
+        },
+      }),
+    });
+    const { user, username, password, submit } = setup();
+    await user.type(username, 'admin');
+    await user.type(password, 'password');
+    await user.click(submit);
+    await waitFor(() =>
+      expect(username).toHaveAccessibleDescription('must not be blank'),
+    );
+    expect(password).toHaveAccessibleDescription('Enter a valid password');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Request validation failed',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Application channel: must match "PC|PAD"',
+    );
+    await user.type(username, '2');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(username).not.toBeInvalid();
+  });
+  it('shows the recognized channel access detail without marking the password as incorrect', async () => {
+    postMock.mockResolvedValue({
+      status: 403,
+      data: {
+        type: 'about:blank',
+        title: 'Forbidden',
+        status: 403,
+        detail: 'Role does not allow this application channel',
+        code: 'ACCESS_DENIED',
+      },
+    });
+    const { user, username, password, submit } = setup();
+    await user.type(username, 'admin');
+    await user.type(password, 'password');
+    await user.click(submit);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Role does not allow this application channel',
+    );
+    expect(password).not.toBeInvalid();
+    expect(readSession()).toBeNull();
+  });
+  it.each([401, 403, 500, 502, 503, 504])(
+    'shows a safe fallback for an unstructured HTTP %s failure',
+    async (status) => {
+      postMock.mockResolvedValue({
+        status,
+        data: '<html><script>unsafe page</script>proxy error</html>',
+      });
+      const { user, username, password, submit } = setup();
+      await user.type(username, 'admin');
+      await user.type(password, 'password');
+      await user.click(submit);
+      if (status === 401) {
+        await waitFor(() =>
+          expect(password).toHaveAccessibleDescription('401'),
+        );
+      } else
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+          String(status),
+        );
+      expect(
+        screen.queryByText(/unsafe page|proxy error/),
+      ).not.toBeInTheDocument();
+      expect(readSession()).toBeNull();
+    },
+  );
+  it('shows a connection message for a rejected request', async () => {
+    postMock.mockRejectedValue(new Error('Network error'));
+    const { user, username, password, submit } = setup();
+    await user.type(username, 'admin');
+    await user.type(password, 'password');
+    await user.click(submit);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network error');
+  });
+
+  it('disables repeated submissions while waiting and opens the first backend-authorized module', async () => {
+    let resolve!: (value: { status: number; data: unknown }) => void;
+    postMock.mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/reports" element={<h1>Backend reports</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Username' }), 'admin');
+    await user.type(
+      screen.getByLabelText('Password', { exact: true }),
+      'password',
+    );
+    const submit = screen.getByRole('button', { name: 'Sign In' });
+    await user.click(submit);
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest('form')!);
+    expect(postMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolve({ status: 200, data: loginResponse });
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Backend reports' }),
+    ).toBeVisible();
+    expect(readSession()?.authentication?.roles).toEqual([
+      'NW',
+      'FACTOR_PASSWORD',
+    ]);
+  });
+  it('cancels a pending request when the login screen unmounts', async () => {
+    postMock.mockImplementation(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    const view = renderWithProviders(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Username' }), 'admin');
+    await user.type(
+      screen.getByLabelText('Password', { exact: true }),
+      'password',
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    const signal = postMock.mock.calls[0][2]?.signal as AbortSignal;
+    view.unmount();
+    expect(signal.aborted).toBe(true);
   });
 
   it('offers recovery feedback even with empty credentials without submitting the form', async () => {

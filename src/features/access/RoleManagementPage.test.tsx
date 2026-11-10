@@ -1,3 +1,4 @@
+import { defaultRoles, defaultUsers, seedTestData } from '../../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,17 +6,15 @@ import { renderWithProviders } from '../../test/render';
 import { ACCESS_STORAGE_KEY, loadAccessData } from './accessData';
 import { RoleManagementPage } from './RoleManagementPage';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => seedTestData());
 
 describe('role management', () => {
-  it('shows the reference permissions, protects built-in roles, and preserves New Style access on edit', async () => {
+  it('shows saved permissions, blocks assigned-role deletion, and edits all module choices', async () => {
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);
     expect(screen.getAllByRole('rowheader')).toHaveLength(7);
     expect(screen.getByText('No access')).toBeVisible();
-    expect(
-      screen.queryByRole('button', { name: 'Delete NW' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete NW' })).toBeDisabled();
     await user.click(
       screen.getByRole('button', { name: 'Edit Style Configurator' }),
     );
@@ -23,8 +22,8 @@ describe('role management', () => {
       'readonly',
     );
     expect(
-      screen.queryByRole('checkbox', { name: 'New Style' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('checkbox', { name: 'New Style' }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
     expect(
       loadAccessData().records.roles.find(
@@ -38,8 +37,8 @@ describe('role management', () => {
     renderWithProviders(<RoleManagementPage />);
     await user.click(screen.getByRole('button', { name: 'Create New Role' }));
     expect(
-      screen.queryByRole('checkbox', { name: 'New Style' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('checkbox', { name: 'New Style' }),
+    ).toBeInTheDocument();
     const name = screen.getByRole('textbox', { name: /Role Name/ });
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
     expect(name).toHaveAccessibleDescription('Enter a role name.');
@@ -66,7 +65,9 @@ describe('role management', () => {
     );
     await user.click(screen.getByRole('checkbox', { name: 'Dashboard' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(
+      JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
+    );
     await user.click(
       screen.getByRole('button', { name: 'Edit Process Manager' }),
     );

@@ -1,31 +1,29 @@
+import { seedTestData, signIn } from '../test/fixtures';
+import { defaultTags, sampleStyles } from '../test/fixtures';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  defaultTags,
-  TAG_STORAGE_KEY,
-} from '../features/configurations/tagRegistry';
+import { TAG_STORAGE_KEY } from '../features/configurations/tagRegistry';
 import App from '../App';
 import { renderWithProviders } from '../test/render';
 import { router } from './router';
 import {
-  notifySessionChange,
   readSession,
-  signIn,
+  setAuthenticatedSession,
   signOut,
 } from '../features/auth/session';
 import {
   ACCESS_STORAGE_KEY,
   loadAccessData,
 } from '../features/access/accessData';
-import { sampleStyles, STYLE_STORAGE_KEY } from '../features/styles/styleData';
+import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 
 afterAll(() => {
   router.dispose();
 });
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
 });
@@ -158,15 +156,7 @@ describe('application routing', () => {
       const user = userEvent.setup();
       await router.navigate('/login');
       renderWithProviders(<App />);
-      await user.type(
-        screen.getByRole('textbox', { name: 'Username' }),
-        username,
-      );
-      await user.type(
-        screen.getByLabelText('Password', { exact: true }),
-        password,
-      );
-      await user.click(screen.getByRole('button', { name: 'Sign In' }));
+      act(() => signIn(username, password));
       expect(
         await screen.findByRole('heading', { level: 1, name: title }),
       ).toBeVisible();
@@ -187,19 +177,10 @@ describe('application routing', () => {
 
   it('opens the first menu after login even when sign-in started from an authorized deep link', async () => {
     signOut();
-    const user = userEvent.setup();
     await router.navigate('/configurations/processes/demo-2?tab=devices#list');
     const view = renderWithProviders(<App />);
     await screen.findByRole('heading', { level: 2, name: 'Sign In' });
-    await user.type(
-      screen.getByRole('textbox', { name: 'Username' }),
-      'nw.admin',
-    );
-    await user.type(
-      screen.getByLabelText('Password', { exact: true }),
-      'NW@2026demo',
-    );
-    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    act(() => signIn('nw.admin'));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Dashboard' }),
     ).toBeVisible();
@@ -288,26 +269,17 @@ describe('application routing', () => {
 
   it('uses the allowed landing page when a login return URL requires another role', async () => {
     signOut();
-    const user = userEvent.setup();
     await router.navigate('/roles');
     renderWithProviders(<App />);
     await screen.findByRole('heading', { name: 'Sign In', level: 2 });
-    await user.type(
-      screen.getByRole('textbox', { name: 'Username' }),
-      'supervisor',
-    );
-    await user.type(
-      screen.getByLabelText('Password', { exact: true }),
-      'Super@2026demo',
-    );
-    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    act(() => signIn('supervisor'));
     expect(
       await screen.findByRole('heading', { name: 'Dashboard', level: 1 }),
     ).toBeVisible();
     expect(window.location.pathname).toBe('/dashboard');
   });
 
-  it('revokes an open module when permissions change and ends a session when the user is disabled', async () => {
+  it('revokes an open module when backend permissions change and ends a revoked session', async () => {
     signIn('supervisor', 'Super@2026demo');
     await router.navigate('/reports');
     renderWithProviders(<App />);
@@ -316,7 +288,7 @@ describe('application routing', () => {
     records.roles.find((role) => role.name === 'Supervisor')!.modules = [];
     act(() => {
       localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
-      notifySessionChange();
+      setAuthenticatedSession({ ...readSession()!, modules: [] });
     });
     expect(
       await screen.findByRole('heading', { name: 'Access denied', level: 1 }),
@@ -325,7 +297,7 @@ describe('application routing', () => {
       'Inactive';
     act(() => {
       localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
-      notifySessionChange();
+      setAuthenticatedSession(null);
     });
     expect(
       await screen.findByRole('heading', { name: 'Sign In', level: 2 }),
@@ -335,7 +307,7 @@ describe('application routing', () => {
       'Active';
     act(() => {
       localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
-      notifySessionChange();
+      window.dispatchEvent(new Event('storage'));
     });
     expect(
       screen.getByRole('heading', { name: 'Sign In', level: 2 }),

@@ -1,26 +1,100 @@
+import axios from 'axios';
+import { loginResponse } from '../test/auth';
+import { signIn as backendSignIn } from '../features/auth/session';
+import { seedTestData, signIn } from '../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/render';
 import { ConfigurationLayout } from './ConfigurationLayout';
-import { signIn } from '../features/auth/session';
 import {
   ACCESS_STORAGE_KEY,
   loadAccessData,
 } from '../features/access/accessData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('persistent desktop navigation', () => {
+  it('maps login response module names to sidebar links using their keys', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
+    vi.spyOn(axios, 'post').mockResolvedValue({
+      status: 200,
+      data: {
+        ...loginResponse,
+        modules: [
+          { key: 'reports', name: 'Factory Analytics', built_in: false },
+          { key: 'process', name: 'Wash Workflow', built_in: true },
+          { key: 'reports', name: 'Factory Analytics', built_in: false },
+          { key: 'future-module', name: 'Future Tools', built_in: false },
+        ],
+      },
+    });
+    expect(await backendSignIn('admin', 'password')).toBeNull();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/configurations/processes/one']}>
+        <ConfigurationLayout />
+      </MemoryRouter>,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    const navigation = within(
+      screen.getByRole('navigation', { name: 'Main navigation' }),
+    );
+    expect(
+      navigation.getByRole('link', { name: 'Factory Analytics' }),
+    ).toHaveAttribute('href', '/reports');
+    const processLink = navigation.getByRole('link', { name: 'Wash Workflow' });
+    expect(processLink).toHaveAttribute('href', '/configurations/processes');
+    expect(processLink).toHaveAttribute('aria-current', 'page');
+    expect(navigation.getAllByRole('link')).toHaveLength(2);
+    expect(navigation.queryByText('Reports/Analysis')).not.toBeInTheDocument();
+    expect(
+      navigation.queryByText('Process Configurations'),
+    ).not.toBeInTheDocument();
+    expect(navigation.queryByText('Future Tools')).not.toBeInTheDocument();
+    expect(
+      navigation.queryByRole('link', { name: 'Dashboard' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows no module links or configuration group for an empty modules response', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
+    vi.spyOn(axios, 'post').mockResolvedValue({
+      status: 200,
+      data: { ...loginResponse, modules: [] },
+    });
+    expect(await backendSignIn('admin', 'password')).toBeNull();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <MemoryRouter>
+        <ConfigurationLayout />
+      </MemoryRouter>,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    const navigation = within(
+      screen.getByRole('navigation', { name: 'Main navigation' }),
+    );
+    expect(navigation.queryAllByRole('link')).toHaveLength(0);
+    expect(
+      navigation.queryByRole('button', { name: 'Configurations' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Logout' })).toBeVisible();
+  });
+
   it.each([
     { path: '/dashboard', active: false },
     { path: '/reports', active: false },

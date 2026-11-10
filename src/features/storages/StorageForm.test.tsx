@@ -1,12 +1,12 @@
+import { sampleStorages, seedTestData } from '../../test/fixtures';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { StorageForm } from './StorageForm';
-import { sampleStorages } from './storageData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('storage editor callbacks', () => {
@@ -34,7 +34,7 @@ describe('storage editor callbacks', () => {
       description: 'Holding area',
       tag: 'NFC-STORE-003',
     });
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.length).toBe(5);
   });
 
   it('blocks stale NFC assignments and attaches the error to the dropdown', async () => {

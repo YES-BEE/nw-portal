@@ -1,12 +1,12 @@
+import { sampleProcesses, seedTestData } from '../../test/fixtures';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { ProcessForm } from './ProcessForm';
-import { sampleProcesses } from './processData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('process editor callbacks', () => {

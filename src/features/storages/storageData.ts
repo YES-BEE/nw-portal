@@ -2,22 +2,7 @@ import { loadTags } from '../configurations/tagRegistry';
 import type { ProcessConfiguration } from '../processes/types';
 import type { StorageConfiguration } from './types';
 
-export const STORAGE_STORAGE_KEY = 'nw-track-storages-v1';
-
-export const sampleStorages: StorageConfiguration[] = [
-  {
-    id: 'storage-demo-1',
-    number: 'ST-001',
-    description: 'Intermediate storage bay A',
-    tag: 'NFC-STORE-001',
-  },
-  {
-    id: 'storage-demo-2',
-    number: 'ST-002',
-    description: 'Finished goods holding area',
-    tag: 'NFC-STORE-002',
-  },
-];
+export const STORAGE_STORAGE_KEY = 'nw-track-storages-v2';
 
 function isStorage(value: unknown): value is StorageConfiguration {
   if (typeof value !== 'object' || value === null) return false;
@@ -38,12 +23,12 @@ export function loadStorages(): {
     if (Array.isArray(stored) && stored.every(isStorage))
       return { records: stored, storageUnavailable: false };
     return {
-      records: structuredClone(sampleStorages),
+      records: [],
       storageUnavailable: stored !== null,
     };
   } catch {
     return {
-      records: structuredClone(sampleStorages),
+      records: [],
       storageUnavailable: true,
     };
   }

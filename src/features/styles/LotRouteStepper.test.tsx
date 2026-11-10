@@ -1,7 +1,8 @@
+import { sampleProcesses } from '../../test/fixtures';
 import { screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { sampleProcesses } from '../processes/processData';
+
 import { LotRouteStepper } from './LotRouteStepper';
 
 afterEach(() => vi.unstubAllGlobals());

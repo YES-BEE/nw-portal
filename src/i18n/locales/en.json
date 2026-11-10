@@ -111,13 +111,12 @@
     "dragFinished": "Placed {{name}} in the production sequence.",
     "dragCancelled": "Drag cancelled. The sequence has not changed.",
     "process": "Process",
-    "station": "Linked Station",
     "step": "Step {{count}}",
     "removeStep": "Remove step {{count}}",
     "unavailableProcess": "Unavailable process ({{id}})",
     "deleteTitle": "Delete style?",
     "deleteMessage": "Delete {{name}}? This action cannot be undone.",
-    "loadWarning": "Saved styles could not be loaded. Reference records are shown. Restore browser data before saving changes.",
+    "loadWarning": "Saved styles could not be loaded. No records are shown. Restore browser data before saving changes.",
     "storageError": "Changes could not be saved in this browser. Your records and editor have been kept.",
     "recordsUnavailable": "Saved styles could not be verified. No changes were saved. Restore browser data and try again.",
     "processesUnavailable": "Process configurations could not be verified. Restore the process records before saving a style.",
@@ -140,9 +139,9 @@
     "emptyTitle": "No modules available",
     "emptyDescription": "Your role currently has no available modules. Contact your administrator for access.",
     "backToWorkspace": "Back to workspace",
+    "channelError": "Application channel: {{message}}",
     "errors": {
-      "invalidCredentials": "Invalid username or password, or the account is inactive.",
-      "recordsUnavailable": "User and role records could not be verified. Please try again later.",
+      "invalidResponse": "The sign-in service returned an invalid response. Please try again.",
       "sessionUnavailable": "Your session could not be started. Allow browser storage and try again."
     }
   },
@@ -170,7 +169,7 @@
     "deleteTitle": "Delete record?",
     "deleteMessage": "Delete {{name}}? This action cannot be undone.",
     "saved": "Changes saved successfully.",
-    "loadWarning": "Saved user and role records could not be loaded. Reference records are shown; saving will replace the local records.",
+    "loadWarning": "Saved user and role records could not be loaded. No records are shown; saving will replace the local records.",
     "storageError": "Changes could not be saved in this browser. Your records and editor have been kept.",
     "roleAssigned": "The records have changed or this role is assigned to users. Refresh the page and review the records before trying again.",
     "users": {
@@ -182,7 +181,7 @@
       "search": "Search users",
       "associatedProcesses": "Associated Processes",
       "selectProcesses": "Select processes",
-      "processHint": "Associate this process manager with at least one process.",
+      "processHint": "Optionally associate this user with processes.",
       "noProcesses": "No processes available.",
       "processLoadWarning": "Saved processes could not be loaded. Reference processes are shown.",
       "empty": "No users match your search."
@@ -211,7 +210,6 @@
       "roleRequired": "Select a valid role.",
       "roleNameRequired": "Enter a role name.",
       "statusRequired": "Select a status.",
-      "processesRequired": "Select at least one process.",
       "roleDuplicate": "This role already exists."
     }
   },
@@ -280,7 +278,7 @@
     "deleted": "Process deleted.",
     "deleteTitle": "Delete process?",
     "deleteMessage": "Delete “{{name}}”? Its NFC tags will become available for other processes.",
-    "loadWarning": "Saved data could not be loaded. Sample records are shown; saving will replace the local records.",
+    "loadWarning": "Saved data could not be loaded. No records are shown; saving will replace the local records.",
     "storageError": "Changes could not be saved in this browser. Your existing records have been kept. Check browser storage and try again.",
     "errors": {
       "nameRequired": "Enter a process name.",
@@ -329,7 +327,7 @@
     "deleted": "Storage deleted.",
     "deleteTitle": "Delete storage?",
     "deleteMessage": "Delete storage “{{number}}”? Its NFC tag will become available for other configurations.",
-    "loadWarning": "Saved storage data could not be loaded. Sample records are shown; saving will replace the local storage records.",
+    "loadWarning": "Saved storage data could not be loaded. No records are shown; saving will replace the local storage records.",
     "storageError": "Changes could not be saved in this browser. Your existing storage records have been kept. Check browser storage and try again.",
     "errors": {
       "numberRequired": "Enter a storage number.",
@@ -373,7 +371,7 @@
     "search": "Search tags",
     "searchPlaceholder": "Search by tag name or NFC ID",
     "noMatches": "No tags match your search.",
-    "loadWarning": "Saved tag data could not be loaded. Default tags are shown; saving will replace the local tag registry.",
+    "loadWarning": "Saved tag data could not be loaded. No tags are shown; saving will replace the local tag registry.",
     "storageError": "Changes could not be saved in this browser. Your existing tags and form have been kept. Check browser storage and try again.",
     "assignmentsUnavailable": "Assignments could not be verified. Existing NFC IDs and tag deletions are locked until process and storage records can be loaded.",
     "assignment": {

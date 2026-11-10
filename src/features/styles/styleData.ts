@@ -1,7 +1,7 @@
 import type { AuthSession } from '../auth/session';
 import type { ProcessConfiguration } from '../processes/types';
 
-export const STYLE_STORAGE_KEY = 'nw-track-demo-styles-v1';
+export const STYLE_STORAGE_KEY = 'nw-track-styles-v2';
 export type StyleMode = 'management' | 'own';
 export interface StyleRecord {
   id: string;
@@ -27,22 +27,6 @@ export type StyleDraft = Omit<
   weight: string;
   avg: string;
 };
-
-export const sampleStyles: StyleRecord[] = [
-  {
-    id: 'sty-1',
-    number: 'STY-1001',
-    created: '2026-11-01',
-    description: 'Denim wash style',
-    client: 'Fabric Client A',
-    garments: 2000,
-    lots: 20,
-    weight: 100,
-    avg: 1,
-    delivery: '2026-11-30',
-    steps: ['demo-1', 'demo-2'],
-  },
-];
 
 export function isDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -110,7 +94,7 @@ export function loadStyles(): {
     const raw = localStorage.getItem(STYLE_STORAGE_KEY);
     if (raw === null)
       return {
-        records: structuredClone(sampleStyles),
+        records: [],
         storageUnavailable: false,
       };
     const values: unknown = JSON.parse(raw);
@@ -127,7 +111,7 @@ export function loadStyles(): {
       throw new Error('Duplicate styles');
     return { records: valid, storageUnavailable: false };
   } catch {
-    return { records: structuredClone(sampleStyles), storageUnavailable: true };
+    return { records: [], storageUnavailable: true };
   }
 }
 

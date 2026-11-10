@@ -30,13 +30,13 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutlined';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
-import type { ModuleKey } from '../features/access/accessData';
 import { configurationTheme, theme } from '../app/theme';
 import logo from '../assets/logo.png';
 import { signOut } from '../features/auth/session';
 import { useSession } from '../features/auth/useSession';
 import {
   mainNavigationItems,
+  mapNavigationModules,
   configurationNavigationItems as configurationItems,
 } from '../app/navigation';
 
@@ -62,9 +62,17 @@ export function ConfigurationLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const session = useSession();
-  const allowed = (key: ModuleKey) => session?.modules.includes(key) ?? false;
-  const visibleConfigurationItems = configurationItems.filter((item) =>
-    allowed(item.permission),
+  const modules = session?.authentication?.modules ?? [];
+  const permissions = session?.modules ?? [];
+  const visibleMainItems = mapNavigationModules(
+    mainNavigationItems,
+    modules,
+    permissions,
+  );
+  const visibleConfigurationItems = mapNavigationModules(
+    configurationItems,
+    modules,
+    permissions,
   );
   const hasConfigurations = visibleConfigurationItems.length > 0;
   const isActive = (path: string) =>
@@ -133,10 +141,9 @@ export function ConfigurationLayout() {
       </Toolbar>
       <Divider sx={{ borderColor: '#304361' }} />
       <List component="nav" aria-label={t('navigation.main')} disablePadding>
-        {mainNavigationItems
-          .filter((item) => allowed(item.permission))
+        {visibleMainItems
           .map((item) => ({ ...item, Icon: navigationIcons[item.key] }))
-          .map(({ key, path, Icon }) => (
+          .map(({ key, path, name, Icon }) => (
             <ListItemButton
               key={key}
               component={NavLink}
@@ -152,7 +159,7 @@ export function ConfigurationLayout() {
                 <Icon />
               </ListItemIcon>
               <ListItemText
-                primary={t(`navigation.${key}`)}
+                primary={name}
                 slotProps={{
                   primary: {
                     sx: {
@@ -224,7 +231,7 @@ export function ConfigurationLayout() {
                   }}
                 >
                   <ListItemText
-                    primary={t(`navigation.${item.key}`)}
+                    primary={item.name}
                     slotProps={{
                       primary: {
                         sx: {

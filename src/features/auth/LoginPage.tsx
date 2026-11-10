@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import {
+  Alert,
   Box,
   Button,
   FormLabel,
@@ -40,9 +41,23 @@ export function LoginPage() {
     password: '',
   });
   const [submitted, setSubmitted] = useState(false);
-  const usernameError = submitted && !credentials.username.trim();
+  const [signingIn, setSigningIn] = useState(false);
+  const loginRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => loginRequest.current?.abort(), []);
+  const backendError = typeof signInError === 'object' ? signInError : null;
+  const fieldErrors = backendError?.fieldErrors;
+  const credentialsError = backendError?.kind === 'credentials';
+  const usernameRequired = submitted && !credentials.username.trim();
+  const usernameError = usernameRequired || Boolean(fieldErrors?.username);
+  const passwordRequired = submitted && !credentials.password.trim();
   const passwordError =
-    (submitted && !credentials.password) || signInError !== null;
+    passwordRequired || Boolean(fieldErrors?.password) || credentialsError;
+  const formError =
+    signInError && !credentialsError
+      ? typeof signInError === 'string'
+        ? t(`auth.errors.${signInError}`)
+        : signInError.message
+      : null;
 
   useEffect(() => {
     document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
@@ -52,8 +67,9 @@ export function LoginPage() {
       ?.setAttribute('content', t('login.pageDescription'));
   }, [i18n.resolvedLanguage, t]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loginRequest.current) return;
     const data = new FormData(event.currentTarget);
     const username = String(data.get('username') ?? '').trim();
     const password = String(data.get('password') ?? '');
@@ -61,13 +77,22 @@ export function LoginPage() {
     setSubmitted(true);
     setNotice(null);
     setSignInError(null);
-    if (!username || !password) {
+    if (!username || !password.trim()) {
       event.currentTarget
         .querySelector<HTMLInputElement>(!username ? '#username' : '#password')
         ?.focus();
       return;
     }
-    setSignInError(signIn(username, password));
+    const controller = new AbortController();
+    loginRequest.current = controller;
+    setSigningIn(true);
+    try {
+      const error = await signIn(username, password, controller.signal);
+      if (!controller.signal.aborted) setSignInError(error);
+    } finally {
+      loginRequest.current = null;
+      if (!controller.signal.aborted) setSigningIn(false);
+    }
   }
 
   if (session) return <Navigate to={getLandingPath(session)} replace />;
@@ -142,6 +167,7 @@ export function LoginPage() {
           className="auth-card"
           onSubmit={handleSubmit}
           noValidate
+          aria-busy={signingIn}
           elevation={0}
         >
           <Box className="auth-lock">
@@ -150,6 +176,16 @@ export function LoginPage() {
           <Typography component="h2" id="sign-in-heading">
             {t('login.signIn')}
           </Typography>
+          {formError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {formError}
+              {fieldErrors?.clientType && (
+                <Box>
+                  {t('auth.channelError', { message: fieldErrors.clientType })}
+                </Box>
+              )}
+            </Alert>
+          )}
           <Box className="auth-field">
             <FormLabel
               htmlFor="username"
@@ -160,6 +196,7 @@ export function LoginPage() {
             </FormLabel>
             <TextField
               id="username"
+              disabled={signingIn}
               name="username"
               value={credentials.username}
               onChange={(event) => {
@@ -172,7 +209,9 @@ export function LoginPage() {
               }}
               error={usernameError}
               helperText={
-                usernameError ? t('login.errors.usernameRequired') : undefined
+                usernameRequired
+                  ? t('login.errors.usernameRequired')
+                  : fieldErrors?.username
               }
               placeholder={t('login.usernamePlaceholder')}
               autoComplete="username"
@@ -199,6 +238,7 @@ export function LoginPage() {
             </FormLabel>
             <TextField
               id="password"
+              disabled={signingIn}
               name="password"
               value={credentials.password}
               onChange={(event) => {
@@ -211,11 +251,10 @@ export function LoginPage() {
               }}
               error={passwordError}
               helperText={
-                submitted && !credentials.password
+                passwordRequired
                   ? t('login.errors.passwordRequired')
-                  : signInError
-                    ? t(`auth.errors.${signInError}`)
-                    : undefined
+                  : (fieldErrors?.password ??
+                    (credentialsError ? backendError?.message : undefined))
               }
               type={showPassword ? 'text' : 'password'}
               placeholder={t('login.passwordPlaceholder')}
@@ -265,7 +304,12 @@ export function LoginPage() {
               {t('login.forgot')}
             </Link>
           </Box>
-          <Button type="submit" variant="contained" fullWidth>
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={signingIn}
+          >
             {t('login.signIn')}
           </Button>
           <Typography className="auth-notice" role="status" aria-live="polite">

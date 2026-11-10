@@ -1,7 +1,14 @@
+import {
+  defaultRoles,
+  defaultUsers,
+  sampleProcesses,
+  sampleStyles,
+  seedTestData,
+} from '../../test/fixtures';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { defaultRoles, defaultUsers } from '../access/accessData';
+
 import type { AuthSession } from '../auth/session';
-import { sampleProcesses } from '../processes/processData';
+
 import {
   canViewStyle,
   emptyStyle,
@@ -10,13 +17,12 @@ import {
   loadStyles,
   normalizeStyle,
   ownsStyle,
-  sampleStyles,
   saveStyleRecord,
   STYLE_STORAGE_KEY,
   toStyleDraft,
 } from './styleData';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => seedTestData());
 const admin: AuthSession = {
   user: defaultUsers[0],
   modules: defaultRoles[0].modules,
@@ -32,7 +38,7 @@ describe('style records and validation', () => {
     expect(data).toEqual({ records: sampleStyles, storageUnavailable: false });
     data.records[0].steps.reverse();
     expect(sampleStyles[0].steps).toEqual(['demo-1', 'demo-2']);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.length).toBe(5);
     localStorage.setItem(STYLE_STORAGE_KEY, '[]');
     expect(loadStyles()).toEqual({ records: [], storageUnavailable: false });
   });
@@ -56,7 +62,7 @@ describe('style records and validation', () => {
     (value) => {
       localStorage.setItem(STYLE_STORAGE_KEY, value);
       expect(loadStyles()).toEqual({
-        records: sampleStyles,
+        records: [],
         storageUnavailable: true,
       });
       expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBe(value);

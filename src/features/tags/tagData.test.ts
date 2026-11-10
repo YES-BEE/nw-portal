@@ -1,14 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
 import {
   defaultTags,
-  loadTags,
-  TAG_STORAGE_KEY,
-} from '../configurations/tagRegistry';
-import {
   sampleProcesses,
-  getProcessFieldErrors,
-} from '../processes/processData';
-import { sampleStorages, getStorageFieldErrors } from '../storages/storageData';
+  sampleStorages,
+  seedTestData,
+} from '../../test/fixtures';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { loadTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
+import { getProcessFieldErrors } from '../processes/processData';
+import { getStorageFieldErrors } from '../storages/storageData';
 import {
   collectTagAssignments,
   normalizeTag,
@@ -16,7 +15,7 @@ import {
 } from './tagData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('tag validation', () => {
@@ -123,7 +122,7 @@ describe('tag registry persistence', () => {
     (stored) => {
       localStorage.setItem(TAG_STORAGE_KEY, stored);
       expect(loadTags()).toEqual({
-        records: defaultTags,
+        records: [],
         storageUnavailable: true,
       });
       expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(stored);

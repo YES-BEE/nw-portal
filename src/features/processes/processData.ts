@@ -2,41 +2,7 @@ import type { ProcessConfiguration } from './types';
 import { loadTags } from '../configurations/tagRegistry';
 import { loadStorages } from '../storages/storageData';
 
-export const PROCESS_STORAGE_KEY = 'nw-track-process-config-v3';
-
-export const sampleProcesses: ProcessConfiguration[] = [
-  {
-    id: 'demo-1',
-    name: 'Lot Preparation',
-    description: 'Preparation and sorting of garments',
-    station: '01',
-    mode: 'process',
-    processTag: 'NFC-PROC-001',
-    devices: [],
-  },
-  {
-    id: 'demo-2',
-    name: 'Washing',
-    description: 'Industrial washing process',
-    station: '03',
-    mode: 'devices',
-    processTag: '',
-    devices: [
-      {
-        id: 'washer-1',
-        name: 'Washer 01',
-        description: 'Main washing machine',
-        tag: 'NFC-DEV-001',
-      },
-      {
-        id: 'washer-2',
-        name: 'Washer 02',
-        description: 'Secondary washing machine',
-        tag: 'NFC-DEV-002',
-      },
-    ],
-  },
-];
+export const PROCESS_STORAGE_KEY = 'nw-track-process-config-v4';
 
 function isProcess(value: unknown): value is ProcessConfiguration {
   if (typeof value !== 'object' || value === null) return false;
@@ -81,12 +47,12 @@ export function loadProcesses(): {
       };
     }
     return {
-      records: structuredClone(sampleProcesses),
+      records: [],
       storageUnavailable: stored !== null,
     };
   } catch {
     return {
-      records: structuredClone(sampleProcesses),
+      records: [],
       storageUnavailable: true,
     };
   }

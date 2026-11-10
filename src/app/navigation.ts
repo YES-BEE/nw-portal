@@ -1,3 +1,6 @@
+import type { ModuleKey } from '../features/access/accessData';
+import type { LoginModule } from '../features/auth/types';
+
 export const mainNavigationItems = [
   { key: 'dashboard', permission: 'dashboard', path: '/dashboard' },
   { key: 'reports', permission: 'reports', path: '/reports' },
@@ -21,3 +24,18 @@ export const orderedNavigationItems = [
   ...mainNavigationItems,
   ...configurationNavigationItems,
 ];
+
+// Route paths and icons belong to the app; availability and names come from login.
+export function mapNavigationModules<T extends { permission: ModuleKey }>(
+  items: readonly T[],
+  modules: readonly LoginModule[],
+  permissions: readonly ModuleKey[],
+): (T & { name: string })[] {
+  const byKey = new Map(modules.map((module) => [module.key, module]));
+  return items.flatMap((item) => {
+    const module = byKey.get(item.permission);
+    return module && permissions.includes(item.permission)
+      ? [{ ...item, name: module.name }]
+      : [];
+  });
+}

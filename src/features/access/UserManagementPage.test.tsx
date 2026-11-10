@@ -1,3 +1,4 @@
+import { defaultRoles, defaultUsers, seedTestData } from '../../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -5,7 +6,7 @@ import { renderWithProviders } from '../../test/render';
 import { ACCESS_STORAGE_KEY, loadAccessData } from './accessData';
 import { UserManagementPage } from './UserManagementPage';
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => seedTestData());
 
 describe('user management', () => {
   it('positions the user form without animation and keeps the role menu open until selection', async () => {
@@ -32,13 +33,13 @@ describe('user management', () => {
     }
   });
 
-  it('saves multiple process associations, restores them on edit, and clears them for another role', async () => {
+  it('saves optional process associations and preserves them when a user changes roles', async () => {
     const user = userEvent.setup();
     renderWithProviders(<UserManagementPage />);
     await user.click(screen.getByRole('button', { name: 'Add User' }));
     expect(
-      screen.queryByRole('combobox', { name: 'Associated Processes' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('combobox', { name: 'Associated Processes' }),
+    ).toBeVisible();
     await user.type(
       screen.getByRole('textbox', { name: /Username/ }),
       'new.manager',
@@ -47,14 +48,9 @@ describe('user management', () => {
     await user.click(screen.getByRole('option', { name: 'Process Manager' }));
     await user.click(screen.getByRole('combobox', { name: /Status/ }));
     await user.click(screen.getByRole('option', { name: 'Active' }));
-    await user.click(screen.getByRole('button', { name: 'Save User' }));
     const selector = screen.getByRole('combobox', {
       name: /Associated Processes/,
     });
-    expect(selector).toHaveAccessibleDescription(
-      'Select at least one process.',
-    );
-    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
     await user.click(selector);
     await user.click(screen.getByRole('option', { name: /Lot Preparation/ }));
     await user.click(screen.getByRole('option', { name: /Washing/ }));
@@ -84,11 +80,11 @@ describe('user management', () => {
     await user.click(screen.getByRole('combobox', { name: /Role/ }));
     await user.click(screen.getByRole('option', { name: 'Supervisor' }));
     expect(
-      screen.queryByRole('combobox', { name: 'Associated Processes' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('combobox', { name: 'Associated Processes' }),
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save User' }));
-    expect(savedUser()?.processIds).toEqual([]);
-  });
+    expect(savedUser()?.processIds).toEqual(['demo-1']);
+  }, 15000);
 
   it('shows the reference accounts and searches usernames and roles without case sensitivity', async () => {
     const user = userEvent.setup();
@@ -159,7 +155,9 @@ describe('user management', () => {
     await user.type(name, 'NW.ADMIN');
     await user.click(screen.getByRole('button', { name: 'Save User' }));
     expect(name).toHaveAccessibleDescription('This username already exists.');
-    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(
+      JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
+    );
     await user.clear(name);
     await user.type(name, 'supervisor');
     await user.click(screen.getByRole('combobox', { name: /Status/ }));
@@ -182,7 +180,9 @@ describe('user management', () => {
     renderWithProviders(<UserManagementPage />);
     await user.click(screen.getByRole('button', { name: 'Edit supervisor' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(
+      JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
+    );
     await user.click(screen.getByRole('button', { name: 'Delete supervisor' }));
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {
@@ -192,7 +192,9 @@ describe('user management', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );
-    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(
+      JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
+    );
     await user.click(screen.getByRole('button', { name: 'Delete supervisor' }));
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {

@@ -1,3 +1,4 @@
+import { sampleStyles, seedTestData } from '../../test/fixtures';
 import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,11 +8,11 @@ import {
   mockProcessDragLayout,
 } from '../../test/processDrag';
 import { PROCESS_STORAGE_KEY } from '../processes/processData';
-import { emptyStyle, sampleStyles, toStyleDraft } from './styleData';
+import { emptyStyle, toStyleDraft } from './styleData';
 import { StyleForm } from './StyleForm';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
   mockProcessDragLayout();
 });
 
@@ -87,7 +88,7 @@ describe('shared style form and drag-only process sequence', () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole('region', { name: 'Step 1' })).getByText(
-        'Station 03',
+        'Washing',
       ),
     ).toBeVisible();
     expect(onSave).not.toHaveBeenCalled();
@@ -170,7 +171,11 @@ describe('shared style form and drag-only process sequence', () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText('Unavailable process (removed)')).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
+        'Unavailable process (removed)',
+      ),
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save Style' }));
     expect(
       screen.getByText(

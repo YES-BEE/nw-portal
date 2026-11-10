@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ACCESS_STORAGE_KEY, isAccessData, loadAccessData } from './accessData';
 import type { AccessData } from './accessData';
-import { notifySessionChange } from '../auth/session';
 
 export function useAccessData() {
   const [data, setData] = useState(loadAccessData);
@@ -17,7 +16,6 @@ export function useAccessData() {
         return false;
       }
       localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
-      notifySessionChange();
       setData({ records, unavailable: false });
       setError(null);
       return true;

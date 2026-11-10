@@ -1,13 +1,14 @@
+import { defaultTags, seedTestData } from '../../test/fixtures';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { TagForm } from './TagForm';
-import { defaultTags } from '../configurations/tagRegistry';
+
 import { PROCESS_STORAGE_KEY } from '../processes/processData';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('tag editor callbacks', () => {
@@ -28,7 +29,7 @@ describe('tag editor callbacks', () => {
       name: 'Factory tag',
       actual: '04:AA:BB',
     });
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.length).toBe(5);
   });
 
   it('locks the NFC ID when assignments cannot be verified but allows a safe rename', async () => {

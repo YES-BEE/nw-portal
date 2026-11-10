@@ -1,10 +1,10 @@
+import { sampleStyles, seedTestData, signIn } from '../../test/fixtures';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { signIn } from '../auth/session';
-import { loadStyles, sampleStyles, STYLE_STORAGE_KEY } from './styleData';
+import { loadStyles, STYLE_STORAGE_KEY } from './styleData';
 import { StyleWorkspacePage } from './StyleWorkspacePage';
 import { StyleDetailsPage } from './StyleDetailsPage';
 import {
@@ -14,7 +14,7 @@ import {
 
 beforeEach(() => {
   mockProcessDragLayout();
-  localStorage.clear();
+  seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
 });
@@ -41,7 +41,9 @@ describe('shared style workspace', () => {
     await user.clear(search);
     await user.click(screen.getByRole('button', { name: 'Edit STY-1001' }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBe(
+      JSON.stringify(sampleStyles),
+    );
     expect(
       screen.getByRole('table', { name: 'Existing Styles' }),
     ).toBeVisible();
@@ -79,7 +81,9 @@ describe('shared style workspace', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );
-    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBe(
+      JSON.stringify(sampleStyles),
+    );
     await user.click(screen.getByRole('button', { name: 'Delete STY-1001' }));
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {

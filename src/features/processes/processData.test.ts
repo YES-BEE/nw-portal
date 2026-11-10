@@ -1,15 +1,15 @@
+import { sampleProcesses, seedTestData } from '../../test/fixtures';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   loadProcesses,
   normalizeProcess,
   PROCESS_STORAGE_KEY,
-  sampleProcesses,
   getProcessFieldErrors,
 } from './processData';
 import type { ProcessConfiguration } from './types';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('process validation', () => {
@@ -104,7 +104,7 @@ describe('local process records', () => {
     (stored) => {
       localStorage.setItem(PROCESS_STORAGE_KEY, stored);
       expect(loadProcesses()).toEqual({
-        records: sampleProcesses,
+        records: [],
         storageUnavailable: true,
       });
       expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(stored);
@@ -135,7 +135,7 @@ describe('local process records', () => {
       throw new Error('Storage denied');
     });
     expect(loadProcesses()).toEqual({
-      records: sampleProcesses,
+      records: [],
       storageUnavailable: true,
     });
   });

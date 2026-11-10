@@ -108,34 +108,32 @@ export function RoleForm({
               gap: 1,
             }}
           >
-            {moduleKeys
-              .filter((key) => key !== 'newstyle')
-              .map((key) => (
-                <FormControlLabel
-                  key={key}
-                  label={t(`access.modules.${key}`)}
-                  sx={{
-                    m: 0,
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    p: 0.5,
-                  }}
-                  control={
-                    <Checkbox
-                      checked={draft.modules.includes(key)}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          modules: event.target.checked
-                            ? [...draft.modules, key]
-                            : draft.modules.filter((item) => item !== key),
-                        })
-                      }
-                    />
-                  }
-                />
-              ))}
+            {moduleKeys.map((key) => (
+              <FormControlLabel
+                key={key}
+                label={t(`access.modules.${key}`)}
+                sx={{
+                  m: 0,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 0.5,
+                }}
+                control={
+                  <Checkbox
+                    checked={draft.modules.includes(key)}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        modules: event.target.checked
+                          ? [...draft.modules, key]
+                          : draft.modules.filter((item) => item !== key),
+                      })
+                    }
+                  />
+                }
+              />
+            ))}
           </FormGroup>
         </FormControl>
         <Stack

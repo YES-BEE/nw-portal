@@ -1,4 +1,4 @@
-export const ACCESS_STORAGE_KEY = 'nw-track-access-v1';
+export const ACCESS_STORAGE_KEY = 'nw-track-access-v2';
 
 export const moduleKeys = [
   'dashboard',
@@ -31,49 +31,9 @@ export type UserDraft = Omit<AccessUser, 'status'> & {
   status: AccessUser['status'] | '';
 };
 
-const fullModules: ModuleKey[] = [
-  'dashboard',
-  'reports',
-  'process',
-  'storage',
-  'tags',
-  'styles',
-  'users',
-  'roles',
-];
-export const defaultRoles: AccessRole[] = [
-  { name: 'NW', modules: [...fullModules] },
-  { name: 'IT Admin', modules: [...fullModules] },
-  { name: 'Top Manager', modules: ['dashboard', 'reports'] },
-  {
-    name: 'Production Manager',
-    modules: ['dashboard', 'reports', 'process', 'storage', 'tags', 'styles'],
-  },
-  { name: 'Supervisor', modules: ['dashboard', 'reports'] },
-  { name: 'Process Manager', modules: [] },
-  { name: 'Style Configurator', modules: ['newstyle'] },
-];
-export const defaultUsers: AccessUser[] = [
-  ['nw.admin', 'NW'],
-  ['it.admin', 'IT Admin'],
-  ['top.manager', 'Top Manager'],
-  ['production.manager', 'Production Manager'],
-  ['supervisor', 'Supervisor'],
-  ['process.manager', 'Process Manager'],
-  ['style.configurator', 'Style Configurator'],
-].map(([username, role], index) => ({
-  id: `user-${index + 1}`,
-  username,
-  role,
-  status: 'Active',
-}));
-
 const folded = (value: string) => value.trim().toLowerCase();
 const unique = (values: string[]) =>
   new Set(values.map(folded)).size === values.length;
-export function isBuiltInRole(name: string) {
-  return defaultRoles.some((role) => role.name === name);
-}
 
 export function isAccessData(value: unknown): value is AccessData {
   if (!value || typeof value !== 'object') return false;
@@ -94,13 +54,7 @@ export function isAccessData(value: unknown): value is AccessData {
     )
   )
     return false;
-  if (
-    !unique(roles.map((role) => role.name)) ||
-    !defaultRoles.every((role) =>
-      roles.some((saved) => saved.name === role.name),
-    )
-  )
-    return false;
+  if (!unique(roles.map((role) => role.name))) return false;
   return (
     users.every(
       (user) =>
@@ -136,12 +90,12 @@ export function loadAccessData(): {
       return { records, unavailable: false };
     }
     return {
-      records: structuredClone({ users: defaultUsers, roles: defaultRoles }),
+      records: { users: [], roles: [] },
       unavailable: false,
     };
   } catch {
     return {
-      records: structuredClone({ users: defaultUsers, roles: defaultRoles }),
+      records: { users: [], roles: [] },
       unavailable: true,
     };
   }
@@ -150,12 +104,11 @@ export function loadAccessData(): {
 export function getUserErrors(user: UserDraft, data: AccessData) {
   const errors: Partial<
     Record<
-      'username' | 'role' | 'status' | 'processIds',
+      'username' | 'role' | 'status',
       | 'usernameRequired'
       | 'usernameDuplicate'
       | 'roleRequired'
       | 'statusRequired'
-      | 'processesRequired'
     >
   > = {};
   if (!user.username.trim()) errors.username = 'usernameRequired';
@@ -171,8 +124,6 @@ export function getUserErrors(user: UserDraft, data: AccessData) {
     errors.role = 'roleRequired';
   if (!['Active', 'Inactive'].includes(user.status))
     errors.status = 'statusRequired';
-  if (user.role === 'Process Manager' && !user.processIds?.length)
-    errors.processIds = 'processesRequired';
   return errors;
 }
 
@@ -187,5 +138,5 @@ export function getRoleNameError(
 }
 
 export function canDeleteRole(name: string, data: AccessData) {
-  return !isBuiltInRole(name) && !data.users.some((user) => user.role === name);
+  return !data.users.some((user) => user.role === name);
 }

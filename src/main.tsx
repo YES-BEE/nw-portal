@@ -6,6 +6,9 @@ import App from './App';
 import { theme } from './app/theme';
 import './i18n';
 import './index.css';
+import { initializeSession } from './features/auth/session';
+
+initializeSession();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

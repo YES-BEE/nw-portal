@@ -77,8 +77,7 @@ export function UserForm({
           const normalized = {
             ...draft,
             username: draft.username.trim(),
-            processIds:
-              draft.role === 'Process Manager' ? (draft.processIds ?? []) : [],
+            processIds: draft.processIds ?? [],
           };
           if (
             !Object.keys(getUserErrors(normalized, loadAccessData().records))
@@ -151,76 +150,68 @@ export function UserForm({
             <MenuItem value="Inactive">{t('access.inactive')}</MenuItem>
           </TextField>
         </Stack>
-        {draft.role === 'Process Manager' && (
-          <Box sx={{ mt: 2.5, maxWidth: 640 }}>
-            {processData.storageUnavailable && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                {t('access.users.processLoadWarning')}
-              </Alert>
+        <Box sx={{ mt: 2.5, maxWidth: 640 }}>
+          {processData.storageUnavailable && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {t('access.users.processLoadWarning')}
+            </Alert>
+          )}
+          <TextField
+            select
+            fullWidth
+            label={t('access.users.associatedProcesses')}
+            sx={{
+              '& .MuiOutlinedInput-root': { height: 'auto', minHeight: 47 },
+            }}
+            value={draft.processIds ?? []}
+            onChange={(event) => {
+              const value = event.target.value as string | string[];
+              setDraft({
+                ...draft,
+                processIds:
+                  typeof value === 'string' ? value.split(',') : value,
+              });
+            }}
+            helperText={t('access.users.processHint')}
+            slotProps={{
+              select: {
+                multiple: true,
+                renderValue: (selected) =>
+                  (selected as string[]).length ? (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(selected as string[]).map((id) => (
+                        <Chip
+                          key={id}
+                          label={processLabel(id)}
+                          size="small"
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onDelete={() =>
+                            setDraft({
+                              ...draft,
+                              processIds: (draft.processIds ?? []).filter(
+                                (processId) => processId !== id,
+                              ),
+                            })
+                          }
+                        />
+                      ))}
+                    </Box>
+                  ) : (
+                    t('access.users.selectProcesses')
+                  ),
+              },
+            }}
+          >
+            {!processOptions.length && (
+              <MenuItem disabled>{t('access.users.noProcesses')}</MenuItem>
             )}
-            <TextField
-              select
-              required
-              fullWidth
-              label={t('access.users.associatedProcesses')}
-              sx={{
-                '& .MuiOutlinedInput-root': { height: 'auto', minHeight: 47 },
-              }}
-              value={draft.processIds ?? []}
-              onChange={(event) => {
-                const value = event.target.value as string | string[];
-                setDraft({
-                  ...draft,
-                  processIds:
-                    typeof value === 'string' ? value.split(',') : value,
-                });
-              }}
-              error={Boolean(errors.processIds)}
-              helperText={
-                errors.processIds
-                  ? t(`access.errors.${errors.processIds}`)
-                  : t('access.users.processHint')
-              }
-              slotProps={{
-                select: {
-                  multiple: true,
-                  renderValue: (selected) =>
-                    (selected as string[]).length ? (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {(selected as string[]).map((id) => (
-                          <Chip
-                            key={id}
-                            label={processLabel(id)}
-                            size="small"
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onDelete={() =>
-                              setDraft({
-                                ...draft,
-                                processIds: (draft.processIds ?? []).filter(
-                                  (processId) => processId !== id,
-                                ),
-                              })
-                            }
-                          />
-                        ))}
-                      </Box>
-                    ) : (
-                      t('access.users.selectProcesses')
-                    ),
-                },
-              }}
-            >
-              {!processOptions.length && (
-                <MenuItem disabled>{t('access.users.noProcesses')}</MenuItem>
-              )}
-              {processOptions.map((id) => (
-                <MenuItem key={id} value={id}>
-                  <ListItemText primary={processLabel(id)} />
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
-        )}
+            {processOptions.map((id) => (
+              <MenuItem key={id} value={id}>
+                <ListItemText primary={processLabel(id)} />
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
         <Stack
           direction="row"
           spacing={1.5}

@@ -2,141 +2,120 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ACCESS_STORAGE_KEY,
   canDeleteRole,
-  defaultRoles,
-  defaultUsers,
   getRoleNameError,
   getUserErrors,
   isAccessData,
   loadAccessData,
 } from './accessData';
+import type { AccessData } from './accessData';
 
+const records: AccessData = {
+  users: [
+    { id: 'one', username: 'operator', role: 'Factory role', status: 'Active' },
+  ],
+  roles: [{ name: 'Factory role', modules: ['reports'] }],
+};
 beforeEach(() => localStorage.clear());
 
-describe('reference users and roles', () => {
-  it('accepts optional process associations and rejects malformed or duplicate process IDs', () => {
-    const records = loadAccessData().records;
-    expect(isAccessData(records)).toBe(true);
-    records.users[5].processIds = ['demo-1', 'demo-2'];
-    expect(isAccessData(records)).toBe(true);
-    records.users[5].processIds = ['demo-1', 'demo-1'];
-    expect(isAccessData(records)).toBe(false);
-    records.users[5].processIds = [''];
-    expect(isAccessData(records)).toBe(false);
-    records.users[5].processIds = [42] as unknown as string[];
-    expect(isAccessData(records)).toBe(false);
-  });
-
-  it('loads seven active accounts with the exact reference role assignments without writing storage', () => {
-    const { records, unavailable } = loadAccessData();
-    expect(unavailable).toBe(false);
-    expect(
-      records.users.map((user) => [user.username, user.role, user.status]),
-    ).toEqual([
-      ['nw.admin', 'NW', 'Active'],
-      ['it.admin', 'IT Admin', 'Active'],
-      ['top.manager', 'Top Manager', 'Active'],
-      ['production.manager', 'Production Manager', 'Active'],
-      ['supervisor', 'Supervisor', 'Active'],
-      ['process.manager', 'Process Manager', 'Active'],
-      ['style.configurator', 'Style Configurator', 'Active'],
-    ]);
-    expect(records.roles).toHaveLength(7);
-    expect(
-      records.roles.find((role) => role.name === 'Process Manager')?.modules,
-    ).toEqual([]);
-    expect(
-      records.roles.find((role) => role.name === 'Style Configurator')?.modules,
-    ).toEqual(['newstyle']);
+describe('access records without frontend defaults', () => {
+  it('starts with no users, roles or assignments and does not write storage', () => {
+    expect(loadAccessData()).toEqual({
+      records: { users: [], roles: [] },
+      unavailable: false,
+    });
     expect(localStorage.length).toBe(0);
-    records.roles[0].modules.length = 0;
-    expect(defaultRoles[0].modules).toHaveLength(8);
+    expect(isAccessData({ users: [], roles: [] })).toBe(true);
   });
-
-  it('preserves a deliberately empty user list and valid saved role changes', () => {
-    const records = loadAccessData().records;
-    records.users = [];
-    records.roles[0].modules = ['reports'];
+  it('ignores the previous demo namespace', () => {
+    localStorage.setItem('nw-track-access-v1', JSON.stringify(records));
+    expect(loadAccessData().records).toEqual({ users: [], roles: [] });
+  });
+  it('accepts arbitrary saved roles without requiring built-in roles', () => {
     localStorage.setItem(ACCESS_STORAGE_KEY, JSON.stringify(records));
     expect(loadAccessData()).toEqual({ records, unavailable: false });
+    expect(
+      isAccessData({
+        ...records,
+        users: [{ ...records.users[0], processIds: ['p1', 'p1'] }],
+      }),
+    ).toBe(false);
   });
-
-  it.each(['{invalid', '{}', JSON.stringify({ users: [], roles: [] })])(
-    'recovers malformed records with a warning: %s',
-    (value) => {
-      localStorage.setItem(ACCESS_STORAGE_KEY, value);
+  it.each(['{invalid', '{}', '{"users":[],"roles":[{}]}'])(
+    'returns empty records and a warning for invalid data: %s',
+    (raw) => {
+      localStorage.setItem(ACCESS_STORAGE_KEY, raw);
       expect(loadAccessData()).toEqual({
-        records: { users: defaultUsers, roles: defaultRoles },
+        records: { users: [], roles: [] },
         unavailable: true,
       });
-      expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(value);
+      expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(raw);
     },
   );
-
-  it('recovers when browser storage cannot be read', () => {
+  it('returns empty records when storage is unavailable', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('Unavailable');
     });
-    expect(loadAccessData().unavailable).toBe(true);
+    expect(loadAccessData()).toEqual({
+      records: { users: [], roles: [] },
+      unavailable: true,
+    });
   });
-
-  it('rejects dangling role assignments, invalid modules, and duplicate usernames or IDs', () => {
-    const data = loadAccessData().records;
+  it('rejects unknown roles, unknown modules and duplicate accounts', () => {
     expect(
-      isAccessData({ ...data, users: [{ ...data.users[0], role: 'Missing' }] }),
+      isAccessData({
+        ...records,
+        users: [{ ...records.users[0], role: 'Missing' }],
+      }),
     ).toBe(false);
     expect(
       isAccessData({
-        ...data,
+        ...records,
+        roles: [{ name: 'Factory role', modules: ['unknown'] }],
+      }),
+    ).toBe(false);
+    expect(
+      isAccessData({
+        ...records,
         users: [
-          ...data.users,
-          { ...data.users[0], id: 'extra', username: ' NW.ADMIN ' },
+          ...records.users,
+          { ...records.users[0], id: 'two', username: ' OPERATOR ' },
         ],
       }),
     ).toBe(false);
-    expect(
-      isAccessData({
-        ...data,
-        users: [...data.users, { ...data.users[0], username: 'different' }],
-      }),
-    ).toBe(false);
-    expect(
-      isAccessData({
-        ...data,
-        roles: [...data.roles, { name: 'Custom', modules: ['unknown'] }],
-      }),
-    ).toBe(false);
   });
-
-  it('validates required fields and case-insensitive uniqueness while permitting unchanged edits', () => {
-    const data = loadAccessData().records;
+  it('validates names and status without rules tied to role names', () => {
     expect(
       getUserErrors(
-        { ...defaultUsers[0], id: 'new', username: ' NW.ADMIN ' },
-        data,
+        { ...records.users[0], username: '', role: '', status: '' },
+        records,
+      ),
+    ).toEqual({
+      username: 'usernameRequired',
+      role: 'roleRequired',
+      status: 'statusRequired',
+    });
+    expect(
+      getUserErrors(
+        { ...records.users[0], id: 'two', username: ' OPERATOR ' },
+        records,
       ),
     ).toEqual({ username: 'usernameDuplicate' });
+    const data: AccessData = {
+      users: [],
+      roles: [{ name: 'Process Manager', modules: [] }],
+    };
     expect(
-      getUserErrors({ ...defaultUsers[0], username: '  ', role: '' }, data),
-    ).toEqual({ username: 'usernameRequired', role: 'roleRequired' });
-    expect(getUserErrors(defaultUsers[0], data)).toEqual({});
-    expect(getRoleNameError(' ', data.roles, false)).toBe('roleNameRequired');
-    expect(getRoleNameError(' it admin ', data.roles, false)).toBe(
+      getUserErrors({ ...records.users[0], role: 'Process Manager' }, data),
+    ).toEqual({});
+    expect(getRoleNameError(' factory role ', records.roles, false)).toBe(
       'roleDuplicate',
     );
-    expect(getRoleNameError('IT Admin', data.roles, true)).toBeUndefined();
+    expect(getRoleNameError('', records.roles, false)).toBe('roleNameRequired');
   });
-
-  it('protects built-in and assigned custom roles but allows deletion after unassigning', () => {
-    const data = loadAccessData().records;
-    data.roles.push({ name: 'Auditor', modules: ['reports'] });
-    expect(canDeleteRole('NW', data)).toBe(false);
-    expect(canDeleteRole('Auditor', data)).toBe(true);
-    data.users.push({
-      id: 'auditor',
-      username: 'audit',
-      role: 'Auditor',
-      status: 'Inactive',
-    });
-    expect(canDeleteRole('Auditor', data)).toBe(false);
+  it('protects assigned roles and allows any unassigned role to be deleted', () => {
+    expect(canDeleteRole('Factory role', records)).toBe(false);
+    expect(
+      canDeleteRole('NW', { users: [], roles: [{ name: 'NW', modules: [] }] }),
+    ).toBe(true);
   });
 });

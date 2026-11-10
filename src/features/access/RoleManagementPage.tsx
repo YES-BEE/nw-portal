@@ -19,7 +19,7 @@ import {
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import { canDeleteRole, isBuiltInRole } from './accessData';
+import { canDeleteRole } from './accessData';
 import type { AccessRole } from './accessData';
 import { useAccessData } from './useAccessData';
 import { RoleForm } from './RoleForm';
@@ -106,28 +106,26 @@ export function RoleManagementPage() {
                         <EditOutlinedIcon />
                       </IconButton>
                     </Tooltip>
-                    {!isBuiltInRole(role.name) && (
-                      <Tooltip
-                        title={t(
-                          canDeleteRole(role.name, data.records)
-                            ? 'access.delete'
-                            : 'access.roleAssigned',
-                        )}
-                      >
-                        <Box component="span">
-                          <IconButton
-                            color="error"
-                            disabled={!canDeleteRole(role.name, data.records)}
-                            aria-label={t('access.deleteNamed', {
-                              name: role.name,
-                            })}
-                            onClick={() => setPendingDelete(role)}
-                          >
-                            <DeleteOutlinedIcon />
-                          </IconButton>
-                        </Box>
-                      </Tooltip>
-                    )}
+                    <Tooltip
+                      title={t(
+                        canDeleteRole(role.name, data.records)
+                          ? 'access.delete'
+                          : 'access.roleAssigned',
+                      )}
+                    >
+                      <Box component="span">
+                        <IconButton
+                          color="error"
+                          disabled={!canDeleteRole(role.name, data.records)}
+                          aria-label={t('access.deleteNamed', {
+                            name: role.name,
+                          })}
+                          onClick={() => setPendingDelete(role)}
+                        >
+                          <DeleteOutlinedIcon />
+                        </IconButton>
+                      </Box>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}

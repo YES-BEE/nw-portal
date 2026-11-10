@@ -1,3 +1,8 @@
+import {
+  defaultTags,
+  sampleProcesses,
+  seedTestData,
+} from '../../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -5,12 +10,8 @@ import { ThemeProvider } from '@mui/material';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
 import { configurationTheme } from '../../app/theme';
-import {
-  defaultTags,
-  loadTags,
-  TAG_STORAGE_KEY,
-} from '../configurations/tagRegistry';
-import { PROCESS_STORAGE_KEY, sampleProcesses } from '../processes/processData';
+import { loadTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
+import { PROCESS_STORAGE_KEY } from '../processes/processData';
 import { TagManagementPage } from './TagManagementPage';
 
 function setup() {
@@ -26,7 +27,7 @@ function setup() {
   };
 }
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('tag management', () => {
@@ -173,7 +174,9 @@ describe('tag management', () => {
     expect(
       loadTags().records.some((tag) => tag.actual === 'NFC-PROC-002'),
     ).toBe(true);
-    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(
+      JSON.stringify(defaultTags),
+    );
   });
 
   it('keeps the editor and registry if saving fails', async () => {
@@ -197,7 +200,9 @@ describe('tag management', () => {
     expect(screen.getByRole('textbox', { name: /Tag Name/ })).toHaveValue(
       'New tag',
     );
-    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(
+      JSON.stringify(defaultTags),
+    );
   });
 
   it('paginates and searches the registry without losing matches on later pages', async () => {

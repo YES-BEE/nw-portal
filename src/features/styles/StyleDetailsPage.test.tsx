@@ -1,14 +1,14 @@
+import { sampleStyles, seedTestData, signIn } from '../../test/fixtures';
 import { screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { signIn } from '../auth/session';
-import { sampleStyles, STYLE_STORAGE_KEY } from './styleData';
+import { STYLE_STORAGE_KEY } from './styleData';
 import type { StyleMode } from './styleData';
 import { StyleDetailsPage } from './StyleDetailsPage';
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
 });
@@ -38,16 +38,14 @@ describe('shared style details', () => {
       screen.getByRole('list', { name: 'Lot Route' }),
     ).getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('Lot Preparation');
-    expect(rows[0]).toHaveTextContent('Station 01');
     expect(rows[1]).toHaveTextContent('Washing');
-    expect(rows[1]).toHaveTextContent('Station 03');
     expect(
       screen.getByText('All 20 lots follow this route in the order shown.'),
     ).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Back to Styles' }),
     ).toHaveAttribute('href', '/styles');
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.length).toBe(5);
   });
 
   it('does not expose another creator’s style through a guessed own-mode URL', () => {

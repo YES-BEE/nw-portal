@@ -1,3 +1,4 @@
+import { seedTestData } from '../../test/fixtures';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -32,7 +33,7 @@ function setup(path = '/configurations/storages') {
 }
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('storage details', () => {

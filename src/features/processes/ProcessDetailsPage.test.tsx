@@ -1,3 +1,4 @@
+import { sampleProcesses, seedTestData } from '../../test/fixtures';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -7,7 +8,7 @@ import { configurationTheme } from '../../app/theme';
 import { renderWithProviders } from '../../test/render';
 import { ProcessDetailsPage } from './ProcessDetailsPage';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
-import { PROCESS_STORAGE_KEY, sampleProcesses } from './processData';
+import { PROCESS_STORAGE_KEY } from './processData';
 
 function setup(path = '/configurations/processes/demo-1') {
   return {
@@ -32,7 +33,7 @@ function setup(path = '/configurations/processes/demo-1') {
 }
 
 beforeEach(() => {
-  localStorage.clear();
+  seedTestData();
 });
 
 describe('process details', () => {
