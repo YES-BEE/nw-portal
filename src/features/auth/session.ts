@@ -13,6 +13,8 @@ import {
 } from './refreshTokenApi';
 import { CanceledError } from 'axios';
 import type { RefreshTokenResponse } from './types';
+import type { MeResponse } from './types';
+import { getMe, isMeResponse } from './meApi';
 
 export const SESSION_STORAGE_KEY = 'nw-track-session-v2';
 const sessionChangeEvent = 'nw-track-session-change';
@@ -63,6 +65,7 @@ export interface AuthSession {
   expiresAt?: number;
   refreshToken?: string;
   refreshTokenExpiresAt?: string;
+  profile?: MeResponse;
 }
 export type SignInError = LoginErrorCode | LoginUiError;
 
@@ -95,9 +98,14 @@ export async function signIn(
       token: authentication.accessToken,
       expiresAt,
     };
-    const refresh = await issueRefreshToken(signal);
+    const [refresh, profile] = await Promise.all([
+      issueRefreshToken(signal),
+      getMe(signal),
+    ]);
     if (signal?.aborted || attempt !== authAttempt) return null;
-    setAuthenticatedSession(createSession(authentication, expiresAt, refresh));
+    setAuthenticatedSession(
+      createSession(authentication, expiresAt, refresh, profile),
+    );
     return null;
   } catch (error) {
     if (signal?.aborted || attempt !== authAttempt) return null;
@@ -117,19 +125,20 @@ function createSession(
   authentication: LoginResponse,
   expiresAt: number,
   refresh?: RefreshTokenResponse,
+  profile?: MeResponse,
 ): AuthSession {
   return {
     user: {
-      // Login provides a canonical username but no user ID.
-      id: authentication.username,
-      username: authentication.username,
-      role: authentication.roles.join(', '),
+      id: profile?.id ?? authentication.username,
+      username: profile?.username ?? authentication.username,
+      role: profile?.role ?? '',
       status: 'Active',
     },
     modules: [
-      ...new Set(authentication.modules.map((module) => module.key)),
+      ...new Set(profile?.modules.map((module) => module.key) ?? []),
     ].filter((key): key is ModuleKey => moduleKeys.includes(key as ModuleKey)),
     authentication,
+    profile,
     expiresAt,
     ...(refresh && {
       refreshToken: refresh.refreshToken,
@@ -172,6 +181,9 @@ async function restoreSession() {
       record.authentication,
       record.expiresAt,
       isRefreshTokenResponse(savedRefresh) ? savedRefresh : undefined,
+      isMeResponse(record.profile) && record.profile.enabled
+        ? record.profile
+        : undefined,
     );
     if (session.expiresAt! <= Date.now() && !hasRefreshToken(session))
       throw new Error('Expired session');
@@ -180,13 +192,26 @@ async function restoreSession() {
     try {
       if (session.expiresAt! <= Date.now()) await refreshAccessToken();
       if (version !== authSessionVersion || !readSession()) return;
-      const refresh = await issueRefreshToken();
+      const [refresh, profile] = await Promise.all([
+        issueRefreshToken(),
+        getMe(),
+      ]);
       if (version !== authSessionVersion || !readSession()) return;
       applySession(
         {
           ...currentSession!,
           refreshToken: refresh.refreshToken,
           refreshTokenExpiresAt: refresh.expiresAt,
+          profile,
+          user: {
+            id: profile.id,
+            username: profile.username,
+            role: profile.role,
+            status: 'Active',
+          },
+          modules: moduleKeys.filter((key) =>
+            profile.modules.some((module) => module.key === key),
+          ),
         },
         false,
       );
@@ -223,6 +248,7 @@ function applySession(session: AuthSession | null, replaceIdentity: boolean) {
           expiresAt: session.expiresAt,
           refreshToken: session.refreshToken,
           refreshTokenExpiresAt: session.refreshTokenExpiresAt,
+          profile: session.profile,
         }),
       );
     } catch {
@@ -317,6 +343,7 @@ export function refreshAccessToken(): Promise<string | null> {
             refreshToken: session.refreshToken!,
             expiresAt: session.refreshTokenExpiresAt!,
           },
+          currentSession.profile,
         ),
         false,
       );

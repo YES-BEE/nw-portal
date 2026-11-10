@@ -1,5 +1,5 @@
 import { apiClient } from '../api/client';
-import { loginResponse, refreshTokenResponse } from '../test/auth';
+import { loginResponse, refreshTokenResponse, meResponse } from '../test/auth';
 import { signIn as backendSignIn } from '../features/auth/session';
 import { seedTestData, signIn } from '../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -14,6 +14,10 @@ import {
 } from '../features/access/accessData';
 
 beforeEach(() => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: meResponse,
+  });
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
   sessionStorage.clear();
@@ -26,7 +30,7 @@ afterEach(() => {
 });
 
 describe('persistent desktop navigation', () => {
-  it('maps login response module names to sidebar links using their keys', async () => {
+  it('maps current-user response module names to sidebar links using their keys', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
     vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
       status: 200,
@@ -43,6 +47,17 @@ describe('persistent desktop navigation', () => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({
       status: 200,
       data: refreshTokenResponse,
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: {
+        ...meResponse,
+        modules: [
+          { key: 'reports', name: 'Factory Analytics', built_in: false },
+          { key: 'process', name: 'Wash Workflow', built_in: true },
+          { key: 'future-module', name: 'Future Tools', built_in: false },
+        ],
+      },
     });
     expect(await backendSignIn('admin', 'password')).toBeNull();
     const user = userEvent.setup();
@@ -83,6 +98,10 @@ describe('persistent desktop navigation', () => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({
       status: 200,
       data: refreshTokenResponse,
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: { ...meResponse, modules: [] },
     });
     expect(await backendSignIn('admin', 'password')).toBeNull();
     const user = userEvent.setup();
@@ -180,7 +199,7 @@ describe('persistent desktop navigation', () => {
       role: 'Production Manager',
     },
   ])(
-    'shows $username and their role in the AppBar',
+    'shows the display name and role for $username in the AppBar',
     ({ username, password, role }) => {
       signIn(username, password);
       renderWithProviders(
@@ -191,7 +210,12 @@ describe('persistent desktop navigation', () => {
       const identity = within(screen.getByRole('banner')).getByRole('group', {
         name: 'Signed-in user',
       });
-      expect(within(identity).getByLabelText(username)).toBeVisible();
+      expect(
+        within(identity).getByLabelText(meResponse.display_name),
+      ).toHaveTextContent('BN');
+      expect(
+        within(identity).queryByText(meResponse.display_name),
+      ).not.toBeInTheDocument();
       expect(within(identity).getByText(role)).toBeVisible();
     },
   );

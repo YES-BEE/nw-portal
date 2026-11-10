@@ -1,6 +1,10 @@
 import { apiClient } from '../../api/client';
 import type { MockInstance } from 'vitest';
-import { loginResponse, refreshTokenResponse } from '../../test/auth';
+import {
+  loginResponse,
+  refreshTokenResponse,
+  meResponse,
+} from '../../test/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_STORAGE_KEY } from '../access/accessData';
 import {
@@ -34,6 +38,10 @@ const identity: AuthSession = {
   modules: ['reports'],
 };
 beforeEach(() => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: meResponse,
+  });
   postMock = vi.spyOn(apiClient, 'post');
   localStorage.clear();
   sessionStorage.clear();
@@ -60,7 +68,7 @@ describe('backend session preparation', () => {
       }),
     );
     expect(readSession()).toMatchObject({
-      user: { id: 'admin', username: 'admin', role: 'NW, FACTOR_PASSWORD' },
+      user: { id: meResponse.id, username: 'admin', role: 'NW' },
       modules: ['reports'],
       authentication: loginResponse,
     });

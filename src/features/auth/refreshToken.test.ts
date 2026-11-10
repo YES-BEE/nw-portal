@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
-import { loginResponse, refreshTokenResponse } from '../../test/auth';
+import {
+  loginResponse,
+  refreshTokenResponse,
+  meResponse,
+} from '../../test/auth';
 import {
   initializeSession,
   readSession,
@@ -20,7 +24,11 @@ const response = (
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) =>
   response(
     config,
-    config.url === 'auth/login' ? loginResponse : refreshTokenResponse,
+    config.url === 'auth/me'
+      ? meResponse
+      : config.url === 'auth/login'
+        ? loginResponse
+        : refreshTokenResponse,
   ),
 );
 function saveSession() {
@@ -48,7 +56,11 @@ beforeEach(() => {
     .mockImplementation(async (config) =>
       response(
         config,
-        config.url === 'auth/login' ? loginResponse : refreshTokenResponse,
+        config.url === 'auth/me'
+          ? meResponse
+          : config.url === 'auth/login'
+            ? loginResponse
+            : refreshTokenResponse,
       ),
     );
   apiClient.defaults.adapter = adapter;
@@ -64,6 +76,7 @@ describe('refresh token issuance and storage', () => {
     expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
       'auth/login',
       'auth/refresh-tokens',
+      'auth/me',
     ]);
     expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBeNull();
     const config = adapter.mock.calls[1][0];
@@ -87,7 +100,7 @@ describe('refresh token issuance and storage', () => {
     const first = initializeSession();
     expect(initializeSession()).toBe(first);
     await first;
-    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter).toHaveBeenCalledTimes(2);
     expect(adapter.mock.calls[0][0].url).toBe('auth/refresh-tokens');
     expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBe(
       'Bearer test-access-token',
@@ -118,13 +131,19 @@ describe('refresh token issuance and storage', () => {
     expect(readSession()).toBeNull();
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
     await apiClient.get('users');
-    expect(adapter.mock.calls[2][0].headers.get('Authorization')).toBeNull();
+    expect(
+      adapter.mock.calls
+        .find(([config]) => config.url === 'users')![0]
+        .headers.get('Authorization'),
+    ).toBeNull();
   });
   it('returns a backend refresh-token failure without storing a partial session', async () => {
     adapter.mockImplementation(async (config) =>
-      config.url === 'auth/login'
-        ? response(config, loginResponse)
-        : response(config, { detail: 'Refresh token denied' }, 403),
+      config.url === 'auth/me'
+        ? response(config, meResponse)
+        : config.url === 'auth/login'
+          ? response(config, loginResponse)
+          : response(config, { detail: 'Refresh token denied' }, 403),
     );
     expect(await signIn('admin', 'password')).toMatchObject({
       message: 'Refresh token denied',
@@ -136,14 +155,16 @@ describe('refresh token issuance and storage', () => {
   it('does not restore a session when logout happens while refresh-token issuance is pending', async () => {
     let resolve!: (value: ReturnType<typeof response>) => void;
     adapter.mockImplementation(async (config) =>
-      config.url === 'auth/login'
-        ? response(config, loginResponse)
-        : new Promise((done) => {
-            resolve = done;
-          }),
+      config.url === 'auth/me'
+        ? response(config, meResponse)
+        : config.url === 'auth/login'
+          ? response(config, loginResponse)
+          : new Promise((done) => {
+              resolve = done;
+            }),
     );
     const pending = signIn('admin', 'password');
-    await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(3));
     signOut();
     resolve(response(adapter.mock.calls[1][0], refreshTokenResponse));
     await pending;
@@ -153,14 +174,15 @@ describe('refresh token issuance and storage', () => {
   it('does not overwrite a newer session with a pending startup response', async () => {
     saveSession();
     let resolve!: (value: ReturnType<typeof response>) => void;
-    adapter.mockImplementation(
-      () =>
-        new Promise((done) => {
-          resolve = done;
-        }),
+    adapter.mockImplementation((config) =>
+      config.url === 'auth/me'
+        ? Promise.resolve(response(config, meResponse))
+        : new Promise((done) => {
+            resolve = done;
+          }),
     );
     const pending = initializeSession();
-    await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(2));
     setAuthenticatedSession({
       ...readSession()!,
       authentication: { ...loginResponse, accessToken: 'new-access-token' },

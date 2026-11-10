@@ -1,6 +1,10 @@
 import { apiClient } from '../../api/client';
 import type { MockInstance } from 'vitest';
-import { loginResponse, refreshTokenResponse } from '../../test/auth';
+import {
+  loginResponse,
+  refreshTokenResponse,
+  meResponse,
+} from '../../test/auth';
 import { readSession } from './session';
 import { seedTestData } from '../../test/fixtures';
 import {
@@ -39,6 +43,10 @@ describe('LoginPage', () => {
   let description: HTMLMetaElement;
 
   beforeEach(() => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      status: 200,
+      data: meResponse,
+    });
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
     postMock = vi.spyOn(apiClient, 'post');
     postMock.mockResolvedValue({

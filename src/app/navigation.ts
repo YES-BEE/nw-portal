@@ -25,7 +25,7 @@ export const orderedNavigationItems = [
   ...configurationNavigationItems,
 ];
 
-// Route paths and icons belong to the app; availability and names come from login.
+// Route paths and icons belong to the app; availability and names come from /me.
 export function mapNavigationModules<T extends { permission: ModuleKey }>(
   items: readonly T[],
   modules: readonly LoginModule[],

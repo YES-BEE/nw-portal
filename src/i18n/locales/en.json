@@ -1,5 +1,6 @@
 {
   "common": {
+    "loading": "Loading...",
     "recordNotFound": "This configuration was not found. It may have been deleted.",
     "pagination": {
       "rowsPerPage": "Rows per page:",

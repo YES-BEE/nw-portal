@@ -41,6 +41,19 @@ export interface RefreshAccessTokenRequest {
 
 export type RefreshAccessTokenResponse = LoginSuccessResponse;
 
+export interface MeResponse {
+  id: string;
+  username: string;
+  display_name: string;
+  enabled: boolean;
+  must_change_password: boolean;
+  role: string;
+  clientType: LoginClientType;
+  permissions: string[];
+  processAssignments: unknown[];
+  modules: LoginModule[];
+}
+
 export interface LoginProblemBase {
   type: string;
   title: string;

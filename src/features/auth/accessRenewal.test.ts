@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, isCancel } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
-import { loginResponse, refreshTokenResponse } from '../../test/auth';
+import {
+  loginResponse,
+  refreshTokenResponse,
+  meResponse,
+} from '../../test/auth';
 import {
   initializeSession,
   logout,
@@ -40,6 +44,7 @@ function authenticate(expiresAt = Date.now() + 20_000) {
     user: { id: 'admin', username: 'admin', role: 'NW', status: 'Active' },
     modules: ['reports'],
     authentication: loginResponse,
+    profile: meResponse,
     expiresAt,
     refreshToken: refreshTokenResponse.refreshToken,
     refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
@@ -68,9 +73,11 @@ beforeEach(() => {
         config,
         config.url === 'auth/refresh'
           ? renewed
-          : config.url === 'auth/refresh-tokens'
-            ? refreshTokenResponse
-            : [],
+          : config.url === 'auth/me'
+            ? meResponse
+            : config.url === 'auth/refresh-tokens'
+              ? refreshTokenResponse
+              : [],
       ),
     );
   apiClient.defaults.adapter = adapter;
@@ -98,8 +105,8 @@ describe('expired access-token renewal', () => {
     expect(config.headers.get('Authorization')).toBeNull();
     expect(readSession()).toMatchObject({
       authentication: renewed,
-      modules: ['users'],
-      user: { role: 'Updated role' },
+      modules: ['reports'],
+      user: { role: 'NW' },
       expiresAt: Date.now() + 900_000,
       refreshToken: refreshTokenResponse.refreshToken,
       refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
@@ -133,6 +140,7 @@ describe('expired access-token renewal', () => {
       SESSION_STORAGE_KEY,
       JSON.stringify({
         authentication: loginResponse,
+        profile: meResponse,
         expiresAt: Date.now() - 1000,
         refreshToken: refreshTokenResponse.refreshToken,
         refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
@@ -142,6 +150,7 @@ describe('expired access-token renewal', () => {
     expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
       'auth/refresh',
       'auth/refresh-tokens',
+      'auth/me',
     ]);
     expect(adapter.mock.calls[1][0].headers.get('Authorization')).toBe(
       'Bearer renewed-access-token',

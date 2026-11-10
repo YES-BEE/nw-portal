@@ -139,7 +139,7 @@ import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 import { setAuthenticatedSession } from '../features/auth/session';
 import { orderedNavigationItems } from '../app/navigation';
 import i18n from '../i18n';
-import { loginResponse, refreshTokenResponse } from './auth';
+import { loginResponse, refreshTokenResponse, meResponse } from './auth';
 
 export function seedTestData() {
   localStorage.clear();
@@ -164,6 +164,19 @@ export function signIn(username: string, _password?: string) {
   setAuthenticatedSession({
     user,
     modules,
+    profile: {
+      ...meResponse,
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      modules: orderedNavigationItems
+        .filter((item) => modules.includes(item.permission))
+        .map((item) => ({
+          key: item.permission,
+          name: i18n.t(`navigation.${item.key}`),
+          built_in: true,
+        })),
+    },
     refreshToken: refreshTokenResponse.refreshToken,
     refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
     authentication: {

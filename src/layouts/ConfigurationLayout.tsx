@@ -34,6 +34,7 @@ import { configurationTheme, theme } from '../app/theme';
 import logo from '../assets/logo.png';
 import { logout } from '../features/auth/session';
 import { useSession } from '../features/auth/useSession';
+import { useCurrentUser } from '../features/auth/currentUserContext';
 import {
   mainNavigationItems,
   mapNavigationModules,
@@ -62,7 +63,10 @@ export function ConfigurationLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const session = useSession();
-  const modules = session?.authentication?.modules ?? [];
+  const profile = useCurrentUser();
+  const displayName =
+    profile?.display_name.trim() || session?.user.username || '';
+  const modules = profile?.modules ?? [];
   const permissions = session?.modules ?? [];
   const visibleMainItems = mapNavigationModules(
     mainNavigationItems,
@@ -383,8 +387,8 @@ export function ConfigurationLayout() {
                   }}
                 />
                 <Avatar
-                  aria-label={session.user.username}
-                  title={session.user.username}
+                  aria-label={displayName}
+                  title={displayName}
                   sx={{
                     width: 36,
                     height: 36,
@@ -395,7 +399,7 @@ export function ConfigurationLayout() {
                     flexShrink: 0,
                   }}
                 >
-                  {session.user.username
+                  {displayName
                     .split(/[\s._-]+/)
                     .filter(Boolean)
                     .slice(0, 2)
