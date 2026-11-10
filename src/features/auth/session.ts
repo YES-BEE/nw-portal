@@ -15,6 +15,7 @@ import { CanceledError } from 'axios';
 import type { RefreshTokenResponse } from './types';
 import type { MeResponse } from './types';
 import { getMe, isMeResponse } from './meApi';
+import { getStartupStatus, setStartupStatus } from './startupState';
 
 export const SESSION_STORAGE_KEY = 'nw-track-session-v2';
 const sessionChangeEvent = 'nw-track-session-change';
@@ -22,23 +23,16 @@ let currentSession: AuthSession | null = null;
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 let authAttempt = 0;
 let logoutRequest: Promise<void> | null = null;
-let pendingLoginToken: {
-  attempt: number;
-  token: string;
-  expiresAt: number;
-} | null = null;
 let startupRequest: Promise<void> | null = null;
+let startupRun = 0;
+let startupController: AbortController | null = null;
+let retrySession: AuthSession | null = null;
 let authSessionVersion = 0;
 let accessRefresh: { version: number; request: Promise<string | null> } | null =
   null;
 
 setAccessTokenProvider(
   (allowRefresh) => {
-    if (
-      pendingLoginToken?.attempt === authAttempt &&
-      pendingLoginToken.expiresAt > Date.now()
-    )
-      return pendingLoginToken.token;
     if (!currentSession?.authentication) return null;
     if (
       currentSession.expiresAt !== undefined &&
@@ -93,20 +87,7 @@ export async function signIn(
     );
     if (signal?.aborted || attempt !== authAttempt) return null;
     const expiresAt = Date.now() + authentication.expiresIn * 1000;
-    pendingLoginToken = {
-      attempt,
-      token: authentication.accessToken,
-      expiresAt,
-    };
-    const [refresh, profile] = await Promise.all([
-      issueRefreshToken(signal),
-      getMe(signal),
-    ]);
-    if (signal?.aborted || attempt !== authAttempt) return null;
-    setAuthenticatedSession(
-      createSession(authentication, expiresAt, refresh, profile),
-    );
-    return null;
+    return await completeStartup(createSession(authentication, expiresAt));
   } catch (error) {
     if (signal?.aborted || attempt !== authAttempt) return null;
     signOut();
@@ -116,8 +97,6 @@ export async function signIn(
           kind: 'network',
           message: error instanceof Error ? error.message : '',
         };
-  } finally {
-    if (pendingLoginToken?.attempt === attempt) pendingLoginToken = null;
   }
 }
 
@@ -187,44 +166,78 @@ async function restoreSession() {
     );
     if (session.expiresAt! <= Date.now() && !hasRefreshToken(session))
       throw new Error('Expired session');
-    setAuthenticatedSession(session);
-    const version = authSessionVersion;
-    try {
-      if (session.expiresAt! <= Date.now()) await refreshAccessToken();
-      if (version !== authSessionVersion || !readSession()) return;
-      const [refresh, profile] = await Promise.all([
-        issueRefreshToken(),
-        getMe(),
-      ]);
-      if (version !== authSessionVersion || !readSession()) return;
-      applySession(
-        {
-          ...currentSession!,
-          refreshToken: refresh.refreshToken,
-          refreshTokenExpiresAt: refresh.expiresAt,
-          profile,
-          user: {
-            id: profile.id,
-            username: profile.username,
-            role: profile.role,
-            status: 'Active',
-          },
-          modules: moduleKeys.filter((key) =>
-            profile.modules.some((module) => module.key === key),
-          ),
-        },
-        false,
-      );
-    } catch {
-      if (version === authSessionVersion) signOut();
-    }
+    await completeStartup(session);
   } catch {
     signOut();
   }
 }
 
+function cancelStartup() {
+  startupRun++;
+  startupController?.abort();
+  startupController = null;
+  retrySession = null;
+  setStartupStatus('ready');
+}
+
+export async function retryStartup(): Promise<void> {
+  if (getStartupStatus() === 'error' && retrySession)
+    await completeStartup(retrySession);
+}
+
+async function completeStartup(
+  session: AuthSession,
+): Promise<SignInError | null> {
+  startupController?.abort();
+  const controller = new AbortController();
+  startupController = controller;
+  const run = ++startupRun;
+  retrySession = session;
+  setStartupStatus('loading');
+  try {
+    if (session.expiresAt! <= Date.now() && !hasRefreshToken(session))
+      throw new LoginError('invalidResponse');
+    applySession(session, true);
+    if (session.expiresAt! <= Date.now()) await refreshAccessToken();
+    if (run !== startupRun) return null;
+    const [refresh, profile] = await Promise.all([
+      issueRefreshToken(controller.signal),
+      getMe(controller.signal),
+    ]);
+    if (run !== startupRun) return null;
+    if (!currentSession) throw new CanceledError();
+    applySession(
+      createSession(
+        currentSession.authentication!,
+        currentSession.expiresAt!,
+        refresh,
+        profile,
+      ),
+      false,
+    );
+    retrySession = null;
+    setStartupStatus('ready');
+    return null;
+  } catch (error) {
+    if (run !== startupRun) return null;
+    retrySession = currentSession ?? session;
+    controller.abort();
+    clearSession();
+    setStartupStatus('error');
+    return error instanceof LoginError
+      ? error.failure
+      : {
+          kind: 'network',
+          message: error instanceof Error ? error.message : '',
+        };
+  } finally {
+    if (startupController === controller) startupController = null;
+  }
+}
+
 // Persist the backend token and metadata, without passwords or local access records.
 export function setAuthenticatedSession(session: AuthSession | null) {
+  cancelStartup();
   applySession(session, true);
 }
 
@@ -263,7 +276,6 @@ function applySession(session: AuthSession | null, replaceIdentity: boolean) {
   }
   authAttempt++;
   if (replaceIdentity) authSessionVersion++;
-  pendingLoginToken = null;
   clearTimeout(expiryTimer);
   currentSession = session ? structuredClone(session) : null;
   if (session?.expiresAt !== undefined) scheduleExpiry();
@@ -274,7 +286,7 @@ function scheduleExpiry() {
   if (currentSession?.expiresAt === undefined) return;
   const remaining = currentSession.expiresAt - Date.now();
   if (remaining <= 0) {
-    if (!hasRefreshToken(currentSession)) signOut();
+    if (!hasRefreshToken(currentSession)) clearSession();
     else
       void refreshAccessToken().catch(() => {
         /* Renewal clears the failed session. */
@@ -288,9 +300,14 @@ export function signOut() {
   setAuthenticatedSession(null);
 }
 
+function clearSession() {
+  applySession(null, true);
+}
+
 // Explicit user logout calls the server; expiry and failed-login cleanup stay local.
 export function logout(): Promise<void> {
   if (logoutRequest) return logoutRequest;
+  cancelStartup();
   const attempt = ++authAttempt;
   authSessionVersion++;
   clearTimeout(expiryTimer);
@@ -328,7 +345,7 @@ export function refreshAccessToken(): Promise<string | null> {
   if (accessRefresh?.version === version) return accessRefresh.request;
   const session = currentSession;
   if (!session?.authentication || !hasRefreshToken(session)) {
-    signOut();
+    clearSession();
     return Promise.reject(new CanceledError());
   }
   const request = exchangeRefreshToken({ refreshToken: session.refreshToken! })
@@ -350,7 +367,7 @@ export function refreshAccessToken(): Promise<string | null> {
       return authentication.accessToken;
     })
     .catch((error: unknown) => {
-      if (version === authSessionVersion) signOut();
+      if (version === authSessionVersion) clearSession();
       throw error;
     })
     .finally(() => {

@@ -17,6 +17,13 @@
     "logoAlt": "NoWash",
     "copyright": "© {{year}} NoWash. All rights reserved."
   },
+  "startup": {
+    "loading": "Getting your workspace ready...",
+    "title": "Something went wrong",
+    "description": "We couldn't finish loading your workspace. Please try again, or return to sign in.",
+    "retry": "Try again",
+    "signIn": "Back to sign in"
+  },
   "navigation": {
     "styles": "Style Management",
     "newstyle": "New Style",
