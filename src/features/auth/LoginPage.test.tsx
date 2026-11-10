@@ -1,6 +1,6 @@
-import axios from 'axios';
+import { apiClient } from '../../api/client';
 import type { MockInstance } from 'vitest';
-import { loginResponse } from '../../test/auth';
+import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { readSession } from './session';
 import { seedTestData } from '../../test/fixtures';
 import {
@@ -16,7 +16,7 @@ import { renderWithProviders } from '../../test/render';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './LoginPage';
 
-let postMock: MockInstance<typeof axios.post>;
+let postMock: MockInstance<typeof apiClient.post>;
 
 function setup() {
   const user = userEvent.setup();
@@ -40,7 +40,7 @@ describe('LoginPage', () => {
 
   beforeEach(() => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
-    postMock = vi.spyOn(axios, 'post');
+    postMock = vi.spyOn(apiClient, 'post');
     postMock.mockResolvedValue({
       status: 401,
       data: {
@@ -340,12 +340,13 @@ describe('LoginPage', () => {
 
   it('disables repeated submissions while waiting and opens the first backend-authorized module', async () => {
     let resolve!: (value: { status: number; data: unknown }) => void;
-    postMock.mockImplementation(
+    postMock.mockImplementationOnce(
       () =>
         new Promise((done) => {
           resolve = done;
         }),
     );
+    postMock.mockResolvedValueOnce({ status: 200, data: refreshTokenResponse });
     const user = userEvent.setup();
     renderWithProviders(
       <MemoryRouter initialEntries={['/login']}>

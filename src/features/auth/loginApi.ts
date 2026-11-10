@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { apiClient } from '../../api/client';
 import type { LoginRequest, LoginResponse, LoginUiError } from './types';
 import { parseLoginFailure } from './loginFailure';
 
@@ -46,18 +46,7 @@ export async function login(
   request: LoginRequest,
   signal?: AbortSignal,
 ): Promise<LoginResponse> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
-  const apiVersion = import.meta.env.VITE_API_VERSION?.trim();
-  const endpoint = new URL(
-    `${baseUrl ?? ''}/api/${apiVersion ?? ''}/auth/login`,
-  ).toString();
-
-  const response = await axios.post<unknown>(endpoint, request, {
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, application/problem+json',
-      Authorization: null,
-    },
+  const response = await apiClient.post<unknown>('auth/login', request, {
     signal,
     validateStatus: () => true,
   });

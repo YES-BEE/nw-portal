@@ -1,8 +1,9 @@
+import { apiClient } from '../api/client';
 import { seedTestData, signIn } from '../test/fixtures';
 import { defaultTags, sampleStyles } from '../test/fixtures';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TAG_STORAGE_KEY } from '../features/configurations/tagRegistry';
 import App from '../App';
 import { renderWithProviders } from '../test/render';
@@ -23,6 +24,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
@@ -475,6 +477,13 @@ describe('application routing', () => {
     expect(window.location.pathname).toBe('/login');
     expect(router.state.historyAction).toBe('REPLACE');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(apiClient.post).toHaveBeenCalledWith(
+      'auth/logout',
+      { refreshToken: 'test-refresh-token' },
+      {
+        timeout: 10_000,
+      },
+    );
     expect(readSession()).toBeNull();
     await act(() => router.navigate('/configurations/processes'));
     expect(

@@ -1,6 +1,6 @@
-import axios from 'axios';
+import { apiClient } from '../../api/client';
 import type { MockInstance } from 'vitest';
-import { loginResponse } from '../../test/auth';
+import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ACCESS_STORAGE_KEY } from '../access/accessData';
 import {
@@ -15,7 +15,14 @@ import {
 } from './session';
 import type { AuthSession } from './session';
 
-let postMock: MockInstance<typeof axios.post>;
+let postMock: MockInstance<typeof apiClient.post>;
+
+function mockSuccessfulLogin(data = loginResponse) {
+  postMock.mockImplementation(async (url) => ({
+    status: 200,
+    data: url === 'auth/refresh-tokens' ? refreshTokenResponse : data,
+  }));
+}
 
 const identity: AuthSession = {
   user: {
@@ -27,7 +34,7 @@ const identity: AuthSession = {
   modules: ['reports'],
 };
 beforeEach(() => {
-  postMock = vi.spyOn(axios, 'post');
+  postMock = vi.spyOn(apiClient, 'post');
   localStorage.clear();
   sessionStorage.clear();
   signOut();
@@ -42,19 +49,13 @@ afterEach(() => {
 });
 
 describe('backend session preparation', () => {
-  it('posts typed credentials using the configured base URL and API version and starts a session', async () => {
-    vi.stubEnv('VITE_API_VERSION', 'v2');
-    postMock.mockResolvedValue({ status: 200, data: loginResponse });
+  it('posts typed credentials through the shared client and starts a session', async () => {
+    mockSuccessfulLogin();
     expect(await signIn(' admin ', ' exact password ')).toBeNull();
     expect(postMock).toHaveBeenCalledWith(
-      'http://backend.test/api/v2/auth/login',
+      'auth/login',
       { username: 'admin', password: ' exact password ', clientType: 'PC' },
       expect.objectContaining({
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, application/problem+json',
-          Authorization: null,
-        },
         validateStatus: expect.any(Function),
       }),
     );
@@ -82,7 +83,7 @@ describe('backend session preparation', () => {
         { key: 'future', name: 'Future', built_in: false },
       ],
     };
-    postMock.mockResolvedValue({ status: 200, data: response });
+    mockSuccessfulLogin(response);
     await signIn('admin', 'password');
     expect(postMock.mock.calls[0][1]).toMatchObject({ clientType: 'PAD' });
     expect(readSession()?.modules).toEqual(['reports']);
@@ -116,7 +117,9 @@ describe('backend session preparation', () => {
     },
   );
   it('clears a previous token and session when a subsequent login fails', async () => {
-    postMock.mockResolvedValueOnce({ status: 200, data: loginResponse });
+    postMock
+      .mockResolvedValueOnce({ status: 200, data: loginResponse })
+      .mockResolvedValueOnce({ status: 200, data: refreshTokenResponse });
     await signIn('admin', 'password');
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).not.toBeNull();
     postMock.mockResolvedValueOnce({
@@ -136,16 +139,11 @@ describe('backend session preparation', () => {
     expect(readSession()).toBeNull();
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
-  it('reports network failures and missing configuration', async () => {
+  it('reports transport failures', async () => {
     postMock.mockRejectedValue(new Error('Network error'));
     expect(await signIn('admin', 'password')).toMatchObject({
       kind: 'network',
       message: 'Network error',
-    });
-    vi.stubEnv('VITE_API_BASE_URL', '');
-    expect(await signIn('admin', 'password')).toMatchObject({
-      kind: 'network',
-      message: expect.any(String),
     });
     expect(postMock).toHaveBeenCalledTimes(1);
   });
@@ -167,16 +165,20 @@ describe('backend session preparation', () => {
     postMock.mockResolvedValue({ status: 200, data: '<html>Error</html>' });
     expect(await signIn('admin', 'password')).toBe('invalidResponse');
   });
-  it('expires the session according to expiresIn and clears tokens on logout', async () => {
+  it('renews an expired access token and clears tokens on logout', async () => {
     vi.useFakeTimers();
-    postMock.mockResolvedValue({ status: 200, data: loginResponse });
+    mockSuccessfulLogin();
     await signIn('admin', 'password');
     expect(readSession()?.authentication?.accessToken).toBe(
       'test-access-token',
     );
-    vi.advanceTimersByTime(900_000);
-    expect(readSession()).toBeNull();
-    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    await vi.advanceTimersByTimeAsync(900_000);
+    expect(readSession()?.expiresAt).toBeGreaterThan(Date.now());
+    expect(postMock).toHaveBeenCalledWith(
+      'auth/refresh',
+      { refreshToken: refreshTokenResponse.refreshToken },
+      expect.any(Object),
+    );
     await signIn('admin', 'password');
     signOut();
     expect(readSession()).toBeNull();
@@ -203,7 +205,11 @@ describe('backend session preparation', () => {
     await cancelled;
     expect(readSession()).toBeNull();
   });
-  it('restores the token and sidebar metadata after reload without extending the original expiry', () => {
+  it('restores the token and sidebar metadata after reload without extending the original expiry', async () => {
+    postMock.mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'auth/refresh' ? loginResponse : refreshTokenResponse,
+    }));
     vi.useFakeTimers();
     const expiresAt = Date.now() + 60_000;
     sessionStorage.setItem(
@@ -221,16 +227,15 @@ describe('backend session preparation', () => {
         roles: [{ name: 'NW', modules: ['users'] }],
       }),
     );
-    initializeSession();
+    await initializeSession();
     expect(readSession()).toMatchObject({
       authentication: loginResponse,
       modules: ['reports'],
       expiresAt,
     });
     expect(getLandingPath(readSession()!)).toBe('/reports');
-    vi.advanceTimersByTime(60_000);
-    expect(readSession()).toBeNull();
-    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(readSession()?.expiresAt).toBeGreaterThan(Date.now());
   });
   it.each([
     '{invalid',
@@ -240,14 +245,14 @@ describe('backend session preparation', () => {
       authentication: { ...loginResponse, accessToken: '' },
       expiresAt: 9_999_999_999_999,
     }),
-  ])('discards malformed or expired saved sessions: %s', (raw) => {
+  ])('discards malformed or expired saved sessions: %s', async (raw) => {
     sessionStorage.setItem(SESSION_STORAGE_KEY, raw);
-    initializeSession();
+    await initializeSession();
     expect(readSession()).toBeNull();
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
   it('reports unavailable browser storage without starting an unpersisted login', async () => {
-    postMock.mockResolvedValue({ status: 200, data: loginResponse });
+    mockSuccessfulLogin();
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('Blocked');
     });
@@ -255,7 +260,7 @@ describe('backend session preparation', () => {
     expect(readSession()).toBeNull();
   });
   it('ends the in-memory session even if removing browser storage fails', async () => {
-    postMock.mockResolvedValue({ status: 200, data: loginResponse });
+    mockSuccessfulLogin();
     await signIn('admin', 'password');
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('Blocked');

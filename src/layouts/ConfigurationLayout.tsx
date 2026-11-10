@@ -32,7 +32,7 @@ import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettin
 import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
 import { configurationTheme, theme } from '../app/theme';
 import logo from '../assets/logo.png';
-import { signOut } from '../features/auth/session';
+import { logout } from '../features/auth/session';
 import { useSession } from '../features/auth/useSession';
 import {
   mainNavigationItems,
@@ -83,6 +83,7 @@ export function ConfigurationLayout() {
   const [expanded, setExpanded] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const navigationOpen = desktop ? drawerOpen : mobileOpen;
   const openButton = useRef<HTMLButtonElement>(null);
@@ -253,10 +254,18 @@ export function ConfigurationLayout() {
       </List>
       <List disablePadding sx={{ mt: 'auto', px: 1, pt: 3 }}>
         <ListItemButton
-          onClick={() => {
-            signOut();
-            setMobileOpen(false);
-            void navigate('/login', { replace: true });
+          disabled={loggingOut}
+          onClick={async () => {
+            if (loggingOut) return;
+            setLoggingOut(true);
+            try {
+              await logout();
+            } catch {
+              // Logout clears local credentials even if server revocation fails.
+            } finally {
+              setMobileOpen(false);
+              void navigate('/login', { replace: true });
+            }
           }}
           sx={{ borderRadius: 1, minHeight: 48 }}
         >

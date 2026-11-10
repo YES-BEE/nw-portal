@@ -8,7 +8,7 @@ import './i18n';
 import './index.css';
 import { initializeSession } from './features/auth/session';
 
-initializeSession();
+void initializeSession();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

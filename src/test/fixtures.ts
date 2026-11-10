@@ -139,7 +139,7 @@ import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 import { setAuthenticatedSession } from '../features/auth/session';
 import { orderedNavigationItems } from '../app/navigation';
 import i18n from '../i18n';
-import { loginResponse } from './auth';
+import { loginResponse, refreshTokenResponse } from './auth';
 
 export function seedTestData() {
   localStorage.clear();
@@ -164,6 +164,8 @@ export function signIn(username: string, _password?: string) {
   setAuthenticatedSession({
     user,
     modules,
+    refreshToken: refreshTokenResponse.refreshToken,
+    refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
     authentication: {
       ...loginResponse,
       username: user.username,

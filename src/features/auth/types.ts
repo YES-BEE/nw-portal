@@ -30,6 +30,17 @@ export interface LoginSuccessResponse {
 // Preserve the existing success-response name used by the API and session code.
 export type LoginResponse = LoginSuccessResponse;
 
+export interface RefreshTokenResponse {
+  refreshToken: string;
+  expiresAt: string;
+}
+
+export interface RefreshAccessTokenRequest {
+  refreshToken: string;
+}
+
+export type RefreshAccessTokenResponse = LoginSuccessResponse;
+
 export interface LoginProblemBase {
   type: string;
   title: string;

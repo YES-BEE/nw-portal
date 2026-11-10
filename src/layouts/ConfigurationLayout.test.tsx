@@ -1,5 +1,5 @@
-import axios from 'axios';
-import { loginResponse } from '../test/auth';
+import { apiClient } from '../api/client';
+import { loginResponse, refreshTokenResponse } from '../test/auth';
 import { signIn as backendSignIn } from '../features/auth/session';
 import { seedTestData, signIn } from '../test/fixtures';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -14,6 +14,7 @@ import {
 } from '../features/access/accessData';
 
 beforeEach(() => {
+  vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
   sessionStorage.clear();
   signIn('nw.admin', 'NW@2026demo');
@@ -27,7 +28,7 @@ afterEach(() => {
 describe('persistent desktop navigation', () => {
   it('maps login response module names to sidebar links using their keys', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
-    vi.spyOn(axios, 'post').mockResolvedValue({
+    vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
       status: 200,
       data: {
         ...loginResponse,
@@ -38,6 +39,10 @@ describe('persistent desktop navigation', () => {
           { key: 'future-module', name: 'Future Tools', built_in: false },
         ],
       },
+    });
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      status: 200,
+      data: refreshTokenResponse,
     });
     expect(await backendSignIn('admin', 'password')).toBeNull();
     const user = userEvent.setup();
@@ -71,9 +76,13 @@ describe('persistent desktop navigation', () => {
 
   it('shows no module links or configuration group for an empty modules response', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
-    vi.spyOn(axios, 'post').mockResolvedValue({
+    vi.spyOn(apiClient, 'post').mockResolvedValueOnce({
       status: 200,
       data: { ...loginResponse, modules: [] },
+    });
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      status: 200,
+      data: refreshTokenResponse,
     });
     expect(await backendSignIn('admin', 'password')).toBeNull();
     const user = userEvent.setup();
