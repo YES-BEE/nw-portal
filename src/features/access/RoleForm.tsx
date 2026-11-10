@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
+  Alert,
+  AlertTitle,
   Button,
   Checkbox,
   FormControl,
@@ -13,30 +15,47 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { getRoleNameError, loadAccessData, moduleKeys } from './accessData';
-import type { AccessRole } from './accessData';
+import { moduleKeys } from './accessData';
+import type { ModuleKey } from './accessData';
+import type { AccessRoleDraft, AccessRolesFailure } from './types';
+import { AccessRolesError } from './accessRolesFailure';
+import { signOut } from '../auth/session';
 
 export function RoleForm({
   initial,
   editing,
+  existingCodes,
   onSave,
   onClose,
 }: {
-  initial: AccessRole;
+  initial: AccessRoleDraft;
   editing: boolean;
-  onSave: (role: AccessRole) => void;
+  existingCodes: string[];
+  onSave: (role: AccessRoleDraft, signal: AbortSignal) => Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useTranslation('translation');
   const [draft, setDraft] = useState(initial);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<AccessRolesFailure | null>(null);
+  const pending = useRef<AbortController | null>(null);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    return () => pending.current?.abort();
   }, []);
-  const error = submitted
-    ? getRoleNameError(draft.name, loadAccessData().records.roles, editing)
-    : undefined;
+  const code = draft.code.trim();
+  const codeError = !code
+    ? 'codeRequired'
+    : !editing &&
+        existingCodes.some(
+          (existing) => existing.toLowerCase() === code.toLowerCase(),
+        )
+      ? 'codeDuplicate'
+      : undefined;
+  const error = submitted ? codeError : undefined;
+  const choices = [...new Set([...moduleKeys, ...initial.modules])];
   return (
     <Paper
       component="section"
@@ -56,31 +75,42 @@ export function RoleForm({
       <Box
         component="form"
         noValidate
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
           setSubmitted(true);
-          if (
-            !getRoleNameError(
-              draft.name,
-              loadAccessData().records.roles,
-              editing,
-            )
-          )
-            onSave({ ...draft, name: draft.name.trim() });
+          if (codeError || pending.current) return;
+          const controller = new AbortController();
+          pending.current = controller;
+          setSaving(true);
+          setFailure(null);
+          try {
+            await onSave({ ...draft, code }, controller.signal);
+          } catch (error: unknown) {
+            if (!controller.signal.aborted)
+              setFailure(
+                error instanceof AccessRolesError
+                  ? error.failure
+                  : { kind: 'network', action: 'retry' },
+              );
+          } finally {
+            pending.current = null;
+            if (!controller.signal.aborted) setSaving(false);
+          }
         }}
       >
         <TextField
-          label={t('access.roleName')}
+          label={t('access.roles.code')}
           autoFocus
           required
-          value={draft.name}
-          onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          value={draft.code}
+          disabled={saving}
+          onChange={(event) => setDraft({ ...draft, code: event.target.value })}
           error={Boolean(error)}
           helperText={
             error
-              ? t(`access.errors.${error}`)
+              ? t(`access.roles.${error}`)
               : editing
-                ? t('access.roleNameLocked')
+                ? t('access.roles.codeLocked')
                 : undefined
           }
           slotProps={{
@@ -89,7 +119,11 @@ export function RoleForm({
           }}
           sx={{ width: '100%', maxWidth: 420 }}
         />
-        <FormControl component="fieldset" sx={{ display: 'flex', mt: 3 }}>
+        <FormControl
+          component="fieldset"
+          disabled={saving}
+          sx={{ display: 'flex', mt: 3 }}
+        >
           <FormLabel component="legend">{t('access.moduleAccess')}</FormLabel>
           <Typography
             color="text.secondary"
@@ -108,10 +142,14 @@ export function RoleForm({
               gap: 1,
             }}
           >
-            {moduleKeys.map((key) => (
+            {choices.map((key) => (
               <FormControlLabel
                 key={key}
-                label={t(`access.modules.${key}`)}
+                label={
+                  moduleKeys.includes(key as ModuleKey)
+                    ? t(`access.modules.${key as ModuleKey}`)
+                    : key
+                }
                 sx={{
                   m: 0,
                   border: 1,
@@ -136,14 +174,51 @@ export function RoleForm({
             ))}
           </FormGroup>
         </FormControl>
+        <FormControl component="fieldset" disabled={saving} sx={{ mt: 3 }}>
+          <FormLabel component="legend">
+            {t('access.roles.channelAccess')}
+          </FormLabel>
+          <FormGroup row>
+            <FormControlLabel
+              label={t('access.roles.padAccess')}
+              control={
+                <Checkbox
+                  checked={draft.padAccess}
+                  onChange={(event) =>
+                    setDraft({ ...draft, padAccess: event.target.checked })
+                  }
+                />
+              }
+            />
+          </FormGroup>
+        </FormControl>
+        {failure && (
+          <Alert
+            severity="error"
+            sx={{ mt: 2 }}
+            action={
+              failure.action === 'signIn' ? (
+                <Button color="inherit" onClick={signOut}>
+                  {t('startup.signIn')}
+                </Button>
+              ) : undefined
+            }
+          >
+            <AlertTitle>{t('access.roles.saveFailure')}</AlertTitle>
+            {failure.message ||
+              t(`access.roles.failures.${failure.kind}.description`)}
+          </Alert>
+        )}
         <Stack
           direction="row"
           spacing={1.5}
           sx={{ justifyContent: 'flex-end', mt: 3 }}
         >
-          <Button onClick={onClose}>{t('access.cancel')}</Button>
-          <Button type="submit" variant="contained">
-            {t('access.roles.save')}
+          <Button onClick={onClose} disabled={saving}>
+            {t('access.cancel')}
+          </Button>
+          <Button type="submit" variant="contained" disabled={saving}>
+            {t(saving ? 'access.roles.saving' : 'access.roles.save')}
           </Button>
         </Stack>
       </Box>

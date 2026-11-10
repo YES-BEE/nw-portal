@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
+  AlertTitle,
   Box,
+  Button,
   Chip,
+  CircularProgress,
   IconButton,
   Paper,
   Snackbar,
@@ -19,38 +22,106 @@ import {
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import { canDeleteRole } from './accessData';
-import type { AccessRole } from './accessData';
-import { useAccessData } from './useAccessData';
+import { moduleKeys } from './accessData';
+import type { ModuleKey } from './accessData';
+import { getAccessRoles, saveAccessRole } from './accessRolesApi';
+import { AccessRolesError } from './accessRolesFailure';
+import { signOut } from '../auth/session';
+import type {
+  AccessRoleDraft,
+  AccessRolesFailure,
+  AccessRolesResponse,
+} from './types';
+import { ManagementHeader } from './ManagementScaffold';
 import { RoleForm } from './RoleForm';
-import { DeleteAccessDialog, ManagementHeader } from './ManagementScaffold';
+
+type RolesState =
+  | { status: 'loading' }
+  | { status: 'ready'; roles: AccessRolesResponse }
+  | { status: 'error'; failure: AccessRolesFailure };
 
 export function RoleManagementPage() {
   const { t } = useTranslation('translation');
-  const { data, error, persist, setError } = useAccessData();
+  const [state, setState] = useState<RolesState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
   const [form, setForm] = useState<{
-    initial: AccessRole;
+    initial: AccessRoleDraft;
     editing: boolean;
   } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<AccessRole | null>(null);
   const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAccessRoles(controller.signal).then(
+      (roles) => {
+        if (!controller.signal.aborted) setState({ status: 'ready', roles });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'error',
+            failure:
+              error instanceof AccessRolesError
+                ? error.failure
+                : { kind: 'network', action: 'retry' },
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [attempt]);
   return (
     <>
       <ManagementHeader
         kind="roles"
-        onAdd={() => {
-          setError(null);
-          setForm({ initial: { name: '', modules: [] }, editing: false });
-        }}
+        onAdd={
+          state.status === 'ready' && !form
+            ? () => {
+                setSaved(false);
+                setForm({
+                  initial: {
+                    code: '',
+                    modules: [],
+                    padAccess: true,
+                  },
+                  editing: false,
+                });
+              }
+            : undefined
+        }
       />
-      {data.unavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('access.loadWarning')}
-        </Alert>
-      )}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t(`access.${error}`)}
+      {state.status === 'error' && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            state.failure.action === 'signIn' ? (
+              <Button color="inherit" onClick={signOut}>
+                {t('startup.signIn')}
+              </Button>
+            ) : state.failure.action === 'retry' ? (
+              <Button
+                color="inherit"
+                onClick={() => {
+                  setState({ status: 'loading' });
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                {t('startup.retry')}
+              </Button>
+            ) : undefined
+          }
+        >
+          <AlertTitle>
+            {t(`access.roles.failures.${state.failure.kind}.title`)}
+          </AlertTitle>
+          {state.failure.message ||
+            t(`access.roles.failures.${state.failure.kind}.description`)}
+          {state.failure.status !== undefined && (
+            <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+              {t('access.roles.failureStatus', {
+                status: state.failure.status,
+              })}
+            </Typography>
+          )}
         </Alert>
       )}
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -58,7 +129,10 @@ export function RoleManagementPage() {
           {t('access.roles.existing')}
         </Typography>
         <TableContainer>
-          <Table aria-label={t('access.roles.existing')}>
+          <Table
+            aria-label={t('access.roles.existing')}
+            aria-busy={state.status === 'loading'}
+          >
             <TableHead>
               <TableRow>
                 <TableCell>{t('access.role')}</TableCell>
@@ -67,116 +141,130 @@ export function RoleManagementPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.records.roles.map((role) => (
-                <TableRow key={role.name}>
-                  <TableCell component="th" scope="row" sx={{ minWidth: 170 }}>
-                    {role.name}
-                  </TableCell>
-                  <TableCell>
-                    <Stack
-                      direction="row"
-                      useFlexGap
-                      sx={{ gap: 0.75, flexWrap: 'wrap' }}
-                    >
-                      {role.modules.length ? (
-                        role.modules.map((key) => (
-                          <Chip
-                            key={key}
-                            size="small"
-                            variant="outlined"
-                            label={t(`access.modules.${key}`)}
-                          />
-                        ))
-                      ) : (
-                        <Typography color="text.secondary" variant="body2">
-                          {t('access.noAccess')}
-                        </Typography>
-                      )}
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Tooltip title={t('access.edit')}>
-                      <IconButton
-                        aria-label={t('access.editNamed', { name: role.name })}
-                        onClick={() => {
-                          setError(null);
-                          setForm({ initial: role, editing: true });
-                        }}
-                      >
-                        <EditOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={t(
-                        canDeleteRole(role.name, data.records)
-                          ? 'access.delete'
-                          : 'access.roleAssigned',
-                      )}
-                    >
-                      <Box component="span">
-                        <IconButton
-                          color="error"
-                          disabled={!canDeleteRole(role.name, data.records)}
-                          aria-label={t('access.deleteNamed', {
-                            name: role.name,
-                          })}
-                          onClick={() => setPendingDelete(role)}
-                        >
-                          <DeleteOutlinedIcon />
-                        </IconButton>
-                      </Box>
-                    </Tooltip>
+              {state.status === 'loading' && (
+                <TableRow>
+                  <TableCell colSpan={3} align="center">
+                    <CircularProgress
+                      size={28}
+                      aria-label={t('common.loading')}
+                      sx={{ my: 3 }}
+                    />
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
+              {state.status === 'ready' && !state.roles.length && (
+                <TableRow>
+                  <TableCell colSpan={3} align="center">
+                    {t('access.roles.empty')}
+                  </TableCell>
+                </TableRow>
+              )}
+              {state.status === 'ready' &&
+                state.roles.map((role) => (
+                  <TableRow key={role.code}>
+                    <TableCell
+                      component="th"
+                      scope="row"
+                      sx={{ minWidth: 170 }}
+                    >
+                      {role.name}
+                    </TableCell>
+                    <TableCell>
+                      <Stack
+                        direction="row"
+                        useFlexGap
+                        sx={{ gap: 0.75, flexWrap: 'wrap' }}
+                      >
+                        {role.modules.length ? (
+                          [...new Set(role.modules)].map((key) => (
+                            <Chip
+                              key={key}
+                              size="small"
+                              variant="outlined"
+                              label={
+                                moduleKeys.includes(key as ModuleKey)
+                                  ? t(`access.modules.${key as ModuleKey}`)
+                                  : key
+                              }
+                            />
+                          ))
+                        ) : (
+                          <Typography color="text.secondary" variant="body2">
+                            {t('access.noAccess')}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      <Tooltip title={t('access.edit')}>
+                        <Box component="span">
+                          <IconButton
+                            disabled={Boolean(form)}
+                            onClick={() => {
+                              setSaved(false);
+                              setForm({
+                                initial: {
+                                  code: role.code,
+                                  modules: [...role.modules],
+                                  padAccess: role.pad_access,
+                                },
+                                editing: true,
+                              });
+                            }}
+                            aria-label={t('access.editNamed', {
+                              name: role.name,
+                            })}
+                          >
+                            <EditOutlinedIcon />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                      <Tooltip title={t('access.roles.deleteUnavailable')}>
+                        <Box component="span">
+                          <IconButton
+                            disabled
+                            color="error"
+                            aria-label={t('access.deleteNamed', {
+                              name: role.name,
+                            })}
+                          >
+                            <DeleteOutlinedIcon />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </TableContainer>
       </Paper>
       {form && (
         <RoleForm
-          key={form.editing ? form.initial.name : 'new-role'}
+          key={form.editing ? form.initial.code : 'new-role'}
           {...form}
+          existingCodes={
+            state.status === 'ready' ? state.roles.map((role) => role.code) : []
+          }
           onClose={() => setForm(null)}
-          onSave={(role) => {
-            if (
-              persist((latest) => ({
-                ...latest,
-                roles: form.editing
-                  ? latest.roles.map((record) =>
-                      record.name === form.initial.name ? role : record,
-                    )
-                  : [...latest.roles, role],
-              }))
-            ) {
-              setForm(null);
-              setSaved(true);
-            }
+          onSave={async (draft, signal) => {
+            await saveAccessRole(
+              draft.code,
+              {
+                modules: draft.modules,
+                pcAccess: draft.modules.length > 0,
+                padAccess: draft.padAccess,
+              },
+              signal,
+            );
+            if (signal.aborted) return;
+            setForm(null);
+            setSaved(true);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
           }}
         />
       )}
-      <DeleteAccessDialog
-        name={pendingDelete?.name ?? null}
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (pendingDelete) {
-            const success = persist((latest) => {
-              if (!canDeleteRole(pendingDelete.name, latest)) return null;
-              return {
-                ...latest,
-                roles: latest.roles.filter(
-                  (role) => role.name !== pendingDelete.name,
-                ),
-              };
-            });
-            if (success) {
-              if (form?.initial.name === pendingDelete.name) setForm(null);
-              setSaved(true);
-            }
-          }
-          setPendingDelete(null);
-        }}
-      />
       <Snackbar
         open={saved}
         autoHideDuration={3500}

@@ -24,6 +24,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: [] });
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
   sessionStorage.clear();

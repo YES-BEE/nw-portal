@@ -195,7 +195,52 @@
       "empty": "No users match your search."
     },
     "roles": {
-      "description": "Create roles and choose which modules each role can access.",
+      "description": "Manage roles, module assignments, and application access.",
+      "empty": "No roles found.",
+      "deleteUnavailable": "Role deletion is not available yet.",
+      "code": "Role Code",
+      "codeRequired": "Enter a role code.",
+      "codeDuplicate": "This role code already exists. Edit the existing role instead.",
+      "codeLocked": "The role code cannot be changed.",
+      "channelAccess": "Application access",
+      "padAccess": "PAD access",
+      "saving": "Saving...",
+      "saveFailure": "Unable to save role",
+      "failureStatus": "HTTP {{status}}",
+      "failures": {
+        "authentication": {
+          "title": "Sign in required",
+          "description": "Your session could not be verified. Sign in again to view roles."
+        },
+        "access": {
+          "title": "Access denied",
+          "description": "Your account cannot view roles with its current access settings."
+        },
+        "roleChanged": {
+          "title": "Your role has changed",
+          "description": "Sign in again to load your updated access settings."
+        },
+        "representation": {
+          "title": "Response format unavailable",
+          "description": "The service could not return roles in the requested format. Contact your administrator."
+        },
+        "service": {
+          "title": "Roles are temporarily unavailable",
+          "description": "The role service could not complete the request. Please try again shortly."
+        },
+        "network": {
+          "title": "Unable to connect",
+          "description": "Check your connection and try again. If the problem continues, contact your administrator."
+        },
+        "http": {
+          "title": "Unable to load roles",
+          "description": "The role request could not be completed. Please try again."
+        },
+        "invalidResponse": {
+          "title": "Unable to read roles",
+          "description": "The service returned an unexpected response. Try again or contact your administrator."
+        }
+      },
       "existing": "Roles & Module Permissions",
       "add": "Create New Role",
       "edit": "Edit Role",

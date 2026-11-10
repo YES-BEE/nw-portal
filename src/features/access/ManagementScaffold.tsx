@@ -17,7 +17,7 @@ export function ManagementHeader({
   onAdd,
 }: {
   kind: 'users' | 'roles';
-  onAdd: () => void;
+  onAdd?: () => void;
 }) {
   const { t } = useTranslation('translation');
   useEffect(() => {
@@ -48,6 +48,7 @@ export function ManagementHeader({
         variant="contained"
         startIcon={<AddIcon />}
         onClick={onAdd}
+        disabled={!onAdd}
         sx={{ flexShrink: 0 }}
       >
         {t(`access.${kind}.add`)}
