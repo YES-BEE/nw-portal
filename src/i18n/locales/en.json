@@ -198,16 +198,30 @@
       "description": "Manage roles, module assignments, and application access.",
       "empty": "No roles found.",
       "deleteUnavailable": "Role deletion is not available yet.",
-      "code": "Role Code",
-      "codeRequired": "Enter a role code.",
-      "codeDuplicate": "This role code already exists. Edit the existing role instead.",
-      "codeLocked": "The role code cannot be changed.",
       "channelAccess": "Application access",
       "padAccess": "PAD access",
       "saving": "Saving...",
-      "saveFailure": "Unable to save role",
+      "createFailure": "Unable to create role",
+      "updateFailure": "Unable to update role",
+      "reload": "Reload roles",
       "failureStatus": "HTTP {{status}}",
       "failures": {
+        "validation": {
+          "title": "Check the role fields",
+          "description": "Review the role settings and save again."
+        },
+        "invalidRequest": {
+          "title": "Invalid role settings",
+          "description": "Review the role settings before saving again."
+        },
+        "notFound": {
+          "title": "Role no longer available",
+          "description": "Reload the role list to view the available roles."
+        },
+        "conflict": {
+          "title": "Role settings conflict",
+          "description": "The changes conflict with the current server state. Review the role settings before saving again."
+        },
         "authentication": {
           "title": "Sign in required",
           "description": "Your session could not be verified. Sign in again to view roles."

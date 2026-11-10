@@ -8,6 +8,8 @@ import {
 import type {
   AccessRoleResponse,
   AccessRolesResponse,
+  AccessRolesOperation,
+  CreateAccessRoleRequest,
   SaveAccessRoleRequest,
 } from './types';
 
@@ -33,6 +35,7 @@ function isRole(value: unknown): value is AccessRoleResponse {
 
 async function request(
   operation: () => Promise<AxiosResponse<unknown>>,
+  kind: AccessRolesOperation = 'list',
 ): Promise<unknown> {
   let response;
   try {
@@ -41,14 +44,18 @@ async function request(
     if (axios.isCancel(error)) throw error;
     if (axios.isAxiosError(error) && error.response) {
       throw new AccessRolesError(
-        parseAccessRolesFailure(error.response.data, error.response.status),
+        parseAccessRolesFailure(
+          error.response.data,
+          error.response.status,
+          kind,
+        ),
       );
     }
     throw new AccessRolesError({ kind: 'network', action: 'retry' });
   }
   if (response.status < 200 || response.status >= 300) {
     throw new AccessRolesError(
-      parseAccessRolesFailure(response.data, response.status),
+      parseAccessRolesFailure(response.data, response.status, kind),
     );
   }
   return response.data;
@@ -78,15 +85,37 @@ export async function saveAccessRole(
   body: SaveAccessRoleRequest,
   signal?: AbortSignal,
 ): Promise<void> {
-  await request(() =>
-    apiClient.put<unknown>(
-      `access-roles/${encodeURIComponent(roleCode)}`,
-      {
-        modules: body.modules,
-        pcAccess: body.pcAccess,
-        padAccess: body.padAccess,
-      },
-      { signal, timeout: 10000, validateStatus: () => true },
-    ),
+  await request(
+    () =>
+      apiClient.put<unknown>(
+        `access-roles/${encodeURIComponent(roleCode)}`,
+        {
+          modules: body.modules,
+          pcAccess: body.pcAccess,
+          padAccess: body.padAccess,
+        },
+        { signal, timeout: 10000, validateStatus: () => true },
+      ),
+    'update',
+  );
+}
+
+export async function createAccessRole(
+  body: CreateAccessRoleRequest,
+  signal?: AbortSignal,
+): Promise<void> {
+  await request(
+    () =>
+      apiClient.post<unknown>(
+        'access-roles',
+        {
+          name: body.name,
+          modules: body.modules,
+          pcAccess: body.pcAccess,
+          padAccess: body.padAccess,
+        },
+        { signal, timeout: 10000, validateStatus: () => true },
+      ),
+    'create',
   );
 }

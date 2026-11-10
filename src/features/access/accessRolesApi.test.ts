@@ -4,7 +4,11 @@ import type { InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { setAuthenticatedSession } from '../auth/session';
-import { getAccessRoles, saveAccessRole } from './accessRolesApi';
+import {
+  createAccessRole,
+  getAccessRoles,
+  saveAccessRole,
+} from './accessRolesApi';
 
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
@@ -42,6 +46,123 @@ afterEach(() => {
 });
 
 describe('access roles API transport', () => {
+  it.each(['post', 'put'] as const)(
+    'normalizes %s validation, access, conflict, and service failures without automatic resubmission',
+    async (method) => {
+      const cases = [
+        {
+          status: 400,
+          data: {
+            code: 'VALIDATION_FAILED',
+            fieldErrors: { modules: 'Invalid module selection' },
+          },
+          kind: 'validation',
+        },
+        {
+          status: 400,
+          data: { code: 'INVALID_ARGUMENT', detail: 'Unknown module: other' },
+          kind: 'invalidRequest',
+        },
+        {
+          status: 403,
+          data: {
+            code: 'ACCESS_DENIED',
+            detail: 'Missing module access: roles',
+          },
+          kind: 'access',
+        },
+        {
+          status: 409,
+          data: {
+            code: 'DATA_CONFLICT',
+            detail: 'The operation violates a state constraint',
+          },
+          kind: 'conflict',
+        },
+        { status: 500, data: '', kind: 'service' },
+        { status: 502, data: '{broken', kind: 'service' },
+        { status: 503, data: '<html>proxy failure</html>', kind: 'service' },
+        { status: 504, data: { unexpected: true }, kind: 'service' },
+      ];
+      for (const failure of cases) {
+        adapter
+          .mockClear()
+          .mockImplementation(async (config) =>
+            response(config, failure.status, failure.data),
+          );
+        const body = { modules: [], pcAccess: false, padAccess: true };
+        const save =
+          method === 'post'
+            ? createAccessRole({ ...body, name: 'New role' })
+            : saveAccessRole('NW', body);
+        await expect(save).rejects.toMatchObject({
+          failure: { status: failure.status, kind: failure.kind },
+        });
+        expect(adapter).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
+
+  it.each(['post', 'put'] as const)(
+    'handles %s transport timeouts and cancellations',
+    async (method) => {
+      const body = { modules: [], pcAccess: false, padAccess: true };
+      const save = () =>
+        method === 'post'
+          ? createAccessRole({ ...body, name: 'New role' })
+          : saveAccessRole('NW', body);
+      adapter.mockImplementation(async (config) => {
+        throw new AxiosError('timeout', 'ECONNABORTED', config);
+      });
+      await expect(save()).rejects.toMatchObject({
+        failure: { kind: 'network', action: 'retry' },
+      });
+      const cancelled = new CanceledError();
+      adapter.mockRejectedValue(cancelled);
+      await expect(save()).rejects.toBe(cancelled);
+    },
+  );
+  it('creates a role with its name via POST without a client-generated code', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, {
+        code: 'CUSTOM_backend_generated',
+        name: 'Factory Operator',
+      }),
+    );
+    const body = {
+      name: 'Factory Operator',
+      modules: ['dashboard'],
+      pcAccess: true,
+      padAccess: false,
+    };
+    await expect(createAccessRole(body)).resolves.toBeUndefined();
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/access-roles',
+    );
+    expect(config.method).toBe('post');
+    expect(JSON.parse(config.data)).toEqual(body);
+    expect(config.headers.get('Authorization')).toBe(
+      `Bearer ${loginResponse.accessToken}`,
+    );
+  });
+
+  it('preserves create failure reasons without retrying POST automatically', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 400, { detail: 'Role name is required' }),
+    );
+    await expect(
+      createAccessRole({
+        name: '',
+        modules: [],
+        pcAccess: false,
+        padAccess: true,
+      }),
+    ).rejects.toMatchObject({
+      failure: { status: 400, message: 'Role name is required' },
+    });
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
   it.each([200, 201, 204])(
     'saves only the documented PUT body and accepts HTTP %s',
     async (status) => {

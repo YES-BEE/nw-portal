@@ -377,15 +377,6 @@ export function refreshAccessToken(): Promise<string | null> {
   return request;
 }
 
-export function getModuleForPath(pathname: string): ModuleKey | null {
-  if (pathname === '/configurations' || pathname === '/configurations/')
-    return 'process';
-  for (const { permission, path } of orderedNavigationItems) {
-    if (pathname === path || pathname.startsWith(path + '/')) return permission;
-  }
-  return null;
-}
-
 export function getLandingPath(session: AuthSession) {
   return (
     orderedNavigationItems.find((item) =>

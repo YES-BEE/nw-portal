@@ -31,6 +31,10 @@ const roles: AccessRolesResponse = defaultRoles.map((role) => ({
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: roles });
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 204, data: null });
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
+    status: 200,
+    data: { code: 'CUSTOM_OPS' },
+  });
 });
 
 describe('backend role management', () => {
@@ -244,15 +248,18 @@ describe('backend role management', () => {
     expect(apiClient.get).toHaveBeenCalledTimes(2);
   });
 
-  it('creates a role through PUT and reloads the authoritative backend list', async () => {
+  it('creates a named role through POST and reloads the authoritative backend list', async () => {
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);
     await screen.findByRole('rowheader', { name: 'NW' });
     await user.click(screen.getByRole('button', { name: 'Create New Role' }));
     await user.type(
-      screen.getByRole('textbox', { name: /Role Code/ }),
-      ' CUSTOM_OPS ',
+      screen.getByRole('textbox', { name: /Role Name/ }),
+      ' Custom Operations ',
     );
+    expect(
+      screen.queryByRole('textbox', { name: /Role Code/ }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Dashboard' }));
     await user.click(
       screen.getByRole('checkbox', { name: 'Reports/Analysis' }),
@@ -272,26 +279,28 @@ describe('backend role management', () => {
       ],
     });
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
-    expect(apiClient.put).toHaveBeenCalledWith(
-      'access-roles/CUSTOM_OPS',
+    expect(apiClient.post).toHaveBeenCalledWith(
+      'access-roles',
       {
+        name: 'Custom Operations',
         modules: ['dashboard', 'reports'],
         pcAccess: true,
         padAccess: false,
       },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    expect(apiClient.put).not.toHaveBeenCalled();
     expect(
       await screen.findByRole('rowheader', { name: 'Custom Operations' }),
     ).toBeVisible();
     expect(
-      screen.queryByRole('textbox', { name: /Role Code/ }),
+      screen.queryByRole('textbox', { name: /Role Name/ }),
     ).not.toBeInTheDocument();
     expect(apiClient.get).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Changes saved successfully.')).toBeVisible();
   });
 
-  it('edits by immutable backend code, preserves unknown mappings, and derives PC access from modules', async () => {
+  it('displays the role name while editing by backend code and preserving unknown mappings', async () => {
     const record = {
       ...roles[0],
       code: 'ADMIN_IT',
@@ -305,12 +314,15 @@ describe('backend role management', () => {
     renderWithProviders(<RoleManagementPage />);
     await screen.findByRole('rowheader', { name: 'IT Admin' });
     await user.click(screen.getByRole('button', { name: 'Edit IT Admin' }));
-    expect(screen.getByRole('textbox', { name: /Role Code/ })).toHaveValue(
-      'ADMIN_IT',
+    expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveValue(
+      'IT Admin',
     );
-    expect(screen.getByRole('textbox', { name: /Role Code/ })).toHaveAttribute(
+    expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveAttribute(
       'readonly',
     );
+    expect(
+      screen.queryByRole('textbox', { name: /Role Code/ }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('checkbox', { name: 'PC access' }),
     ).not.toBeInTheDocument();
@@ -361,24 +373,51 @@ describe('backend role management', () => {
     );
   });
 
-  it('validates blank and duplicate role codes against the API list', async () => {
+  it('validates blank and duplicate role names against the API list', async () => {
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);
     await screen.findByRole('rowheader', { name: 'NW' });
     await user.click(screen.getByRole('button', { name: 'Create New Role' }));
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
-    const code = screen.getByRole('textbox', { name: /Role Code/ });
-    expect(code).toHaveAccessibleDescription('Enter a role code.');
-    await user.type(code, ' nw ');
+    const name = screen.getByRole('textbox', { name: /Role Name/ });
+    expect(name).toHaveAccessibleDescription('Enter a role name.');
+    await user.type(name, ' nw ');
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
-    expect(code).toHaveAccessibleDescription(
-      'This role code already exists. Edit the existing role instead.',
-    );
+    expect(name).toHaveAccessibleDescription('This role already exists.');
     expect(apiClient.put).not.toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(
-      screen.queryByRole('textbox', { name: /Role Code/ }),
+      screen.queryByRole('textbox', { name: /Role Name/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it('retains the new role name after a failed POST and permits manual resubmission', async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      status: 400,
+      data: { detail: 'Role creation rejected' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<RoleManagementPage />);
+    await screen.findByRole('rowheader', { name: 'NW' });
+    await user.click(screen.getByRole('button', { name: 'Create New Role' }));
+    await user.type(
+      screen.getByRole('textbox', { name: /Role Name/ }),
+      'Factory Operator',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save Role' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Role creation rejected',
+    );
+    expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveValue(
+      'Factory Operator',
+    );
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
+    expect(apiClient.put).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save Role' }));
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledTimes(2));
+    expect(apiClient.post).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the draft and backend reason on failure, then permits resubmission', async () => {
@@ -394,7 +433,7 @@ describe('backend role management', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unknown module assignment',
     );
-    expect(screen.getByRole('textbox', { name: /Role Code/ })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveValue(
       'NW',
     );
     expect(apiClient.get).toHaveBeenCalledTimes(1);
@@ -405,6 +444,113 @@ describe('backend role management', () => {
     await waitFor(() => expect(apiClient.get).toHaveBeenCalledTimes(2));
     expect(apiClient.put).toHaveBeenCalledTimes(2);
   });
+
+  it('shows POST validation reasons beside the controls and clears them as fields change', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      status: 400,
+      data: {
+        code: 'VALIDATION_FAILED',
+        detail: 'Request validation failed',
+        fieldErrors: {
+          name: 'Name rejected by server',
+          modules: 'Module selection rejected',
+          pcAccess: 'PC settings rejected',
+          padAccess: 'PAD settings rejected',
+          ignored: 'Do not display',
+        },
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<RoleManagementPage />);
+    await screen.findByRole('rowheader', { name: 'NW' });
+    await user.click(screen.getByRole('button', { name: 'Create New Role' }));
+    await user.type(
+      screen.getByRole('textbox', { name: /Role Name/ }),
+      'Factory Operator',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save Role' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to create role',
+    );
+    expect(
+      screen.getByRole('textbox', { name: /Role Name/ }),
+    ).toHaveAccessibleDescription('Name rejected by server');
+    expect(
+      screen.getByText('Module selection rejected PC settings rejected'),
+    ).toBeVisible();
+    expect(screen.getByText('PAD settings rejected')).toBeVisible();
+    expect(screen.queryByText('Do not display')).not.toBeInTheDocument();
+    await user.type(
+      screen.getByRole('textbox', { name: /Role Name/ }),
+      ' updated',
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Dashboard' }));
+    await user.click(screen.getByRole('checkbox', { name: 'PAD access' }));
+    expect(
+      screen.queryByText('Name rejected by server'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Module selection rejected PC settings rejected'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('PAD settings rejected')).not.toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a missing role draft until the user explicitly reloads the roles', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({
+      status: 404,
+      data: { code: 'NOT_FOUND', detail: 'Requested resource was not found' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<RoleManagementPage />);
+    await screen.findByRole('rowheader', { name: 'NW' });
+    await user.click(screen.getByRole('button', { name: 'Edit NW' }));
+    await user.click(screen.getByRole('button', { name: 'Save Role' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to update role',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Requested resource was not found',
+    );
+    expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveValue(
+      'NW',
+    );
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Reload roles' }));
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledTimes(2));
+    expect(
+      screen.queryByRole('textbox', { name: /Role Name/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Changes saved successfully.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([400, 409, 503])(
+    'retains the PUT draft and renders safe fallback text for HTTP %s',
+    async (status) => {
+      vi.mocked(apiClient.put).mockResolvedValue({
+        status,
+        data: '<html>Proxy page</html>',
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<RoleManagementPage />);
+      await screen.findByRole('rowheader', { name: 'NW' });
+      await user.click(screen.getByRole('button', { name: 'Edit NW' }));
+      await user.click(screen.getByRole('button', { name: 'Save Role' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Unable to update role',
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent(`HTTP ${status}`);
+      expect(screen.getByRole('textbox', { name: /Role Name/ })).toHaveValue(
+        'NW',
+      );
+      expect(screen.getByRole('button', { name: 'Save Role' })).toBeEnabled();
+      expect(screen.queryByText('Proxy page')).not.toBeInTheDocument();
+      expect(apiClient.put).toHaveBeenCalledTimes(1);
+      expect(apiClient.get).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('prevents duplicate submissions and cancels a pending save when unmounted', async () => {
     vi.mocked(apiClient.put).mockReturnValue(new Promise(() => {}));

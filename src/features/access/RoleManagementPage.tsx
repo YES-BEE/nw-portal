@@ -24,7 +24,11 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import { moduleKeys } from './accessData';
 import type { ModuleKey } from './accessData';
-import { getAccessRoles, saveAccessRole } from './accessRolesApi';
+import {
+  createAccessRole,
+  getAccessRoles,
+  saveAccessRole,
+} from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
 import { signOut } from '../auth/session';
 import type {
@@ -79,6 +83,7 @@ export function RoleManagementPage() {
                 setForm({
                   initial: {
                     code: '',
+                    name: '',
                     modules: [],
                     padAccess: true,
                   },
@@ -205,6 +210,7 @@ export function RoleManagementPage() {
                               setForm({
                                 initial: {
                                   code: role.code,
+                                  name: role.name,
                                   modules: [...role.modules],
                                   padAccess: role.pad_access,
                                 },
@@ -243,20 +249,24 @@ export function RoleManagementPage() {
         <RoleForm
           key={form.editing ? form.initial.code : 'new-role'}
           {...form}
-          existingCodes={
-            state.status === 'ready' ? state.roles.map((role) => role.code) : []
+          existingNames={
+            state.status === 'ready' ? state.roles.map((role) => role.name) : []
           }
           onClose={() => setForm(null)}
+          onReload={() => {
+            setForm(null);
+            setSaved(false);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
+          }}
           onSave={async (draft, signal) => {
-            await saveAccessRole(
-              draft.code,
-              {
-                modules: draft.modules,
-                pcAccess: draft.modules.length > 0,
-                padAccess: draft.padAccess,
-              },
-              signal,
-            );
+            const body = {
+              modules: draft.modules,
+              pcAccess: draft.modules.length > 0,
+              padAccess: draft.padAccess,
+            };
+            if (form.editing) await saveAccessRole(draft.code, body, signal);
+            else await createAccessRole({ ...body, name: draft.name }, signal);
             if (signal.aborted) return;
             setForm(null);
             setSaved(true);

@@ -11,6 +11,102 @@ const denied = {
 };
 
 describe('access roles failure contract', () => {
+  it.each(['create', 'update'] as const)(
+    'extracts only safe known field errors for %s',
+    (operation) => {
+      expect(
+        parseAccessRolesFailure(
+          {
+            code: 'VALIDATION_FAILED',
+            detail: 'Request validation failed',
+            fieldErrors: {
+              name: 'must not be blank',
+              modules: 'must not be null',
+              pcAccess: 'PC access is invalid',
+              padAccess: 'PAD access is invalid',
+              extra: 'unknown field',
+            },
+          },
+          400,
+          operation,
+        ),
+      ).toMatchObject({
+        kind: 'validation',
+        status: 400,
+        code: 'VALIDATION_FAILED',
+        action: 'none',
+        fieldErrors: {
+          name: 'must not be blank',
+          modules: 'must not be null',
+          pcAccess: 'PC access is invalid',
+          padAccess: 'PAD access is invalid',
+        },
+      });
+      expect(
+        parseAccessRolesFailure(
+          {
+            code: 'VALIDATION_FAILED',
+            fieldErrors: {
+              name: '<html>proxy</html>',
+              modules: 42,
+              unknown: 'unknown',
+            },
+          },
+          400,
+          operation,
+        ).fieldErrors,
+      ).toBeUndefined();
+      expect(
+        parseAccessRolesFailure(
+          { code: 'VALIDATION_FAILED', fieldErrors: [] },
+          400,
+          operation,
+        ).kind,
+      ).toBe('invalidRequest');
+      expect(
+        parseAccessRolesFailure(
+          { code: 'VALIDATION_FAILED', fieldErrors: { name: 'invalid' } },
+          500,
+          operation,
+        ),
+      ).toMatchObject({ kind: 'service', status: 500 });
+    },
+  );
+
+  it('classifies invalid settings, missing roles, and conflicts using HTTP status', () => {
+    expect(
+      parseAccessRolesFailure(
+        { code: 'INVALID_ARGUMENT', detail: 'Unknown module: new-module' },
+        400,
+        'update',
+      ),
+    ).toMatchObject({
+      kind: 'invalidRequest',
+      action: 'none',
+      code: 'INVALID_ARGUMENT',
+      message: 'Unknown module: new-module',
+    });
+    expect(
+      parseAccessRolesFailure({ code: 'NOT_FOUND' }, 404, 'update'),
+    ).toMatchObject({ kind: 'notFound', action: 'reload' });
+    expect(
+      parseAccessRolesFailure({ code: 'NOT_FOUND' }, 404, 'create'),
+    ).toMatchObject({ kind: 'http' });
+    expect(
+      parseAccessRolesFailure({ code: 'DATA_CONFLICT' }, 409, 'create'),
+    ).toMatchObject({
+      kind: 'conflict',
+      action: 'none',
+      code: 'DATA_CONFLICT',
+    });
+    expect(
+      parseAccessRolesFailure({ code: 'ROLE_STATE_CONFLICT' }, 409, 'update'),
+    ).toMatchObject({
+      kind: 'conflict',
+      action: 'none',
+      code: 'ROLE_STATE_CONFLICT',
+    });
+  });
   it.each([
     'Role does not allow this application channel',
     'Missing module access: roles',

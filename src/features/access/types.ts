@@ -18,11 +18,29 @@ export interface SaveAccessRoleRequest {
   padAccess: boolean;
 }
 
+export interface CreateAccessRoleRequest extends SaveAccessRoleRequest {
+  name: string;
+}
+
 export interface AccessRoleDraft extends Omit<
   SaveAccessRoleRequest,
   'pcAccess'
 > {
   code: string;
+  name: string;
+}
+
+export type AccessRoleField = keyof CreateAccessRoleRequest;
+export type AccessRolesOperation = 'list' | 'create' | 'update';
+
+export interface AccessRolesValidationResponse {
+  type: string;
+  title: string;
+  status: 400;
+  detail: string;
+  instance?: string;
+  code: 'VALIDATION_FAILED';
+  fieldErrors: Partial<Record<AccessRoleField, string>>;
 }
 
 // Only application-defined 403 responses have a guaranteed JSON contract.
@@ -44,9 +62,14 @@ export interface AccessRolesFailure {
     | 'service'
     | 'network'
     | 'http'
-    | 'invalidResponse';
+    | 'invalidResponse'
+    | 'validation'
+    | 'invalidRequest'
+    | 'notFound'
+    | 'conflict';
   status?: number;
   code?: string;
   message?: string;
-  action: 'signIn' | 'retry' | 'none';
+  fieldErrors?: Partial<Record<AccessRoleField, string>>;
+  action: 'signIn' | 'retry' | 'reload' | 'none';
 }

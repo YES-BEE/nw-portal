@@ -32,6 +32,60 @@ beforeEach(() => {
 });
 
 describe('application routing', () => {
+  it.each([
+    '/dashboard',
+    '/reports',
+    '/users',
+    '/roles',
+    '/styles',
+    '/styles/sty-1',
+    '/new-style',
+    '/new-style/sty-1',
+    '/configurations',
+    '/configurations/',
+    '/configurations/processes',
+    '/configurations/processes/demo-1',
+    '/configurations/storages',
+    '/configurations/storages/storage-demo-1',
+    '/configurations/tags',
+    '/ROLES',
+    '/%72oles',
+    '/UsErS',
+    '/%75sers',
+    '/STYLES/sty-1',
+    '/%73tyles/sty-1',
+    '/NEW-STYLE/sty-1',
+    '/CONFIGURATIONS/PROCESSES/demo-1',
+    '/configurations/%73torages/storage-demo-1',
+    '/configurations/%74ags?tab=settings#list',
+  ])('blocks direct module access without permission at %s', async (path) => {
+    setAuthenticatedSession({ ...readSession()!, modules: [] });
+    await router.navigate(path);
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Access denied' }),
+    ).toBeVisible();
+    expect(window.location.pathname).toBe('/access-denied');
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+
+  it.each(['/ROLES', '/%72oles'])(
+    'allows alternate URL spellings only with the matching module: %s',
+    async (path) => {
+      setAuthenticatedSession({ ...readSession()!, modules: ['roles'] });
+      await router.navigate(path);
+      renderWithProviders(<App />);
+      expect(
+        await screen.findByRole('heading', {
+          level: 1,
+          name: 'Role Management',
+        }),
+      ).toBeVisible();
+      await screen.findByText('No roles found.');
+      expect(apiClient.get).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('opens Style Management and its shared detail screen with the active sidebar item', async () => {
     const user = userEvent.setup();
     await router.navigate('/styles');

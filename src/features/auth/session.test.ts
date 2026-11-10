@@ -11,7 +11,6 @@ import {
   SESSION_STORAGE_KEY,
   initializeSession,
   getLandingPath,
-  getModuleForPath,
   readSession,
   setAuthenticatedSession,
   signIn,
@@ -320,16 +319,6 @@ describe('backend session preparation', () => {
 });
 
 describe('permission-aware destinations', () => {
-  it('maps configuration URLs and respects path boundaries', () => {
-    expect(getModuleForPath('/configurations/processes/example')).toBe(
-      'process',
-    );
-    expect(getModuleForPath('/configurations/storages/example')).toBe(
-      'storage',
-    );
-    expect(getModuleForPath('/configurations')).toBe('process');
-    expect(getModuleForPath('/users-other')).toBeNull();
-  });
   it('uses effective permissions in sidebar order with an empty-permissions landing page', () => {
     expect(getLandingPath(identity)).toBe('/reports');
     expect(

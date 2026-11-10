@@ -1,4 +1,9 @@
-import type { AccessRolesDeniedResponse, AccessRolesFailure } from './types';
+import type {
+  AccessRoleField,
+  AccessRolesDeniedResponse,
+  AccessRolesFailure,
+  AccessRolesOperation,
+} from './types';
 
 export class AccessRolesError extends Error {
   readonly failure: AccessRolesFailure;
@@ -41,6 +46,7 @@ function isAccessDenied(
 export function parseAccessRolesFailure(
   body: unknown,
   status: number,
+  operation: AccessRolesOperation = 'list',
 ): AccessRolesFailure {
   let value = body;
   if (typeof value === 'string') {
@@ -63,8 +69,36 @@ export function parseAccessRolesFailure(
     safeText(problem?.error) ??
     safeText(value);
   const denied = problem && isAccessDenied(problem, status);
+  const fieldErrors: Partial<Record<AccessRoleField, string>> = {};
+  const fields = problem?.fieldErrors;
+  const validation =
+    operation !== 'list' &&
+    status === 400 &&
+    problem?.code === 'VALIDATION_FAILED' &&
+    fields &&
+    typeof fields === 'object' &&
+    !Array.isArray(fields);
+  if (validation) {
+    for (const field of ['name', 'modules', 'pcAccess', 'padAccess'] as const) {
+      const text = safeText((fields as Record<string, unknown>)[field]);
+      if (text) fieldErrors[field] = text;
+    }
+  }
+  const mutationKind: AccessRolesFailure['kind'] | undefined =
+    operation === 'list'
+      ? undefined
+      : status === 400
+        ? validation
+          ? 'validation'
+          : 'invalidRequest'
+        : status === 404 && operation === 'update'
+          ? 'notFound'
+          : status === 409
+            ? 'conflict'
+            : undefined;
   const kind: AccessRolesFailure['kind'] =
-    status === 401
+    mutationKind ??
+    (status === 401
       ? 'authentication'
       : status === 403
         ? denied && problem.detail === 'Role changed; log in again'
@@ -74,17 +108,25 @@ export function parseAccessRolesFailure(
           ? 'representation'
           : status >= 500 && status <= 599
             ? 'service'
-            : 'http';
+            : 'http');
+  const code = safeText(problem?.code);
   return {
     kind,
     status,
     message,
-    ...(denied ? { code: problem.code as 'ACCESS_DENIED' } : {}),
+    ...(denied || (operation !== 'list' && code) ? { code } : {}),
+    ...(Object.keys(fieldErrors).length ? { fieldErrors } : {}),
     action:
       kind === 'authentication' || kind === 'roleChanged'
         ? 'signIn'
-        : kind === 'access' || kind === 'representation'
-          ? 'none'
-          : 'retry',
+        : kind === 'notFound'
+          ? 'reload'
+          : kind === 'access' ||
+              kind === 'representation' ||
+              kind === 'validation' ||
+              kind === 'invalidRequest' ||
+              kind === 'conflict'
+            ? 'none'
+            : 'retry',
   };
 }

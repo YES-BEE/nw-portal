@@ -9,6 +9,7 @@ import {
   FormControl,
   FormControlLabel,
   FormGroup,
+  FormHelperText,
   FormLabel,
   Paper,
   Stack,
@@ -17,22 +18,28 @@ import {
 } from '@mui/material';
 import { moduleKeys } from './accessData';
 import type { ModuleKey } from './accessData';
-import type { AccessRoleDraft, AccessRolesFailure } from './types';
+import type {
+  AccessRoleDraft,
+  AccessRoleField,
+  AccessRolesFailure,
+} from './types';
 import { AccessRolesError } from './accessRolesFailure';
 import { signOut } from '../auth/session';
 
 export function RoleForm({
   initial,
   editing,
-  existingCodes,
+  existingNames,
   onSave,
   onClose,
+  onReload,
 }: {
   initial: AccessRoleDraft;
   editing: boolean;
-  existingCodes: string[];
+  existingNames: string[];
   onSave: (role: AccessRoleDraft, signal: AbortSignal) => Promise<void>;
   onClose: () => void;
+  onReload: () => void;
 }) {
   const { t } = useTranslation('translation');
   const [draft, setDraft] = useState(initial);
@@ -45,16 +52,36 @@ export function RoleForm({
     section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     return () => pending.current?.abort();
   }, []);
-  const code = draft.code.trim();
-  const codeError = !code
-    ? 'codeRequired'
+  const name = draft.name.trim();
+  const nameError = !name
+    ? 'roleNameRequired'
     : !editing &&
-        existingCodes.some(
-          (existing) => existing.toLowerCase() === code.toLowerCase(),
+        existingNames.some(
+          (existing) => existing.trim().toLowerCase() === name.toLowerCase(),
         )
-      ? 'codeDuplicate'
+      ? 'roleDuplicate'
       : undefined;
-  const error = submitted ? codeError : undefined;
+  const error = submitted ? nameError : undefined;
+  const nameFieldError = failure?.fieldErrors?.name;
+  const moduleError = [
+    failure?.fieldErrors?.modules,
+    failure?.fieldErrors?.pcAccess,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const padError = failure?.fieldErrors?.padAccess;
+  function updateDraft(
+    patch: Partial<AccessRoleDraft>,
+    fields: AccessRoleField[],
+  ) {
+    setDraft((current) => ({ ...current, ...patch }));
+    setFailure((current) => {
+      if (!current?.fieldErrors) return current;
+      const fieldErrors = { ...current.fieldErrors };
+      for (const field of fields) delete fieldErrors[field];
+      return { ...current, fieldErrors };
+    });
+  }
   const choices = [...new Set([...moduleKeys, ...initial.modules])];
   return (
     <Paper
@@ -78,13 +105,13 @@ export function RoleForm({
         onSubmit={async (event) => {
           event.preventDefault();
           setSubmitted(true);
-          if (codeError || pending.current) return;
+          if (nameError || pending.current) return;
           const controller = new AbortController();
           pending.current = controller;
           setSaving(true);
           setFailure(null);
           try {
-            await onSave({ ...draft, code }, controller.signal);
+            await onSave({ ...draft, name }, controller.signal);
           } catch (error: unknown) {
             if (!controller.signal.aborted)
               setFailure(
@@ -99,19 +126,22 @@ export function RoleForm({
         }}
       >
         <TextField
-          label={t('access.roles.code')}
+          label={t('access.roleName')}
           autoFocus
           required
-          value={draft.code}
+          value={draft.name}
           disabled={saving}
-          onChange={(event) => setDraft({ ...draft, code: event.target.value })}
-          error={Boolean(error)}
+          onChange={(event) =>
+            updateDraft({ name: event.target.value }, ['name'])
+          }
+          error={Boolean(error || nameFieldError)}
           helperText={
-            error
-              ? t(`access.roles.${error}`)
+            nameFieldError ||
+            (error
+              ? t(`access.errors.${error}`)
               : editing
-                ? t('access.roles.codeLocked')
-                : undefined
+                ? t('access.roleNameLocked')
+                : undefined)
           }
           slotProps={{
             htmlInput: { maxLength: 80 },
@@ -122,6 +152,8 @@ export function RoleForm({
         <FormControl
           component="fieldset"
           disabled={saving}
+          error={Boolean(moduleError)}
+          aria-describedby={moduleError ? 'role-modules-error' : undefined}
           sx={{ display: 'flex', mt: 3 }}
         >
           <FormLabel component="legend">{t('access.moduleAccess')}</FormLabel>
@@ -161,20 +193,33 @@ export function RoleForm({
                   <Checkbox
                     checked={draft.modules.includes(key)}
                     onChange={(event) =>
-                      setDraft({
-                        ...draft,
-                        modules: event.target.checked
-                          ? [...draft.modules, key]
-                          : draft.modules.filter((item) => item !== key),
-                      })
+                      updateDraft(
+                        {
+                          modules: event.target.checked
+                            ? [...draft.modules, key]
+                            : draft.modules.filter((item) => item !== key),
+                        },
+                        ['modules', 'pcAccess'],
+                      )
                     }
                   />
                 }
               />
             ))}
           </FormGroup>
+          {moduleError && (
+            <FormHelperText id="role-modules-error">
+              {moduleError}
+            </FormHelperText>
+          )}
         </FormControl>
-        <FormControl component="fieldset" disabled={saving} sx={{ mt: 3 }}>
+        <FormControl
+          component="fieldset"
+          disabled={saving}
+          error={Boolean(padError)}
+          aria-describedby={padError ? 'role-pad-error' : undefined}
+          sx={{ mt: 3 }}
+        >
           <FormLabel component="legend">
             {t('access.roles.channelAccess')}
           </FormLabel>
@@ -185,12 +230,17 @@ export function RoleForm({
                 <Checkbox
                   checked={draft.padAccess}
                   onChange={(event) =>
-                    setDraft({ ...draft, padAccess: event.target.checked })
+                    updateDraft({ padAccess: event.target.checked }, [
+                      'padAccess',
+                    ])
                   }
                 />
               }
             />
           </FormGroup>
+          {padError && (
+            <FormHelperText id="role-pad-error">{padError}</FormHelperText>
+          )}
         </FormControl>
         {failure && (
           <Alert
@@ -201,12 +251,27 @@ export function RoleForm({
                 <Button color="inherit" onClick={signOut}>
                   {t('startup.signIn')}
                 </Button>
+              ) : failure.action === 'reload' ? (
+                <Button color="inherit" onClick={onReload}>
+                  {t('access.roles.reload')}
+                </Button>
               ) : undefined
             }
           >
-            <AlertTitle>{t('access.roles.saveFailure')}</AlertTitle>
+            <AlertTitle>
+              {t(
+                editing
+                  ? 'access.roles.updateFailure'
+                  : 'access.roles.createFailure',
+              )}
+            </AlertTitle>
             {failure.message ||
               t(`access.roles.failures.${failure.kind}.description`)}
+            {failure.status !== undefined && (
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                {t('access.roles.failureStatus', { status: failure.status })}
+              </Typography>
+            )}
           </Alert>
         )}
         <Stack

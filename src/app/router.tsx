@@ -17,6 +17,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: '/styles',
+            handle: { requiredModule: 'styles' },
             lazy: async () => {
               const { StyleWorkspacePage } =
                 await import('../features/styles/StyleWorkspacePage');
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/styles/:styleId',
+            handle: { requiredModule: 'styles' },
             lazy: async () => {
               const { StyleDetailsPage } =
                 await import('../features/styles/StyleDetailsPage');
@@ -37,6 +39,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/new-style',
+            handle: { requiredModule: 'newstyle' },
             lazy: async () => {
               const { StyleWorkspacePage } =
                 await import('../features/styles/StyleWorkspacePage');
@@ -45,6 +48,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/new-style/:styleId',
+            handle: { requiredModule: 'newstyle' },
             lazy: async () => {
               const { StyleDetailsPage } =
                 await import('../features/styles/StyleDetailsPage');
@@ -53,6 +57,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/workspace',
+            handle: { authenticatedOnly: true },
             lazy: async () => {
               const { AccessStatusPage } =
                 await import('../features/auth/AccessStatusPage');
@@ -61,6 +66,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/access-denied',
+            handle: { authenticatedOnly: true },
             lazy: async () => {
               const { AccessStatusPage } =
                 await import('../features/auth/AccessStatusPage');
@@ -69,6 +75,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/dashboard',
+            handle: { requiredModule: 'dashboard' },
             lazy: async () => {
               const { ComingSoonPage } =
                 await import('../features/overview/ComingSoonPage');
@@ -77,6 +84,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/reports',
+            handle: { requiredModule: 'reports' },
             lazy: async () => {
               const { ComingSoonPage } =
                 await import('../features/overview/ComingSoonPage');
@@ -85,6 +93,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/users',
+            handle: { requiredModule: 'users' },
             lazy: async () => {
               const { UserManagementPage } =
                 await import('../features/access/UserManagementPage');
@@ -93,6 +102,7 @@ export const router = createBrowserRouter([
           },
           {
             path: '/roles',
+            handle: { requiredModule: 'roles' },
             lazy: async () => {
               const { RoleManagementPage } =
                 await import('../features/access/RoleManagementPage');
@@ -104,6 +114,7 @@ export const router = createBrowserRouter([
             children: [
               {
                 path: 'tags',
+                handle: { requiredModule: 'tags' },
                 lazy: async () => {
                   const { TagManagementPage } =
                     await import('../features/tags/TagManagementPage');
@@ -112,6 +123,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'processes/:processId',
+                handle: { requiredModule: 'process' },
                 lazy: async () => {
                   const { ProcessDetailsPage } =
                     await import('../features/processes/ProcessDetailsPage');
@@ -120,15 +132,21 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'storages/:storageId',
+                handle: { requiredModule: 'storage' },
                 lazy: async () => {
                   const { StorageDetailsPage } =
                     await import('../features/storages/StorageDetailsPage');
                   return { Component: StorageDetailsPage };
                 },
               },
-              { index: true, element: <Navigate to="processes" replace /> },
+              {
+                index: true,
+                handle: { requiredModule: 'process' },
+                element: <Navigate to="processes" replace />,
+              },
               {
                 path: 'processes',
+                handle: { requiredModule: 'process' },
                 lazy: async () => {
                   const { ProcessConfigurationsPage } =
                     await import('../features/processes/ProcessConfigurationsPage');
@@ -137,6 +155,7 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'storages',
+                handle: { requiredModule: 'storage' },
                 lazy: async () => {
                   const { StorageConfigurationsPage } =
                     await import('../features/storages/StorageConfigurationsPage');
