@@ -28,9 +28,13 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
 import { createTag, getTags, TagsError } from './tagsApi';
 import { TagForm } from './TagForm';
+import { TagDetailsDialog } from './TagDetailsDialog';
+import { TagEditor } from './TagEditor';
+import { TagDeleteDialog } from './TagDeleteDialog';
 import type { TagResponse, TagsFailure } from './tagsApi';
 
 type TagsState =
@@ -44,6 +48,16 @@ export function TagManagementPage() {
   const [attempt, setAttempt] = useState(0);
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [viewingTagId, setViewingTagId] = useState<string | null>(null);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [deletingTag, setDeletingTag] = useState<TagResponse | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  function reloadTags() {
+    setEditingTagId(null);
+    setDeletingTag(null);
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  }
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -123,7 +137,12 @@ export function TagManagementPage() {
         </Box>
         <Button
           variant="contained"
-          disabled={state.status !== 'ready' || creating}
+          disabled={
+            state.status !== 'ready' ||
+            creating ||
+            editingTagId !== null ||
+            deletingTag !== null
+          }
           startIcon={<AddIcon />}
           onClick={() => {
             setSaved(false);
@@ -235,19 +254,19 @@ export function TagManagementPage() {
               }}
             >
               <TableRow>
-                {(['name', 'actual', 'assignedTo', 'actions'] as const).map(
-                  (column) => (
-                    <TableCell key={column} scope="col">
-                      {t(`tags.${column}`)}
-                    </TableCell>
-                  ),
-                )}
+                {(
+                  ['name', 'actual', 'status', 'assigned', 'actions'] as const
+                ).map((column) => (
+                  <TableCell key={column} scope="col">
+                    {t(`tags.${column}`)}
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {state.status === 'loading' && (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
                     <CircularProgress
                       size={28}
                       aria-label={t('common.loading')}
@@ -270,39 +289,63 @@ export function TagManagementPage() {
                   <TableCell>
                     <Chip
                       size="small"
-                      label={
-                        tag.assigned ? t('tags.assigned') : t('tags.available')
-                      }
-                      color={tag.assigned ? 'default' : 'success'}
+                      label={t(`tags.statusValues.${tag.status}`)}
+                      color={tag.status === 'ACTIVE' ? 'success' : 'default'}
                       variant="outlined"
                     />
                   </TableCell>
                   <TableCell>
+                    {tag.assigned ? t('tags.yes') : t('tags.no')}
+                  </TableCell>
+                  <TableCell>
                     <Stack direction="row" sx={{ gap: 0.5 }}>
-                      <Tooltip title={t('tags.changesUnavailable')}>
+                      <Tooltip title={t('tags.details.view')}>
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          aria-label={t('tags.details.viewNamed', {
+                            name: tag.name,
+                          })}
+                          onClick={() => setViewingTagId(tag.id)}
+                        >
+                          <VisibilityOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('tags.editAction')}>
                         <Box component="span">
                           <IconButton
                             size="small"
                             color="primary"
-                            disabled
+                            disabled={
+                              creating ||
+                              editingTagId !== null ||
+                              deletingTag !== null
+                            }
+                            onClick={() => {
+                              setSaved(false);
+                              setEditingTagId(tag.id);
+                            }}
                             aria-label={t('tags.editNamed', { name: tag.name })}
                           >
                             <EditOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip
-                        title={t(
-                          tag.assigned
-                            ? 'tags.deleteBlocked'
-                            : 'tags.changesUnavailable',
-                        )}
-                      >
+                      <Tooltip title={t('tags.deleteAction')}>
                         <Box component="span">
                           <IconButton
                             size="small"
                             color="error"
-                            disabled
+                            disabled={
+                              creating ||
+                              editingTagId !== null ||
+                              deletingTag !== null
+                            }
+                            onClick={() => {
+                              setDeleted(false);
+                              setSaved(false);
+                              setDeletingTag(tag);
+                            }}
                             aria-label={t('tags.deleteNamed', {
                               name: tag.name,
                             })}
@@ -317,7 +360,7 @@ export function TagManagementPage() {
               ))}
               {state.status === 'ready' && !visible.length && (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
                     {t(tags.length ? 'tags.noMatches' : 'tags.empty')}
                   </TableCell>
                 </TableRow>
@@ -345,6 +388,47 @@ export function TagManagementPage() {
           />
         )}
       </Paper>
+      {deletingTag && (
+        <TagDeleteDialog
+          tag={deletingTag}
+          onClose={() => setDeletingTag(null)}
+          onReload={reloadTags}
+          onDeleted={() => {
+            setDeleted(true);
+            reloadTags();
+          }}
+        />
+      )}
+      <Snackbar
+        open={deleted}
+        autoHideDuration={3500}
+        onClose={() => setDeleted(false)}
+        message={t('tags.deleted')}
+      />
+      {viewingTagId && (
+        <TagDetailsDialog
+          key={viewingTagId}
+          tagId={viewingTagId}
+          onClose={() => setViewingTagId(null)}
+          onReload={() => {
+            setViewingTagId(null);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
+          }}
+        />
+      )}
+      {editingTagId && (
+        <TagEditor
+          key={editingTagId}
+          tagId={editingTagId}
+          onClose={() => setEditingTagId(null)}
+          onReload={reloadTags}
+          onUpdated={() => {
+            setSaved(true);
+            reloadTags();
+          }}
+        />
+      )}
       {creating && (
         <TagForm
           onClose={() => setCreating(false)}

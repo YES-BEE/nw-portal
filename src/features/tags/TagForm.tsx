@@ -15,17 +15,39 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { signOut } from '../auth/session';
 import { TagsError } from './tagsApi';
-import type { CreateTagField, CreateTagRequest, TagsFailure } from './tagsApi';
+import type {
+  CreateTagField,
+  CreateTagRequest,
+  TagDetailsResponse,
+  TagsFailure,
+  UpdateTagRequest,
+} from './tagsApi';
+
+type TagFormProps = { onClose: () => void; onReload?: () => void } & (
+  | {
+      initial?: never;
+      onCreate: (body: CreateTagRequest, signal: AbortSignal) => Promise<void>;
+      onUpdate?: never;
+    }
+  | {
+      initial: TagDetailsResponse;
+      onUpdate: (body: UpdateTagRequest, signal: AbortSignal) => Promise<void>;
+      onCreate?: never;
+    }
+);
 
 export function TagForm({
   onCreate,
   onClose,
-}: {
-  onCreate: (body: CreateTagRequest, signal: AbortSignal) => Promise<void>;
-  onClose: () => void;
-}) {
+  initial,
+  onUpdate,
+  onReload,
+}: TagFormProps) {
   const { t } = useTranslation('translation');
-  const [draft, setDraft] = useState<CreateTagRequest>({ name: '', uid: '' });
+  const [draft, setDraft] = useState<CreateTagRequest>({
+    name: initial?.name ?? '',
+    uid: initial?.uid ?? '',
+  });
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<TagsFailure | null>(null);
@@ -87,7 +109,7 @@ export function TagForm({
             id="tag-form-heading"
             sx={{ fontSize: 17, fontWeight: 600 }}
           >
-            {t('tags.add')}
+            {t(initial ? 'tags.edit' : 'tags.add')}
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
             {t('tags.formDescription')}
@@ -120,7 +142,7 @@ export function TagForm({
           setSaving(true);
           setFailure(null);
           try {
-            await onCreate(
+            await (onUpdate ?? onCreate)(
               { name: draft.name.trim(), uid: draft.uid.trim() },
               controller.signal,
             );
@@ -149,10 +171,16 @@ export function TagForm({
                   <Button color="inherit" onClick={signOut}>
                     {t('startup.signIn')}
                   </Button>
+                ) : failure.action === 'reload' && onReload ? (
+                  <Button color="inherit" onClick={onReload}>
+                    {t('tags.details.reload')}
+                  </Button>
                 ) : undefined
               }
             >
-              <AlertTitle>{t('tags.createFailure')}</AlertTitle>
+              <AlertTitle>
+                {t(initial ? 'tags.updateFailure' : 'tags.createFailure')}
+              </AlertTitle>
               {failure.message ||
                 t(`tags.failures.${failure.kind}.description`)}
               {!failure.message && failure.status !== undefined && (
@@ -216,6 +244,7 @@ export function TagForm({
             type="submit"
             disabled={
               saving ||
+              failure?.action === 'reload' ||
               failure?.action === 'signIn' ||
               failure?.kind === 'access' ||
               failure?.kind === 'representation'

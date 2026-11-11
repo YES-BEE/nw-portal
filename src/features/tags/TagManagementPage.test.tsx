@@ -78,8 +78,20 @@ describe('backend tag listing', () => {
       .getByRole('rowheader', { name: 'Washing Tag' })
       .closest('tr')!;
     expect(within(row).getByText('04:AA:BB')).toBeVisible();
-    expect(within(row).getByText('Assigned')).toBeVisible();
-    expect(screen.getByText('Available')).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+    expect(
+      screen.getByRole('columnheader', { name: 'Assigned' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Assigned To' }),
+    ).not.toBeInTheDocument();
+    expect(within(row).getByText('Active')).toBeVisible();
+    expect(within(row).getByText('Yes')).toBeVisible();
+    const availableRow = screen
+      .getByRole('rowheader', { name: 'Available Tag' })
+      .closest('tr')!;
+    expect(within(availableRow).getByText('Active')).toBeVisible();
+    expect(within(availableRow).getByText('No')).toBeVisible();
     expect(screen.queryByText('Deleted Tag')).not.toBeInTheDocument();
     expect(screen.queryByText('Local only')).not.toBeInTheDocument();
     expect(screen.getAllByRole('rowheader')).toHaveLength(2);
@@ -88,10 +100,10 @@ describe('backend tag listing', () => {
     expect(screen.getByRole('button', { name: 'Add New Tag' })).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Edit tag Washing Tag' }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Delete tag Washing Tag' }),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   it('shows a loader until the request resolves without an empty state', async () => {

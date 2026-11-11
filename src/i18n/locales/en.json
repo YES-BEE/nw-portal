@@ -523,6 +523,32 @@
     }
   },
   "tags": {
+    "details": {
+      "title": "Tag Details",
+      "view": "View",
+      "viewNamed": "View tag {{name}}",
+      "loading": "Loading tag details...",
+      "failure": "Unable to load tag details",
+      "reload": "Reload tags",
+      "id": "Tag ID",
+      "assetType": "Asset Type",
+      "none": "None",
+      "process_id": "Process ID",
+      "machine_id": "Machine / Device ID",
+      "station_id": "Station ID",
+      "trolley_id": "Trolley ID",
+      "storage_area_id": "Storage Area ID",
+      "storage_location_id": "Storage Unit ID",
+      "version": "Version"
+    },
+    "assetTypes": {
+      "PROCESS": "Process",
+      "MACHINE": "Machine / Device",
+      "STATION": "Station",
+      "TROLLEY": "Trolley",
+      "STORAGE_AREA": "Storage Area",
+      "STORAGE_UNIT": "Storage Unit"
+    },
     "pageTitle": "NW Track | Tag Management",
     "pageDescription": "Register NFC tags before assigning them to processes, devices or storage locations.",
     "title": "Tag Management",
@@ -531,7 +557,13 @@
     "edit": "Edit Tag",
     "name": "Tag Name",
     "actual": "Actual NFC Tag ID",
-    "assignedTo": "Assigned To",
+    "status": "Status",
+    "statusValues": {
+      "ACTIVE": "Active",
+      "DELETED": "Deleted"
+    },
+    "yes": "Yes",
+    "no": "No",
     "actions": "Actions",
     "available": "Available",
     "count_one": "{{count}} tag",
@@ -557,6 +589,9 @@
     "changesUnavailable": "Tag changes are not available yet.",
     "saving": "Saving...",
     "createFailure": "Unable to create tag",
+    "updateFailure": "Unable to update tag",
+    "deleteFailure": "Unable to delete tag",
+    "deleting": "Deleting...",
     "failureStatus": "HTTP {{status}}",
     "failures": {
       "validation": {
@@ -570,6 +605,10 @@
       "conflict": {
         "title": "Tag data conflict",
         "description": "The NFC ID may already be registered. Review the tag details before saving again."
+      },
+      "notFound": {
+        "title": "Tag no longer available",
+        "description": "Reload the tag list to view the available tags."
       },
       "authentication": {
         "title": "Sign in required",

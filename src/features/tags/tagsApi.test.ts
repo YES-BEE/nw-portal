@@ -5,7 +5,14 @@ import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { createTagResponse, tagsResponse } from '../../test/tags';
 import { setAuthenticatedSession } from '../auth/session';
-import { createTag, getTags, parseTagsFailure } from './tagsApi';
+import {
+  createTag,
+  deleteTag,
+  getTag,
+  getTags,
+  updateTag,
+  parseTagsFailure,
+} from './tagsApi';
 
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
@@ -35,6 +42,179 @@ afterEach(() => {
 });
 
 describe('tags API', () => {
+  it('deletes by encoded ID with no body and returns the full deleted record', async () => {
+    const deleted = {
+      ...createTagResponse,
+      id: 'tag/with space',
+      status: 'DELETED',
+      assigned: false,
+      version: 1,
+    };
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, deleted),
+    );
+    const controller = new AbortController();
+    await expect(deleteTag(deleted.id, controller.signal)).resolves.toEqual(
+      deleted,
+    );
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/nfc-tags/tag%2Fwith%20space',
+    );
+    expect(config.method).toBe('delete');
+    expect(config.data).toBeUndefined();
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    [409, 'NFC_STILL_ASSIGNED', 'conflict', 'none'],
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'reload'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])(
+    'normalizes DELETE HTTP %s / %s without resubmitting',
+    async (status, code, kind, action) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { code, detail: 'Backend reason' }),
+      );
+      await expect(deleteTag(createTagResponse.id)).rejects.toMatchObject({
+        failure: { status, code, kind, action, message: 'Backend reason' },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('rejects a success response which has not deleted the tag', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, createTagResponse),
+    );
+    await expect(deleteTag(createTagResponse.id)).rejects.toMatchObject({
+      failure: { kind: 'invalidResponse' },
+    });
+  });
+  it('updates a tag using PUT and returns its full typed record', async () => {
+    const updated = {
+      ...createTagResponse,
+      id: 'tag/with space',
+      name: 'Tag 1',
+      uid: 'ABC123',
+      version: 1,
+    };
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, updated),
+    );
+    const controller = new AbortController();
+    await expect(
+      updateTag(
+        updated.id,
+        { name: 'Tag 1', uid: 'ABC123' },
+        controller.signal,
+      ),
+    ).resolves.toEqual(updated);
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/nfc-tags/tag%2Fwith%20space',
+    );
+    expect(config.method).toBe('put');
+    expect(JSON.parse(config.data)).toEqual({ name: 'Tag 1', uid: 'ABC123' });
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'none'],
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [409, 'DATA_CONFLICT', 'conflict', 'none'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])(
+    'handles update HTTP %s / %s without automatically resubmitting',
+    async (status, code, kind, action) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { code, detail: 'Backend reason' }),
+      );
+      await expect(
+        updateTag(createTagResponse.id, { name: 'Tag 1', uid: 'ABC123' }),
+      ).rejects.toMatchObject({
+        failure: { status, kind, action, message: 'Backend reason' },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('maps PUT validation errors to name and uid', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 400, {
+        code: 'VALIDATION_FAILED',
+        fieldErrors: { name: 'Invalid name', uid: 'Invalid UID' },
+      }),
+    );
+    await expect(
+      updateTag(createTagResponse.id, { name: '', uid: '' }),
+    ).rejects.toMatchObject({
+      failure: {
+        kind: 'validation',
+        fieldErrors: { name: 'Invalid name', uid: 'Invalid UID' },
+      },
+    });
+  });
+  it('fetches full tag details by encoded ID with bearer authentication and no body', async () => {
+    const detail = { ...createTagResponse, id: 'id/with space' };
+    adapter.mockImplementation(async (config) => response(config, 200, detail));
+    const controller = new AbortController();
+    await expect(getTag(detail.id, controller.signal)).resolves.toEqual(detail);
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/nfc-tags/id%2Fwith%20space',
+    );
+    expect(config.method).toBe('get');
+    expect(config.data).toBeUndefined();
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    { data: {} },
+    { data: { ...createTagResponse, id: 'wrong-tag' } },
+    { data: { ...createTagResponse, machine_id: 42 } },
+    { data: { ...createTagResponse, process_id: undefined } },
+    { data: { ...createTagResponse, version: '0' } },
+  ])(
+    'rejects malformed detail responses or mismatched identities: %j',
+    async ({ data }) => {
+      adapter.mockImplementation(async (config) => response(config, 200, data));
+      await expect(getTag(createTagResponse.id)).rejects.toMatchObject({
+        failure: { kind: 'invalidResponse' },
+      });
+    },
+  );
+
+  it.each([
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [409, 'NOT_FOUND', 'notFound', 'reload'],
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'reload'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])(
+    'handles detail HTTP %s / %s without automatic retries',
+    async (status, code, kind, action) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { code, detail: 'Backend reason' }),
+      );
+      await expect(getTag(createTagResponse.id)).rejects.toMatchObject({
+        failure: { status, code, kind, action, message: 'Backend reason' },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
   it('creates a tag using the canonical backend fields and bearer authentication', async () => {
     adapter.mockImplementation(async (config) =>
       response(config, 200, createTagResponse),
