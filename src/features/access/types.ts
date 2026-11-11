@@ -68,7 +68,8 @@ export interface CreateUserRequest {
   processAssignments: UserProcessAssignmentRequest[];
 }
 export type CreateUserField = keyof CreateUserRequest;
-export type UsersOperation = 'list' | 'detail' | 'create' | 'delete';
+export type UpdateUserRequest = Omit<CreateUserRequest, 'initialPassword'>;
+export type UsersOperation = 'list' | 'detail' | 'create' | 'update' | 'delete';
 
 export interface UsersFailure {
   kind:

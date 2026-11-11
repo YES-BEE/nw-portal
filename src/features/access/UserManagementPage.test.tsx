@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,14 @@ import { readSession, setAuthenticatedSession } from '../auth/session';
 import { ACCESS_STORAGE_KEY } from './accessData';
 import { UserManagementPage } from './UserManagementPage';
 import type { UsersResponse } from './types';
+
+function renderPage() {
+  return renderWithProviders(
+    <MemoryRouter>
+      <UserManagementPage />
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
   vi.spyOn(apiClient, 'delete').mockResolvedValue({
@@ -31,7 +40,7 @@ beforeEach(() => {
 });
 
 describe('backend user listing', () => {
-  it('confirms deletion, blocks duplicate submissions, and reloads the disabled account', async () => {
+  it('confirms deletion, blocks duplicate submissions, and hides the disabled account after reloading', async () => {
     let resolve!: (value: { status: number; data: unknown }) => void;
     vi.mocked(apiClient.delete).mockReturnValue(
       new Promise((done) => {
@@ -39,7 +48,7 @@ describe('backend user listing', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Delete admin' }));
     expect(screen.getByRole('dialog')).toHaveTextContent(
@@ -68,12 +77,10 @@ describe('backend user listing', () => {
     await act(async () =>
       resolve({ status: 200, data: { ...userResponse, enabled: false } }),
     );
-    await screen.findByRole('rowheader', { name: 'admin' });
+    expect(await screen.findByText('No users found.')).toBeVisible();
     expect(
-      within(
-        screen.getByRole('rowheader', { name: 'admin' }).closest('tr')!,
-      ).getByText('Inactive'),
-    ).toBeVisible();
+      screen.queryByRole('rowheader', { name: 'admin' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('User account disabled.')).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(apiClient.delete).toHaveBeenCalledTimes(1);
@@ -99,7 +106,7 @@ describe('backend user listing', () => {
         data: { detail },
       });
       const user = userEvent.setup();
-      renderWithProviders(<UserManagementPage />);
+      renderPage();
       await screen.findByRole('rowheader', { name: 'admin' });
       await user.click(screen.getByRole('button', { name: 'Delete admin' }));
       await user.click(
@@ -144,7 +151,7 @@ describe('backend user listing', () => {
       new Error('Network Error'),
     );
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Delete admin' }));
     await user.click(
@@ -164,7 +171,7 @@ describe('backend user listing', () => {
 
   it('creates a user with a backend role code, empty assignments, and an unchanged password', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Add User' }));
     await user.type(
@@ -224,7 +231,7 @@ describe('backend user listing', () => {
 
   it('validates required create fields before sending a POST', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Add User' }));
     await user.click(screen.getByRole('button', { name: 'Save User' }));
@@ -257,7 +264,7 @@ describe('backend user listing', () => {
       data: url === 'users' ? usersResponse : fresh,
     }));
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Edit admin' }));
     expect(apiClient.get).toHaveBeenCalledWith(
@@ -275,9 +282,9 @@ describe('backend user listing', () => {
         'IT Admin',
       ),
     );
-    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent(
-      'Inactive',
-    );
+    expect(
+      screen.queryByRole('combobox', { name: 'Status' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('checkbox', { name: 'Must change password' }),
     ).not.toBeInTheDocument();
@@ -285,7 +292,7 @@ describe('backend user listing', () => {
       screen.queryByRole('textbox', { name: 'Created at' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Associated Processes')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save User' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save User' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(
       screen.queryByRole('textbox', { name: /Username/ }),
@@ -306,7 +313,7 @@ describe('backend user listing', () => {
           },
     );
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     await user.click(screen.getByRole('button', { name: 'Edit admin' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -321,7 +328,7 @@ describe('backend user listing', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('lists backend identities and statuses without using or changing local user records', async () => {
+  it('lists only active backend users without using or changing local user records', async () => {
     const local = JSON.stringify({
       users: [
         { id: 'local', username: 'Local only', role: 'NW', status: 'Active' },
@@ -329,32 +336,31 @@ describe('backend user listing', () => {
       roles: [],
     });
     localStorage.setItem(ACCESS_STORAGE_KEY, local);
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     expect(apiClient.get).toHaveBeenCalledWith(
       'users',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
     const admin = screen
       .getByRole('rowheader', { name: 'admin' })
       .closest('tr')!;
     expect(within(admin).getByText('Bootstrap NW')).toBeVisible();
     expect(within(admin).getByText('NW')).toBeVisible();
     expect(within(admin).getByText('Active')).toBeVisible();
-    const operator = screen
-      .getByRole('rowheader', { name: 'operator' })
-      .closest('tr')!;
-    expect(within(operator).getByText('Inactive')).toBeVisible();
-    expect(within(operator).getByText('No role assigned')).toBeVisible();
+    expect(
+      screen.queryByRole('rowheader', { name: 'operator' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('1–1 of 1')).toBeVisible();
     expect(screen.queryByText('Local only')).not.toBeInTheDocument();
     expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(local);
     expect(screen.getByRole('button', { name: 'Add User' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Edit admin' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Delete admin' })).toBeEnabled();
     expect(
-      screen.getByRole('button', { name: 'Delete operator' }),
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: 'Delete operator' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a loader until the request completes, with no false empty or error state', async () => {
@@ -364,19 +370,19 @@ describe('backend user listing', () => {
         resolve = done;
       }),
     );
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     expect(screen.getByRole('progressbar')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('No users found.')).not.toBeInTheDocument();
     expect(screen.getByRole('searchbox')).toBeDisabled();
     await act(async () => resolve({ status: 200, data: usersResponse }));
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('searches username, display name, and role without case sensitivity', async () => {
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'admin' });
     const search = screen.getByRole('searchbox', { name: 'Search users' });
     for (const value of [' ADMIN ', ' bootstrap ', ' nw ']) {
@@ -386,10 +392,10 @@ describe('backend user listing', () => {
       expect(screen.getByRole('rowheader', { name: 'admin' })).toBeVisible();
     }
     await user.clear(search);
-    await user.type(search, 'nobody');
+    await user.type(search, 'operator');
     expect(screen.getByText('No users match your search.')).toBeVisible();
     await user.clear(search);
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
   });
 
   it('paginates fetched users and resets the page when searching', async () => {
@@ -400,7 +406,7 @@ describe('backend user listing', () => {
     }));
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: records });
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await screen.findByRole('rowheader', { name: 'account-0' });
     expect(screen.getAllByRole('rowheader')).toHaveLength(10);
     await user.click(screen.getByRole('button', { name: /next page/i }));
@@ -413,9 +419,12 @@ describe('backend user listing', () => {
     ).toBeDisabled();
   });
 
-  it('treats an empty response as an empty list', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
-    renderWithProviders(<UserManagementPage />);
+  it.each([
+    { data: [] },
+    { data: usersResponse.map((user) => ({ ...user, enabled: false })) },
+  ])('shows an empty list when no active users exist: %j', async ({ data }) => {
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+    renderPage();
     expect(await screen.findByText('No users found.')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -426,7 +435,7 @@ describe('backend user listing', () => {
       data: { detail: 'Maintenance in progress' },
     });
     const user = userEvent.setup();
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Maintenance in progress',
     );
@@ -442,7 +451,7 @@ describe('backend user listing', () => {
       status: 403,
       data: { detail: 'Missing module access: users', code: 'ACCESS_DENIED' },
     });
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Missing module access: users',
     );
@@ -473,7 +482,7 @@ describe('backend user listing', () => {
       });
       vi.mocked(apiClient.get).mockResolvedValue(response);
       const user = userEvent.setup();
-      renderWithProviders(<UserManagementPage />);
+      renderPage();
       await screen.findByRole('alert');
       await user.click(screen.getByRole('button', { name: 'Back to sign in' }));
       expect(readSession()).toBeNull();
@@ -487,7 +496,7 @@ describe('backend user listing', () => {
         status,
         data: status === 500 ? '' : '<html>Internal proxy diagnostics</html>',
       });
-      renderWithProviders(<UserManagementPage />);
+      renderPage();
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'Users are temporarily unavailable',
       );
@@ -501,7 +510,7 @@ describe('backend user listing', () => {
 
   it('shows connectivity guidance when no response is available', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('Network Error'));
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Check your connection',
     );
@@ -516,7 +525,7 @@ describe('backend user listing', () => {
     [userResponse, userResponse],
   ])('rejects malformed or duplicate user records: %j', async (data) => {
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to read users',
     );
@@ -525,13 +534,13 @@ describe('backend user listing', () => {
 
   it('cancels the request on exit and fetches again on return', async () => {
     vi.mocked(apiClient.get).mockReturnValueOnce(new Promise(() => {}));
-    const { unmount } = renderWithProviders(<UserManagementPage />);
+    const { unmount } = renderPage();
     const signal = vi.mocked(apiClient.get).mock.calls[0][1]?.signal;
     unmount();
     expect(signal?.aborted).toBe(true);
-    renderWithProviders(<UserManagementPage />);
+    renderPage();
     await waitFor(() =>
-      expect(screen.getAllByRole('rowheader')).toHaveLength(2),
+      expect(screen.getAllByRole('rowheader')).toHaveLength(1),
     );
     expect(apiClient.get).toHaveBeenCalledTimes(2);
   });

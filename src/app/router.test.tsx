@@ -1,5 +1,6 @@
 import { apiClient } from '../api/client';
 import { processResponse } from '../test/processes';
+import { userResponse, usersResponse } from '../test/users';
 import { seedTestData, signIn } from '../test/fixtures';
 import { defaultTags, sampleStyles } from '../test/fixtures';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -39,9 +40,34 @@ beforeEach(() => {
 });
 
 describe('application routing', () => {
+  it('opens user details from the list and retains users navigation access', async () => {
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'users' ? usersResponse : userResponse,
+    }));
+    const user = userEvent.setup();
+    await router.navigate('/users');
+    renderWithProviders(<App />);
+    await user.click(await screen.findByRole('link', { name: 'View admin' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'admin' }),
+    ).toBeVisible();
+    expect(window.location.pathname).toBe(`/users/${userResponse.id}`);
+    expect(screen.getByText('Bootstrap NW')).toBeVisible();
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    expect(
+      within(
+        screen.getByRole('navigation', { name: 'Main navigation' }),
+      ).getByRole('link', { name: 'User Management' }),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
   it.each([
     '/dashboard',
     '/users',
+    '/users/user-id',
     '/roles',
     '/workspace',
     '/access-denied',
@@ -65,6 +91,8 @@ describe('application routing', () => {
     '/dashboard',
     '/reports',
     '/users',
+    '/users/user-id',
+    '/%75sers/user-id',
     '/roles',
     '/styles',
     '/styles/sty-1',

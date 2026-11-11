@@ -110,6 +110,15 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/users/:userId',
+            handle: { requiredModule: 'users' },
+            lazy: async () => {
+              const { UserDetailsPage } =
+                await import('../features/access/UserDetailsPage');
+              return { Component: UserDetailsPage };
+            },
+          },
+          {
             path: '/roles',
             handle: { requiredModule: 'roles' },
             lazy: async () => {

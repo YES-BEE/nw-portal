@@ -60,9 +60,9 @@ describe('user detail prefill', () => {
     expect(screen.getByRole('combobox', { name: /Role/ })).toHaveTextContent(
       'Select a role',
     );
-    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent(
-      'Inactive',
-    );
+    expect(
+      screen.queryByRole('combobox', { name: 'Status' }),
+    ).not.toBeInTheDocument();
   });
 
   it('displays the backend reason and retries a transient error when requested', async () => {

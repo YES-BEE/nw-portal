@@ -7,7 +7,9 @@ import type {
   UsersResponse,
   UsersOperation,
   CreateUserRequest,
+  UpdateUserRequest,
 } from './types';
+import type { ProcessLookupResponse } from '../processes/types';
 import { parseUsersFailure, UsersError } from './usersFailure';
 
 function isAssignment(value: unknown): value is UserProcessAssignment {
@@ -139,4 +141,55 @@ export async function deleteUser(
       }),
     'delete',
   );
+}
+
+export async function updateUser(
+  userId: string,
+  body: UpdateUserRequest,
+  signal?: AbortSignal,
+): Promise<UserResponse> {
+  const data = await requestUsers(
+    () =>
+      apiClient.put<unknown>(`users/${encodeURIComponent(userId)}`, body, {
+        signal,
+        timeout: 10000,
+        validateStatus: () => true,
+      }),
+    'update',
+  );
+  if (!isUser(data) || data.id.toLowerCase() !== userId.toLowerCase())
+    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
+}
+
+// UiLookupController returns only processes whose process and station are active.
+export async function getUserProcessOptions(
+  signal?: AbortSignal,
+): Promise<ProcessLookupResponse[]> {
+  const data = await requestUsers(() =>
+    apiClient.get<unknown>('ui/lookups', {
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    }),
+  );
+  const processes =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? (data as Record<string, unknown>).processes
+      : undefined;
+  const isOption = (value: unknown): value is ProcessLookupResponse => {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return false;
+    const option = value as Record<string, unknown>;
+    return ['id', 'name', 'station_id', 'stationNumber'].every(
+      (key) => typeof option[key] === 'string' && !!option[key].trim(),
+    );
+  };
+  if (
+    !Array.isArray(processes) ||
+    !processes.every(isOption) ||
+    new Set(processes.map((option) => option.id)).size !== processes.length
+  )
+    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+  return processes;
 }

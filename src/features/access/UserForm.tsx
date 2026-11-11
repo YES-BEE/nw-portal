@@ -5,22 +5,32 @@ import {
   Alert,
   AlertTitle,
   Button,
-  MenuItem,
   Paper,
   Stack,
   TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
-import type { CreateUserRequest, UserResponse, UsersFailure } from './types';
+import type {
+  CreateUserRequest,
+  UpdateUserRequest,
+  UserResponse,
+  UsersFailure,
+  UserProcessAssignmentRequest,
+} from './types';
+import { UserProcessSelect } from './UserProcessSelect';
 import { UserRoleSelect } from './UserRoleSelect';
 import { UsersError } from './usersFailure';
 import { signOut } from '../auth/session';
 
-type UserFormProps = { onClose: () => void } & (
-  | { initial: UserResponse; onCreate?: never }
+type UserFormProps = { onClose: () => void; onReload?: () => void } & (
+  | {
+      initial: UserResponse;
+      onCreate?: never;
+      onUpdate: (body: UpdateUserRequest, signal: AbortSignal) => Promise<void>;
+    }
   | {
       initial?: never;
+      onUpdate?: never;
       onCreate: (
         body: CreateUserRequest,
         signal: AbortSignal,
@@ -28,15 +38,28 @@ type UserFormProps = { onClose: () => void } & (
     }
 );
 
-export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
+export function UserForm({
+  initial,
+  onClose,
+  onCreate,
+  onUpdate,
+  onReload,
+}: UserFormProps) {
   const { t } = useTranslation('translation');
   const [draft, setDraft] = useState({
     username: initial?.username ?? '',
     displayName: initial?.display_name ?? '',
     role: initial?.role ?? '',
-    enabled: initial?.enabled ?? true,
+    processAssignments: (initial?.processAssignments ?? []).map(
+      ({ processId, activeOnShift }): UserProcessAssignmentRequest => ({
+        processId,
+        activeOnShift,
+      }),
+    ),
     initialPassword: '',
   });
+  const [processesReady, setProcessesReady] = useState(false);
+  const isProcessManager = draft.role === 'PROCESS_MANAGER';
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<UsersFailure | null>(null);
@@ -49,7 +72,7 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
   const requiredErrors = {
     username: !draft.username.trim(),
     displayName: !draft.displayName.trim(),
-    initialPassword: !draft.initialPassword.trim(),
+    initialPassword: !!onCreate && !draft.initialPassword.trim(),
     role: !draft.role.trim(),
   };
   const fieldError = (field: keyof typeof requiredErrors) =>
@@ -58,12 +81,23 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
       ? t(`access.users.required.${field}`)
       : undefined);
   function update(field: keyof typeof requiredErrors, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === 'role' && value !== current.role
+        ? { processAssignments: [] }
+        : {}),
+    }));
+    if (field === 'role' && value !== draft.role) setProcessesReady(false);
     setFailure((current) =>
       current
         ? {
             ...current,
-            fieldErrors: { ...current.fieldErrors, [field]: undefined },
+            fieldErrors: {
+              ...current.fieldErrors,
+              [field]: undefined,
+              ...(field === 'role' ? { processAssignments: undefined } : {}),
+            },
           }
         : null,
     );
@@ -89,7 +123,7 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
         noValidate
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!onCreate || pending.current) return;
+          if (pending.current || (isProcessManager && !processesReady)) return;
           setSubmitted(true);
           if (Object.values(requiredErrors).some(Boolean)) return;
           const controller = new AbortController();
@@ -97,16 +131,18 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
           setSaving(true);
           setFailure(null);
           try {
-            await onCreate(
-              {
-                username: draft.username.trim(),
-                displayName: draft.displayName.trim(),
-                initialPassword: draft.initialPassword,
-                role: draft.role,
-                processAssignments: [],
-              },
-              controller.signal,
-            );
+            const body: UpdateUserRequest = {
+              username: draft.username.trim(),
+              displayName: draft.displayName.trim(),
+              role: draft.role,
+              processAssignments: draft.processAssignments,
+            };
+            if (onCreate)
+              await onCreate(
+                { ...body, initialPassword: draft.initialPassword },
+                controller.signal,
+              );
+            else await onUpdate(body, controller.signal);
           } catch (error: unknown) {
             if (!controller.signal.aborted)
               setFailure(
@@ -153,7 +189,30 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
             errorMessage={fieldError('role')}
           />
         </Stack>
-        {onCreate ? (
+        {isProcessManager && (
+          <UserProcessSelect
+            value={draft.processAssignments}
+            initial={initial?.processAssignments}
+            disabled={saving}
+            onReadyChange={setProcessesReady}
+            errorMessage={failure?.fieldErrors?.processAssignments}
+            onChange={(processAssignments) => {
+              setDraft((current) => ({ ...current, processAssignments }));
+              setFailure((current) =>
+                current
+                  ? {
+                      ...current,
+                      fieldErrors: {
+                        ...current.fieldErrors,
+                        processAssignments: undefined,
+                      },
+                    }
+                  : null,
+              );
+            }}
+          />
+        )}
+        {onCreate && (
           <TextField
             label={t('access.users.initialPassword')}
             type="password"
@@ -166,25 +225,6 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
             helperText={fieldError('initialPassword')}
             sx={{ mt: 2.5, width: { xs: '100%', sm: 320 } }}
           />
-        ) : (
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={2.5}
-            sx={{ mt: 2.5, alignItems: 'flex-start' }}
-          >
-            <TextField
-              select
-              label={t('access.status')}
-              value={draft.enabled ? 'Active' : 'Inactive'}
-              onChange={(event) =>
-                setDraft({ ...draft, enabled: event.target.value === 'Active' })
-              }
-              sx={{ width: { xs: '100%', sm: 180 } }}
-            >
-              <MenuItem value="Active">{t('access.active')}</MenuItem>
-              <MenuItem value="Inactive">{t('access.inactive')}</MenuItem>
-            </TextField>
-          </Stack>
         )}
         {failure && (
           <Alert
@@ -195,13 +235,23 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
                 <Button color="inherit" onClick={signOut}>
                   {t('startup.signIn')}
                 </Button>
+              ) : failure.action === 'reload' && onReload ? (
+                <Button color="inherit" onClick={onReload}>
+                  {t('access.users.reload')}
+                </Button>
               ) : undefined
             }
           >
-            <AlertTitle>{t('access.users.createFailure')}</AlertTitle>
+            <AlertTitle>
+              {t(
+                onCreate
+                  ? 'access.users.createFailure'
+                  : 'access.users.updateFailure',
+              )}
+            </AlertTitle>
             {failure.message ||
               t(`access.users.failures.${failure.kind}.description`)}
-            {failure.fieldErrors?.processAssignments && (
+            {!isProcessManager && failure.fieldErrors?.processAssignments && (
               <Typography variant="body2">
                 {failure.fieldErrors.processAssignments}
               </Typography>
@@ -221,19 +271,19 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
           <Button onClick={onClose} disabled={saving}>
             {t('access.cancel')}
           </Button>
-          {onCreate ? (
-            <Button type="submit" variant="contained" disabled={saving}>
-              {t(saving ? 'access.users.creating' : 'access.users.save')}
-            </Button>
-          ) : (
-            <Tooltip title={t('access.users.saveUnavailable')}>
-              <Box component="span">
-                <Button type="submit" variant="contained" disabled>
-                  {t('access.users.save')}
-                </Button>
-              </Box>
-            </Tooltip>
-          )}
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={saving || (isProcessManager && !processesReady)}
+          >
+            {t(
+              saving
+                ? onCreate
+                  ? 'access.users.creating'
+                  : 'access.users.saving'
+                : 'access.users.save',
+            )}
+          </Button>
         </Stack>
       </Box>
     </Paper>

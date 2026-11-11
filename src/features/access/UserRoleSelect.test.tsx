@@ -117,7 +117,9 @@ describe('backend user role dropdown', () => {
       data: { detail: 'Role maintenance in progress' },
     });
     const user = userEvent.setup();
-    renderWithProviders(<UserForm initial={userResponse} onClose={vi.fn()} />);
+    renderWithProviders(
+      <UserForm initial={userResponse} onClose={vi.fn()} onUpdate={vi.fn()} />,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Role maintenance in progress',
     );

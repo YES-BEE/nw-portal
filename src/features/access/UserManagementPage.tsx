@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -25,6 +26,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
 import { ManagementHeader } from './ManagementScaffold';
 import { createUser, getUsers } from './usersApi';
@@ -53,6 +55,7 @@ export function UserManagementPage() {
   const [deleted, setDeleted] = useState(false);
   function reloadUsers() {
     setDeletingUser(null);
+    setEditingUserId(null);
     setPage(0);
     setState({ status: 'loading' });
     setAttempt((value) => value + 1);
@@ -61,7 +64,11 @@ export function UserManagementPage() {
     const controller = new AbortController();
     void getUsers(controller.signal).then(
       (users) => {
-        if (!controller.signal.aborted) setState({ status: 'ready', users });
+        if (!controller.signal.aborted)
+          setState({
+            status: 'ready',
+            users: users.filter((user) => user.enabled),
+          });
       },
       (error: unknown) => {
         if (!controller.signal.aborted)
@@ -219,6 +226,18 @@ export function UserManagementPage() {
                         />
                       </TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title={t('common.view')}>
+                          <IconButton
+                            component={RouterLink}
+                            to={`/users/${encodeURIComponent(user.id)}`}
+                            color="primary"
+                            aria-label={t('access.users.viewNamed', {
+                              name: user.username,
+                            })}
+                          >
+                            <VisibilityOutlinedIcon />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title={t('access.edit')}>
                           <Box component="span">
                             <IconButton
@@ -315,6 +334,10 @@ export function UserManagementPage() {
           key={editingUserId}
           userId={editingUserId}
           onClose={() => setEditingUserId(null)}
+          onUpdated={() => {
+            setSaved(true);
+            reloadUsers();
+          }}
           onReload={() => {
             setEditingUserId(null);
             setPage(0);

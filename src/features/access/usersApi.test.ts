@@ -5,7 +5,14 @@ import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { userResponse, usersResponse } from '../../test/users';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import { createUser, deleteUser, getUser, getUsers } from './usersApi';
+import {
+  createUser,
+  deleteUser,
+  getUser,
+  getUsers,
+  updateUser,
+  getUserProcessOptions,
+} from './usersApi';
 
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
@@ -36,6 +43,123 @@ afterEach(() => {
 });
 
 describe('users API', () => {
+  it('updates user details and multiple assignments with PUT, without password or status fields', async () => {
+    const body = {
+      username: 'manager',
+      displayName: 'Manager',
+      role: 'PROCESS_MANAGER',
+      processAssignments: [
+        { processId: 'process-1', activeOnShift: false },
+        { processId: 'process-2', activeOnShift: true },
+      ],
+    };
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, {
+        ...userResponse,
+        ...body,
+        display_name: body.displayName,
+        processAssignments: [],
+      }),
+    );
+    await expect(updateUser(userResponse.id, body)).resolves.toMatchObject({
+      id: userResponse.id,
+    });
+    const config = adapter.mock.calls[0][0];
+    expect(config.method).toBe('put');
+    expect(config.url).toBe(`users/${userResponse.id}`);
+    expect(JSON.parse(config.data)).toEqual(body);
+  });
+
+  it('loads typed process options through the user-accessible lookup endpoint', async () => {
+    const processes = [
+      {
+        id: 'process-1',
+        name: 'Washing',
+        station_id: 'station-1',
+        stationNumber: '03',
+      },
+    ];
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, { processes }),
+    );
+    await expect(getUserProcessOptions()).resolves.toEqual(processes);
+    expect(adapter.mock.calls[0][0].url).toBe('ui/lookups');
+  });
+
+  it.each([
+    {},
+    { processes: [{}] },
+    {
+      processes: [
+        { id: 'p', name: 'Wash', station_id: 's', stationNumber: null },
+      ],
+    },
+  ])('rejects malformed process options: %j', async (data) => {
+    adapter.mockImplementation(async (config) => response(config, 200, data));
+    await expect(getUserProcessOptions()).rejects.toMatchObject({
+      failure: { kind: 'invalidResponse' },
+    });
+  });
+
+  it.each([
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'none'],
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [409, 'DATA_CONFLICT', 'conflict', 'none'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])('handles update failures: HTTP %s', async (status, code, kind, action) => {
+    adapter.mockImplementation(async (config) =>
+      response(config, status, { code, detail: 'Backend reason' }),
+    );
+    await expect(
+      updateUser(userResponse.id, {
+        username: 'manager',
+        displayName: 'Manager',
+        role: 'PROCESS_MANAGER',
+        processAssignments: [],
+      }),
+    ).rejects.toMatchObject({
+      failure: { kind, action, message: 'Backend reason' },
+    });
+    expect(adapter).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps nested assignment validation errors to the process selector', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 400, {
+        code: 'VALIDATION_FAILED',
+        detail: 'Validation failed',
+        fieldErrors: { 'processAssignments[0].processId': 'must not be null' },
+      }),
+    );
+    await expect(
+      updateUser(userResponse.id, {
+        username: 'manager',
+        displayName: 'Manager',
+        role: 'PROCESS_MANAGER',
+        processAssignments: [],
+      }),
+    ).rejects.toMatchObject({
+      failure: {
+        kind: 'validation',
+        fieldErrors: { processAssignments: 'must not be null' },
+      },
+    });
+  });
+
+  it('rejects mismatched update responses', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, { ...userResponse, id: 'other-user' }),
+    );
+    await expect(
+      updateUser(userResponse.id, {
+        username: 'manager',
+        displayName: 'Manager',
+        role: 'PROCESS_MANAGER',
+        processAssignments: [],
+      }),
+    ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+  });
   it('deletes the encoded user ID with a bearer token and no request body', async () => {
     vi.stubEnv('VITE_API_VERSION', 'v1');
     adapter.mockImplementation(async (config) =>

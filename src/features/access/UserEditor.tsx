@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import { signOut } from '../auth/session';
-import { getUser } from './usersApi';
+import { getUser, updateUser } from './usersApi';
 import { UsersError } from './usersFailure';
 import { UserForm } from './UserForm';
 import type { UserResponse, UsersFailure } from './types';
@@ -24,10 +24,12 @@ export function UserEditor({
   userId,
   onClose,
   onReload,
+  onUpdated,
 }: {
   userId: string;
   onClose: () => void;
   onReload: () => void;
+  onUpdated?: () => void;
 }) {
   const { t } = useTranslation('translation');
   const [state, setState] = useState<DetailState>({ status: 'loading' });
@@ -54,7 +56,17 @@ export function UserEditor({
     return () => controller.abort();
   }, [userId, attempt]);
   if (state.status === 'ready')
-    return <UserForm initial={state.user} onClose={onClose} />;
+    return (
+      <UserForm
+        initial={state.user}
+        onClose={onClose}
+        onReload={onReload}
+        onUpdate={async (body, signal) => {
+          await updateUser(userId, body, signal);
+          if (!signal.aborted) (onUpdated ?? onReload)();
+        }}
+      />
+    );
   return (
     <Paper
       component="section"

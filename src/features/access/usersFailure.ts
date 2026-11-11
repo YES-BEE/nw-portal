@@ -18,7 +18,7 @@ export function parseUsersFailure(
   const { problem, message } = readProblemDetails(body);
   const fields = problem?.fieldErrors;
   const validation =
-    operation === 'create' &&
+    (operation === 'create' || operation === 'update') &&
     status === 400 &&
     problem?.code === 'VALIDATION_FAILED' &&
     fields &&
@@ -36,6 +36,14 @@ export function parseUsersFailure(
       const text = safeApiText((fields as Record<string, unknown>)[field]);
       if (text) fieldErrors[field] = text;
     }
+  if (validation && !fieldErrors.processAssignments) {
+    const messages = Object.entries(fields as Record<string, unknown>)
+      .filter(([field]) => /^processAssignments\[\d+\](\.|$)/.test(field))
+      .map(([, value]) => safeApiText(value))
+      .filter((value): value is string => !!value);
+    if (messages.length)
+      fieldErrors.processAssignments = [...new Set(messages)].join(' ');
+  }
   const roleChanged =
     status === 403 &&
     problem?.status === 403 &&
@@ -45,17 +53,25 @@ export function parseUsersFailure(
     problem.detail === 'Role changed; log in again' &&
     (problem.instance === undefined || typeof problem.instance === 'string');
   const kind: UsersFailure['kind'] =
-    operation === 'create' && status === 400
+    (operation === 'create' || operation === 'update') && status === 400
       ? validation
         ? 'validation'
         : 'invalidRequest'
       : operation === 'create' && status === 404
         ? 'invalidRequest'
-        : (operation === 'create' || operation === 'delete') && status === 409
+        : (operation === 'create' ||
+              operation === 'update' ||
+              operation === 'delete') &&
+            status === 409
           ? 'conflict'
-          : (operation === 'detail' || operation === 'delete') && status === 404
+          : (operation === 'detail' ||
+                operation === 'update' ||
+                operation === 'delete') &&
+              status === 404
             ? 'notFound'
-            : (operation === 'detail' || operation === 'delete') &&
+            : (operation === 'detail' ||
+                  operation === 'update' ||
+                  operation === 'delete') &&
                 status === 400
               ? 'invalidRequest'
               : status === 401
@@ -78,7 +94,7 @@ export function parseUsersFailure(
     action:
       kind === 'authentication' || kind === 'roleChanged'
         ? 'signIn'
-        : operation === 'create' &&
+        : (operation === 'create' || operation === 'update') &&
             (kind === 'validation' ||
               kind === 'invalidRequest' ||
               kind === 'conflict')
