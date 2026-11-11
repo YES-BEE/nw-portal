@@ -1,57 +1,70 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  Chip,
   Box,
+  Alert,
+  AlertTitle,
   Button,
-  ListItemText,
   MenuItem,
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import { getUserErrors, loadAccessData } from './accessData';
-import type { AccessRole, AccessUser, UserDraft } from './accessData';
-import { loadProcesses } from '../processes/processData';
+import type { CreateUserRequest, UserResponse, UsersFailure } from './types';
+import { UserRoleSelect } from './UserRoleSelect';
+import { UsersError } from './usersFailure';
+import { signOut } from '../auth/session';
 
-export function UserForm({
-  initial,
-  editing,
-  roles,
-  onSave,
-  onClose,
-}: {
-  initial: UserDraft;
-  editing: boolean;
-  roles: AccessRole[];
-  onSave: (user: AccessUser) => void;
-  onClose: () => void;
-}) {
+type UserFormProps = { onClose: () => void } & (
+  | { initial: UserResponse; onCreate?: never }
+  | {
+      initial?: never;
+      onCreate: (body: CreateUserRequest, signal: AbortSignal) => Promise<void>;
+    }
+);
+
+export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
   const { t } = useTranslation('translation');
-  const [draft, setDraft] = useState(initial);
-  const [processData] = useState(loadProcesses);
-  const processOptions = [
-    ...processData.records.map((process) => process.id),
-    ...(draft.processIds ?? []).filter(
-      (id) => !processData.records.some((process) => process.id === id),
-    ),
-  ];
-  const processLabel = (id: string) => {
-    const process = processData.records.find((record) => record.id === id);
-    return process
-      ? `${process.name} — ${t('styles.stationValue', { station: process.station })}`
-      : t('styles.unavailableProcess', { id });
-  };
+  const [draft, setDraft] = useState({
+    username: initial?.username ?? '',
+    displayName: initial?.display_name ?? '',
+    role: initial?.role ?? '',
+    enabled: initial?.enabled ?? true,
+    initialPassword: '',
+  });
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<UsersFailure | null>(null);
+  const pending = useRef<AbortController | null>(null);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
     section.current?.scrollIntoView?.({ behavior: 'instant', block: 'start' });
+    return () => pending.current?.abort();
   }, []);
-  const errors = submitted
-    ? getUserErrors(draft, loadAccessData().records)
-    : {};
+  const requiredErrors = {
+    username: !draft.username.trim(),
+    displayName: !draft.displayName.trim(),
+    initialPassword: !draft.initialPassword.trim(),
+    role: !draft.role.trim(),
+  };
+  const fieldError = (field: keyof typeof requiredErrors) =>
+    failure?.fieldErrors?.[field] ||
+    (submitted && requiredErrors[field]
+      ? t(`access.users.required.${field}`)
+      : undefined);
+  function update(field: keyof typeof requiredErrors, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+    setFailure((current) =>
+      current
+        ? {
+            ...current,
+            fieldErrors: { ...current.fieldErrors, [field]: undefined },
+          }
+        : null,
+    );
+  }
   return (
     <Paper
       component="section"
@@ -66,25 +79,42 @@ export function UserForm({
         variant="h6"
         sx={{ mb: 2 }}
       >
-        {t(editing ? 'access.users.edit' : 'access.users.add')}
+        {t(onCreate ? 'access.users.add' : 'access.users.edit')}
       </Typography>
       <Box
         component="form"
         noValidate
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
+          if (!onCreate || pending.current) return;
           setSubmitted(true);
-          const normalized = {
-            ...draft,
-            username: draft.username.trim(),
-            processIds: draft.processIds ?? [],
-          };
-          if (
-            !Object.keys(getUserErrors(normalized, loadAccessData().records))
-              .length
-          )
-            if (normalized.status !== '')
-              onSave({ ...normalized, status: normalized.status });
+          if (Object.values(requiredErrors).some(Boolean)) return;
+          const controller = new AbortController();
+          pending.current = controller;
+          setSaving(true);
+          setFailure(null);
+          try {
+            await onCreate(
+              {
+                username: draft.username.trim(),
+                displayName: draft.displayName.trim(),
+                initialPassword: draft.initialPassword,
+                role: draft.role,
+                processAssignments: [],
+              },
+              controller.signal,
+            );
+          } catch (error: unknown) {
+            if (!controller.signal.aborted)
+              setFailure(
+                error instanceof UsersError
+                  ? error.failure
+                  : { kind: 'network', action: 'retry' },
+              );
+          } finally {
+            pending.current = null;
+            if (!controller.signal.aborted) setSaving(false);
+          }
         }}
       >
         <Stack
@@ -96,131 +126,111 @@ export function UserForm({
             label={t('access.username')}
             autoFocus
             required
+            disabled={saving}
             value={draft.username}
-            onChange={(event) =>
-              setDraft({ ...draft, username: event.target.value })
-            }
-            error={Boolean(errors.username)}
-            helperText={
-              errors.username && t(`access.errors.${errors.username}`)
-            }
-            slotProps={{ htmlInput: { maxLength: 80 } }}
+            onChange={(event) => update('username', event.target.value)}
+            error={!!fieldError('username')}
+            helperText={fieldError('username')}
             sx={{ width: { xs: '100%', md: 320 } }}
           />
           <TextField
-            select
-            label={t('access.role')}
+            label={t('access.users.displayName')}
             required
+            disabled={saving}
+            value={draft.displayName}
+            onChange={(event) => update('displayName', event.target.value)}
+            error={!!fieldError('displayName')}
+            helperText={fieldError('displayName')}
+            sx={{ width: { xs: '100%', md: 320 } }}
+          />
+          <UserRoleSelect
             value={draft.role}
-            onChange={(event) =>
-              setDraft({ ...draft, role: event.target.value })
-            }
-            error={Boolean(errors.role)}
-            helperText={errors.role && t(`access.errors.${errors.role}`)}
-            sx={{ width: { xs: '100%', md: 280 } }}
-          >
-            <MenuItem disabled value="">
-              {t('access.selectRole')}
-            </MenuItem>
-            {roles.map((role) => (
-              <MenuItem key={role.name} value={role.name}>
-                {role.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label={t('access.status')}
-            required
-            value={draft.status}
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                status: event.target.value as AccessUser['status'],
-              })
-            }
-            error={Boolean(errors.status)}
-            helperText={errors.status && t(`access.errors.${errors.status}`)}
-            sx={{ width: { xs: '100%', md: 180 } }}
-          >
-            <MenuItem disabled value="">
-              {t('access.selectStatus')}
-            </MenuItem>
-            <MenuItem value="Active">{t('access.active')}</MenuItem>
-            <MenuItem value="Inactive">{t('access.inactive')}</MenuItem>
-          </TextField>
+            onChange={(role) => update('role', role)}
+            disabled={saving}
+            errorMessage={fieldError('role')}
+          />
         </Stack>
-        <Box sx={{ mt: 2.5, maxWidth: 640 }}>
-          {processData.storageUnavailable && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {t('access.users.processLoadWarning')}
-            </Alert>
-          )}
+        {onCreate ? (
           <TextField
-            select
-            fullWidth
-            label={t('access.users.associatedProcesses')}
-            sx={{
-              '& .MuiOutlinedInput-root': { height: 'auto', minHeight: 47 },
-            }}
-            value={draft.processIds ?? []}
-            onChange={(event) => {
-              const value = event.target.value as string | string[];
-              setDraft({
-                ...draft,
-                processIds:
-                  typeof value === 'string' ? value.split(',') : value,
-              });
-            }}
-            helperText={t('access.users.processHint')}
-            slotProps={{
-              select: {
-                multiple: true,
-                renderValue: (selected) =>
-                  (selected as string[]).length ? (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {(selected as string[]).map((id) => (
-                        <Chip
-                          key={id}
-                          label={processLabel(id)}
-                          size="small"
-                          onMouseDown={(event) => event.stopPropagation()}
-                          onDelete={() =>
-                            setDraft({
-                              ...draft,
-                              processIds: (draft.processIds ?? []).filter(
-                                (processId) => processId !== id,
-                              ),
-                            })
-                          }
-                        />
-                      ))}
-                    </Box>
-                  ) : (
-                    t('access.users.selectProcesses')
-                  ),
-              },
-            }}
+            label={t('access.users.initialPassword')}
+            type="password"
+            autoComplete="new-password"
+            required
+            disabled={saving}
+            value={draft.initialPassword}
+            onChange={(event) => update('initialPassword', event.target.value)}
+            error={!!fieldError('initialPassword')}
+            helperText={fieldError('initialPassword')}
+            sx={{ mt: 2.5, width: { xs: '100%', sm: 320 } }}
+          />
+        ) : (
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2.5}
+            sx={{ mt: 2.5, alignItems: 'flex-start' }}
           >
-            {!processOptions.length && (
-              <MenuItem disabled>{t('access.users.noProcesses')}</MenuItem>
+            <TextField
+              select
+              label={t('access.status')}
+              value={draft.enabled ? 'Active' : 'Inactive'}
+              onChange={(event) =>
+                setDraft({ ...draft, enabled: event.target.value === 'Active' })
+              }
+              sx={{ width: { xs: '100%', sm: 180 } }}
+            >
+              <MenuItem value="Active">{t('access.active')}</MenuItem>
+              <MenuItem value="Inactive">{t('access.inactive')}</MenuItem>
+            </TextField>
+          </Stack>
+        )}
+        {failure && (
+          <Alert
+            severity="error"
+            sx={{ mt: 2 }}
+            action={
+              failure.action === 'signIn' ? (
+                <Button color="inherit" onClick={signOut}>
+                  {t('startup.signIn')}
+                </Button>
+              ) : undefined
+            }
+          >
+            <AlertTitle>{t('access.users.createFailure')}</AlertTitle>
+            {failure.message ||
+              t(`access.users.failures.${failure.kind}.description`)}
+            {failure.fieldErrors?.processAssignments && (
+              <Typography variant="body2">
+                {failure.fieldErrors.processAssignments}
+              </Typography>
             )}
-            {processOptions.map((id) => (
-              <MenuItem key={id} value={id}>
-                <ListItemText primary={processLabel(id)} />
-              </MenuItem>
-            ))}
-          </TextField>
-        </Box>
+            {failure.status !== undefined && (
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                {t('access.users.failureStatus', { status: failure.status })}
+              </Typography>
+            )}
+          </Alert>
+        )}
         <Stack
           direction="row"
           spacing={1.5}
           sx={{ justifyContent: 'flex-end', mt: 3 }}
         >
-          <Button onClick={onClose}>{t('access.cancel')}</Button>
-          <Button type="submit" variant="contained">
-            {t('access.users.save')}
+          <Button onClick={onClose} disabled={saving}>
+            {t('access.cancel')}
           </Button>
+          {onCreate ? (
+            <Button type="submit" variant="contained" disabled={saving}>
+              {t(saving ? 'access.users.creating' : 'access.users.save')}
+            </Button>
+          ) : (
+            <Tooltip title={t('access.users.saveUnavailable')}>
+              <Box component="span">
+                <Button type="submit" variant="contained" disabled>
+                  {t('access.users.save')}
+                </Button>
+              </Box>
+            </Tooltip>
+          )}
         </Stack>
       </Box>
     </Paper>

@@ -4,6 +4,10 @@ import type {
   AccessRolesFailure,
   AccessRolesOperation,
 } from './types';
+import {
+  readProblemDetails,
+  safeApiText as safeText,
+} from '../../api/problemDetails';
 
 export class AccessRolesError extends Error {
   readonly failure: AccessRolesFailure;
@@ -13,19 +17,6 @@ export class AccessRolesError extends Error {
     this.name = 'AccessRolesError';
     this.failure = failure;
   }
-}
-
-function safeText(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const text = value.trim();
-  // Proxy pages and stack traces are not suitable presentation messages.
-  return text &&
-    !/<\/?[a-z!][^>]*>/i.test(text) &&
-    !/\n\s*at\s|\b(?:java\.[\w.]+Exception|Traceback \(most recent call last\))/i.test(
-      text,
-    )
-    ? text
-    : undefined;
 }
 
 function isAccessDenied(
@@ -48,26 +39,7 @@ export function parseAccessRolesFailure(
   status: number,
   operation: AccessRolesOperation = 'list',
 ): AccessRolesFailure {
-  let value = body;
-  if (typeof value === 'string') {
-    const text = value;
-    try {
-      value = JSON.parse(text);
-    } catch {
-      if (text.trim().startsWith('[') || text.trim().startsWith('{'))
-        value = undefined;
-    }
-  }
-  const problem =
-    value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : undefined;
-  const message =
-    safeText(problem?.detail) ??
-    safeText(problem?.message) ??
-    safeText(problem?.title) ??
-    safeText(problem?.error) ??
-    safeText(value);
+  const { problem, message } = readProblemDetails(body);
   const denied = problem && isAccessDenied(problem, status);
   const fieldErrors: Partial<Record<AccessRoleField, string>> = {};
   const fields = problem?.fieldErrors;

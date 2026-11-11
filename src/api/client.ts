@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { readProblemDetails } from './problemDetails';
 
 type AuthRequestConfig = InternalAxiosRequestConfig & {
   authRetried?: boolean;
@@ -48,7 +49,8 @@ function requestPolicy(config: InternalAxiosRequestConfig) {
     path === `${api.pathname}auth/login` ||
     path === `${api.pathname}auth/refresh`;
   const logout = path === `${api.pathname}auth/logout`;
-  return { backend, anonymous, logout };
+  const passwordChange = path === `${api.pathname}auth/change-password`;
+  return { backend, anonymous, logout, passwordChange };
 }
 
 apiClient.interceptors.request.use(async (config: AuthRequestConfig) => {
@@ -70,11 +72,15 @@ async function retryUnauthorized(
 ): Promise<AxiosResponse | null> {
   const config = response.config as AuthRequestConfig;
   const policy = requestPolicy(config);
+  const wrongCurrentPassword =
+    policy.passwordChange &&
+    readProblemDetails(response.data).problem?.code === 'AUTHENTICATION_FAILED';
   if (
     response.status !== 401 ||
     !policy.backend ||
     policy.anonymous ||
     policy.logout ||
+    wrongCurrentPassword ||
     config.authRetried
   )
     return null;

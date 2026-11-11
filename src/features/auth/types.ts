@@ -8,6 +8,28 @@ export interface LoginRequest {
 
 export type LoginField = keyof LoginRequest;
 
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+export interface ChangePasswordResponse {
+  changed: boolean;
+}
+export interface PasswordChangeFailure {
+  kind:
+    | 'credentials'
+    | 'validation'
+    | 'access'
+    | 'http'
+    | 'network'
+    | 'invalidResponse'
+    | 'unchanged';
+  status?: number;
+  code?: string;
+  message?: string;
+  fieldErrors?: Partial<Record<keyof ChangePasswordRequest, string>>;
+}
+
 export interface LoginModule {
   key: string;
   name: string;

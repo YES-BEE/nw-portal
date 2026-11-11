@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useMatches } from 'react-router-dom';
 import { useSession } from './useSession';
+import { requiresPasswordChange } from './session';
 
 export function ProtectedRoute() {
   const session = useSession();
@@ -8,6 +9,13 @@ export function ProtectedRoute() {
   // Authorize the resolved route, including case-insensitive and encoded URLs.
   // Each protected leaf must explicitly require a module or allow login alone.
   const handle = matches.at(-1)?.handle;
+  const passwordRoute =
+    handle &&
+    typeof handle === 'object' &&
+    'passwordChange' in handle &&
+    handle.passwordChange === true;
+  if (requiresPasswordChange(session) && !passwordRoute)
+    return <Navigate to="/change-password" replace />;
   const allowed =
     handle &&
     typeof handle === 'object' &&

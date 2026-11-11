@@ -9,6 +9,15 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       {
+        path: '/change-password',
+        handle: { authenticatedOnly: true, passwordChange: true },
+        lazy: async () => {
+          const { ChangePasswordPage } =
+            await import('../features/auth/ChangePasswordPage');
+          return { Component: ChangePasswordPage };
+        },
+      },
+      {
         lazy: async () => {
           const { ConfigurationLayout } =
             await import('../layouts/ConfigurationLayout');

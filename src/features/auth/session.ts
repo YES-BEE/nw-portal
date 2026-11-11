@@ -16,6 +16,8 @@ import type { RefreshTokenResponse } from './types';
 import type { MeResponse } from './types';
 import { getMe, isMeResponse } from './meApi';
 import { getStartupStatus, setStartupStatus } from './startupState';
+import { PasswordChangeError, postChangePassword } from './changePasswordApi';
+import type { ChangePasswordRequest } from './types';
 
 export const SESSION_STORAGE_KEY = 'nw-track-session-v2';
 const sessionChangeEvent = 'nw-track-session-change';
@@ -60,6 +62,7 @@ export interface AuthSession {
   refreshToken?: string;
   refreshTokenExpiresAt?: string;
   profile?: MeResponse;
+  passwordChangePending?: boolean;
 }
 export type SignInError = LoginErrorCode | LoginUiError;
 
@@ -164,6 +167,7 @@ async function restoreSession() {
         ? record.profile
         : undefined,
     );
+    session.passwordChangePending = record.passwordChangePending === true;
     if (session.expiresAt! <= Date.now() && !hasRefreshToken(session))
       throw new Error('Expired session');
     await completeStartup(session);
@@ -241,7 +245,12 @@ export function setAuthenticatedSession(session: AuthSession | null) {
   applySession(session, true);
 }
 
-function applySession(session: AuthSession | null, replaceIdentity: boolean) {
+function applySession(
+  session: AuthSession | null,
+  replaceIdentity: boolean,
+  commitInMemoryOnStorageFailure = false,
+) {
+  let storageFailed = false;
   if (
     session &&
     (!session.user.id ||
@@ -262,10 +271,20 @@ function applySession(session: AuthSession | null, replaceIdentity: boolean) {
           refreshToken: session.refreshToken,
           refreshTokenExpiresAt: session.refreshTokenExpiresAt,
           profile: session.profile,
+          ...(session.passwordChangePending
+            ? { passwordChangePending: true }
+            : {}),
         }),
       );
     } catch {
-      throw new LoginError('sessionUnavailable');
+      if (!commitInMemoryOnStorageFailure)
+        throw new LoginError('sessionUnavailable');
+      storageFailed = true;
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {
+        /* Keep the in-memory completion gate active. */
+      }
     }
   } else {
     try {
@@ -280,6 +299,7 @@ function applySession(session: AuthSession | null, replaceIdentity: boolean) {
   currentSession = session ? structuredClone(session) : null;
   if (session?.expiresAt !== undefined) scheduleExpiry();
   notifySessionChange();
+  if (storageFailed) throw new LoginError('sessionUnavailable');
 }
 
 function scheduleExpiry() {
@@ -353,15 +373,20 @@ export function refreshAccessToken(): Promise<string | null> {
       if (version !== authSessionVersion || !currentSession)
         throw new CanceledError();
       applySession(
-        createSession(
-          authentication,
-          Date.now() + authentication.expiresIn * 1000,
-          {
-            refreshToken: session.refreshToken!,
-            expiresAt: session.refreshTokenExpiresAt!,
-          },
-          currentSession.profile,
-        ),
+        {
+          ...createSession(
+            authentication,
+            Date.now() + authentication.expiresIn * 1000,
+            {
+              refreshToken: session.refreshToken!,
+              expiresAt: session.refreshTokenExpiresAt!,
+            },
+            currentSession.profile,
+          ),
+          ...(currentSession.passwordChangePending
+            ? { passwordChangePending: true }
+            : {}),
+        },
         false,
       );
       return authentication.accessToken;
@@ -377,7 +402,85 @@ export function refreshAccessToken(): Promise<string | null> {
   return request;
 }
 
+export function requiresPasswordChange(session: AuthSession) {
+  return (
+    session.profile?.must_change_password === true ||
+    session.passwordChangePending === true
+  );
+}
+
+// Passwords never enter persisted session data. After the backend revokes refresh
+// tokens, persist the completion phase so recovery cannot repeat the mutation.
+export async function changeSessionPassword(
+  body: ChangePasswordRequest,
+  signal?: AbortSignal,
+): Promise<void> {
+  const version = authSessionVersion;
+  if (!currentSession?.authentication || signal?.aborted)
+    throw new CanceledError();
+  if (currentSession.passwordChangePending) throw new CanceledError();
+  await postChangePassword(body, signal);
+  if (signal?.aborted || version !== authSessionVersion || !currentSession)
+    throw new CanceledError();
+  applySession(
+    {
+      ...currentSession,
+      refreshToken: undefined,
+      refreshTokenExpiresAt: undefined,
+      passwordChangePending: true,
+    },
+    true,
+    true,
+  );
+}
+
+export async function completePasswordChange(
+  signal?: AbortSignal,
+): Promise<void> {
+  const version = authSessionVersion;
+  const check = () => {
+    if (
+      signal?.aborted ||
+      version !== authSessionVersion ||
+      !currentSession?.passwordChangePending
+    )
+      throw new CanceledError();
+  };
+  check();
+  if (!hasRefreshToken(currentSession)) {
+    const refresh = await issueRefreshToken(signal);
+    check();
+    applySession(
+      {
+        ...currentSession!,
+        refreshToken: refresh.refreshToken,
+        refreshTokenExpiresAt: refresh.expiresAt,
+      },
+      false,
+      true,
+    );
+  }
+  const profile = await getMe(signal);
+  check();
+  if (profile.must_change_password)
+    throw new PasswordChangeError({ kind: 'invalidResponse' });
+  const session = currentSession!;
+  applySession(
+    createSession(
+      session.authentication!,
+      session.expiresAt!,
+      {
+        refreshToken: session.refreshToken!,
+        expiresAt: session.refreshTokenExpiresAt!,
+      },
+      profile,
+    ),
+    false,
+  );
+}
+
 export function getLandingPath(session: AuthSession) {
+  if (requiresPasswordChange(session)) return '/change-password';
   return (
     orderedNavigationItems.find((item) =>
       session.modules.includes(item.permission),

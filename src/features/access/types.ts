@@ -12,6 +12,64 @@ export interface AccessRoleResponse {
 
 export type AccessRolesResponse = AccessRoleResponse[];
 
+// ProcessAssignmentService.View in the backend.
+export interface UserProcessAssignment {
+  processId: string;
+  processName: string;
+  stationId: string;
+  stationNumber: string;
+  activeOnShift: boolean;
+  processActive: boolean;
+  stationActive: boolean;
+}
+
+export interface UserResponse {
+  id: string;
+  username: string;
+  display_name: string;
+  enabled: boolean;
+  must_change_password: boolean;
+  created_at: string;
+  role: string | null;
+  processAssignments: UserProcessAssignment[];
+}
+
+export type UsersResponse = UserResponse[];
+export interface UserProcessAssignmentRequest {
+  processId: string;
+  activeOnShift: boolean;
+}
+export interface CreateUserRequest {
+  username: string;
+  displayName: string;
+  initialPassword: string;
+  role: string;
+  processAssignments: UserProcessAssignmentRequest[];
+}
+export type CreateUserField = keyof CreateUserRequest;
+export type UsersOperation = 'list' | 'detail' | 'create';
+
+export interface UsersFailure {
+  kind:
+    | 'authentication'
+    | 'access'
+    | 'roleChanged'
+    | 'representation'
+    | 'service'
+    | 'network'
+    | 'http'
+    | 'invalidResponse'
+    | 'notFound'
+    | 'invalidRequest'
+    | 'validation'
+    | 'conflict';
+  status?: number;
+  code?: string;
+  message?: string;
+  fieldErrors?: Partial<Record<CreateUserField, string>>;
+  action: 'signIn' | 'retry' | 'reload' | 'none';
+}
+
 export interface SaveAccessRoleRequest {
   modules: string[];
   pcAccess: boolean;

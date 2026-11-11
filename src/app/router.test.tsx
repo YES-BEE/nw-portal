@@ -34,6 +34,28 @@ beforeEach(() => {
 describe('application routing', () => {
   it.each([
     '/dashboard',
+    '/users',
+    '/roles',
+    '/workspace',
+    '/access-denied',
+    '/change-password',
+    '/%63hange-password',
+  ])('forces a required password change before opening %s', async (path) => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      profile: { ...session.profile!, must_change_password: true },
+    });
+    await router.navigate(path);
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Change password' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+  it.each([
+    '/dashboard',
     '/reports',
     '/users',
     '/roles',

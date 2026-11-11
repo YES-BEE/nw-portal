@@ -153,6 +153,41 @@
       "sessionUnavailable": "Your session could not be started. Allow browser storage and try again."
     }
   },
+  "passwordChange": {
+    "pageTitle": "NW Track | Change password",
+    "title": "Change password",
+    "description": "Enter your current password and choose a new password to continue.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "show": {
+      "currentPassword": "Show current password",
+      "newPassword": "Show new password"
+    },
+    "hide": {
+      "currentPassword": "Hide current password",
+      "newPassword": "Hide new password"
+    },
+    "submit": "Change password",
+    "saving": "Please wait...",
+    "finish": "Finish session setup",
+    "finishingDescription": "Your password has changed. We need to finish setting up your session before you continue.",
+    "failureTitle": "Unable to change password",
+    "sessionFailure": "Unable to finish session setup",
+    "httpStatus": "HTTP {{status}}",
+    "required": {
+      "currentPassword": "Enter your current password.",
+      "newPassword": "Enter a new password."
+    },
+    "failures": {
+      "credentials": "Your current password could not be verified.",
+      "validation": "Review the password fields and try again.",
+      "access": "Your account cannot complete this request. Sign in again or contact your administrator.",
+      "http": "The request could not be completed. Please try again.",
+      "network": "Check your connection and try again. If your password was already changed, sign in with your new password.",
+      "invalidResponse": "The service returned an unexpected response. Try again or sign in with your new password.",
+      "unchanged": "The service did not confirm a password change. Review your details and try again."
+    }
+  },
   "access": {
     "pageTitle": "NW Track | {{title}}",
     "username": "Username",
@@ -181,17 +216,85 @@
     "storageError": "Changes could not be saved in this browser. Your records and editor have been kept.",
     "roleAssigned": "The records have changed or this role is assigned to users. Refresh the page and review the records before trying again.",
     "users": {
-      "description": "Manage user records, assigned roles, and account status.",
+      "description": "View users, assigned roles, and account status.",
+      "displayName": "Display Name",
+      "noDisplayName": "Not provided",
+      "noRole": "No role assigned",
+      "noUsers": "No users found.",
+      "editingUnavailable": "User changes are not available yet.",
+      "loadingDetails": "Loading user details...",
+      "loadingRoles": "Loading roles...",
+      "noRolesAvailable": "No roles are available for selection.",
+      "unavailableRole": "{{code}} (unavailable)",
+      "rolesFailure": "Unable to load roles",
+      "detailFailure": "Unable to load user details",
+      "reload": "Reload users",
+      "saveUnavailable": "Saving user changes is not available yet.",
+      "initialPassword": "Initial Password",
+      "creating": "Creating...",
+      "createFailure": "Unable to create user",
+      "required": {
+        "username": "Enter a username.",
+        "displayName": "Enter a display name.",
+        "initialPassword": "Enter an initial password.",
+        "role": "Select a role."
+      },
+      "failureStatus": "HTTP {{status}}",
+      "failures": {
+        "validation": {
+          "title": "Check the user fields",
+          "description": "Review the user details and save again."
+        },
+        "conflict": {
+          "title": "User data conflict",
+          "description": "The request conflicts with the current server state. Review the user details before saving again."
+        },
+        "notFound": {
+          "title": "User no longer available",
+          "description": "This user could not be found. Reload the user list to view the available accounts."
+        },
+        "invalidRequest": {
+          "title": "Unable to request user details",
+          "description": "The user request was not accepted. Review the details and try again."
+        },
+        "authentication": {
+          "title": "Sign in required",
+          "description": "Your session could not be verified. Sign in again to continue."
+        },
+        "access": {
+          "title": "Access denied",
+          "description": "Your account cannot perform this user request with its current access settings."
+        },
+        "roleChanged": {
+          "title": "Your role has changed",
+          "description": "Sign in again to load your updated access settings."
+        },
+        "representation": {
+          "title": "Response format unavailable",
+          "description": "The service could not return users in the requested format. Contact your administrator."
+        },
+        "service": {
+          "title": "Users are temporarily unavailable",
+          "description": "The user service could not complete the request. Please try again shortly."
+        },
+        "network": {
+          "title": "Unable to connect",
+          "description": "Check your connection and try again. If the problem continues, contact your administrator."
+        },
+        "http": {
+          "title": "Unable to load users",
+          "description": "The request could not be completed. Please try again."
+        },
+        "invalidResponse": {
+          "title": "Unable to read users",
+          "description": "The service returned an unexpected response. Try again or contact your administrator."
+        }
+      },
       "existing": "Existing Users",
       "add": "Add User",
       "edit": "Edit User",
       "save": "Save User",
       "search": "Search users",
-      "associatedProcesses": "Associated Processes",
-      "selectProcesses": "Select processes",
-      "processHint": "Optionally associate this user with processes.",
-      "noProcesses": "No processes available.",
-      "processLoadWarning": "Saved processes could not be loaded. Reference processes are shown.",
       "empty": "No users match your search."
     },
     "roles": {

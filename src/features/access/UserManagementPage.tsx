@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
+  AlertTitle,
   Box,
+  Button,
   Chip,
+  CircularProgress,
   IconButton,
   InputAdornment,
   Paper,
@@ -22,57 +25,109 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import type { AccessUser, UserDraft } from './accessData';
-import { useAccessData } from './useAccessData';
+import { signOut } from '../auth/session';
+import { ManagementHeader } from './ManagementScaffold';
+import { createUser, getUsers } from './usersApi';
+import { UsersError } from './usersFailure';
+import { UserEditor } from './UserEditor';
 import { UserForm } from './UserForm';
-import { DeleteAccessDialog, ManagementHeader } from './ManagementScaffold';
+import type { UsersFailure, UsersResponse } from './types';
+
+type UsersState =
+  | { status: 'loading' }
+  | { status: 'ready'; users: UsersResponse }
+  | { status: 'error'; failure: UsersFailure };
 
 export function UserManagementPage() {
   const { t } = useTranslation('translation');
-  const { data, error, persist, setError } = useAccessData();
-  const [form, setForm] = useState<{
-    initial: UserDraft;
-    editing: boolean;
-  } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<AccessUser | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [state, setState] = useState<UsersState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState(10);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void getUsers(controller.signal).then(
+      (users) => {
+        if (!controller.signal.aborted) setState({ status: 'ready', users });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'error',
+            failure:
+              error instanceof UsersError
+                ? error.failure
+                : { kind: 'network', action: 'retry' },
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [attempt]);
   const search = query.trim().toLowerCase();
-  const filtered = data.records.users.filter((user) =>
-    `${user.username} ${user.role}`.toLowerCase().includes(search),
-  );
+  const filtered =
+    state.status === 'ready'
+      ? state.users.filter((user) =>
+          `${user.username} ${user.display_name} ${user.role ?? ''}`
+            .toLowerCase()
+            .includes(search),
+        )
+      : [];
   const currentPage = Math.min(
     page,
     Math.max(0, Math.ceil(filtered.length / rows) - 1),
   );
-
   return (
     <>
       <ManagementHeader
         kind="users"
-        onAdd={() => {
-          setError(null);
-          setForm({
-            initial: {
-              id: crypto.randomUUID(),
-              username: '',
-              role: '',
-              status: '',
-            },
-            editing: false,
-          });
-        }}
+        onAdd={
+          state.status === 'ready' && !creatingUser && !editingUserId
+            ? () => {
+                setSaved(false);
+                setCreatingUser(true);
+              }
+            : undefined
+        }
       />
-      {data.unavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('access.loadWarning')}
-        </Alert>
-      )}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t(`access.${error}`)}
+      {state.status === 'error' && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            state.failure.action === 'signIn' ? (
+              <Button color="inherit" onClick={signOut}>
+                {t('startup.signIn')}
+              </Button>
+            ) : state.failure.action === 'retry' ? (
+              <Button
+                color="inherit"
+                onClick={() => {
+                  setPage(0);
+                  setState({ status: 'loading' });
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                {t('startup.retry')}
+              </Button>
+            ) : undefined
+          }
+        >
+          <AlertTitle>
+            {t(`access.users.failures.${state.failure.kind}.title`)}
+          </AlertTitle>
+          {state.failure.message ||
+            t(`access.users.failures.${state.failure.kind}.description`)}
+          {state.failure.status !== undefined && (
+            <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+              {t('access.users.failureStatus', {
+                status: state.failure.status,
+              })}
+            </Typography>
+          )}
         </Alert>
       )}
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
@@ -84,6 +139,7 @@ export function UserManagementPage() {
             type="search"
             label={t('access.users.search')}
             value={query}
+            disabled={state.status !== 'ready'}
             onChange={(event) => {
               setQuery(event.target.value);
               setPage(0);
@@ -101,135 +157,146 @@ export function UserManagementPage() {
           />
         </Box>
         <TableContainer>
-          <Table aria-label={t('access.users.existing')}>
+          <Table
+            aria-label={t('access.users.existing')}
+            aria-busy={state.status === 'loading'}
+          >
             <TableHead>
               <TableRow>
-                {(['username', 'role', 'status', 'actions'] as const).map(
-                  (key) => (
-                    <TableCell key={key}>{t(`access.${key}`)}</TableCell>
-                  ),
-                )}
+                <TableCell>{t('access.username')}</TableCell>
+                <TableCell>{t('access.users.displayName')}</TableCell>
+                <TableCell>{t('access.role')}</TableCell>
+                <TableCell>{t('access.status')}</TableCell>
+                <TableCell>{t('access.actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filtered
-                .slice(currentPage * rows, (currentPage + 1) * rows)
-                .map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell component="th" scope="row">
-                      {user.username}
-                    </TableCell>
-                    <TableCell>{user.role}</TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color={user.status === 'Active' ? 'success' : 'default'}
-                        variant="outlined"
-                        label={t(
-                          user.status === 'Active'
-                            ? 'access.active'
-                            : 'access.inactive',
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      <Tooltip title={t('access.edit')}>
-                        <IconButton
-                          aria-label={t('access.editNamed', {
-                            name: user.username,
-                          })}
-                          onClick={() => {
-                            setError(null);
-                            setForm({ initial: user, editing: true });
-                          }}
-                        >
-                          <EditOutlinedIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title={t('access.delete')}>
-                        <IconButton
-                          color="error"
-                          aria-label={t('access.deleteNamed', {
-                            name: user.username,
-                          })}
-                          onClick={() => setPendingDelete(user)}
-                        >
-                          <DeleteOutlinedIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              {!filtered.length && (
+              {state.status === 'loading' && (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                    {t('access.users.empty')}
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    <CircularProgress
+                      size={28}
+                      aria-label={t('common.loading')}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              {state.status === 'ready' &&
+                filtered
+                  .slice(currentPage * rows, (currentPage + 1) * rows)
+                  .map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell component="th" scope="row">
+                        {user.username}
+                      </TableCell>
+                      <TableCell>
+                        {user.display_name || t('access.users.noDisplayName')}
+                      </TableCell>
+                      <TableCell>
+                        {user.role || t('access.users.noRole')}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={user.enabled ? 'success' : 'default'}
+                          variant="outlined"
+                          label={t(
+                            user.enabled ? 'access.active' : 'access.inactive',
+                          )}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title={t('access.edit')}>
+                          <Box component="span">
+                            <IconButton
+                              disabled={editingUserId !== null || creatingUser}
+                              onClick={() => setEditingUserId(user.id)}
+                              aria-label={t('access.editNamed', {
+                                name: user.username,
+                              })}
+                            >
+                              <EditOutlinedIcon />
+                            </IconButton>
+                          </Box>
+                        </Tooltip>
+                        <Tooltip title={t('access.users.editingUnavailable')}>
+                          <Box component="span">
+                            <IconButton
+                              disabled
+                              color="error"
+                              aria-label={t('access.deleteNamed', {
+                                name: user.username,
+                              })}
+                            >
+                              <DeleteOutlinedIcon />
+                            </IconButton>
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              {state.status === 'ready' && !filtered.length && (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    {t(
+                      state.users.length
+                        ? 'access.users.empty'
+                        : 'access.users.noUsers',
+                    )}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={filtered.length}
-          page={currentPage}
-          rowsPerPage={rows}
-          rowsPerPageOptions={[10, 25, 50]}
-          labelRowsPerPage={t('common.pagination.rowsPerPage')}
-          labelDisplayedRows={({ from, to, count }) =>
-            t('common.pagination.range', { from, to, count })
-          }
-          getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
-          onPageChange={(_, next) => setPage(next)}
-          onRowsPerPageChange={(event) => {
-            setRows(Number(event.target.value));
-            setPage(0);
-          }}
-        />
-      </Paper>
-      {form && (
-        <UserForm
-          key={form.initial.id}
-          {...form}
-          roles={data.records.roles}
-          onClose={() => setForm(null)}
-          onSave={(user) => {
-            if (
-              persist((latest) => ({
-                ...latest,
-                users: form.editing
-                  ? latest.users.map((record) =>
-                      record.id === user.id ? user : record,
-                    )
-                  : [...latest.users, user],
-              }))
-            ) {
-              setForm(null);
-              setSaved(true);
+        {state.status === 'ready' && (
+          <TablePagination
+            component="div"
+            count={filtered.length}
+            page={currentPage}
+            rowsPerPage={rows}
+            rowsPerPageOptions={[10, 25, 50]}
+            labelRowsPerPage={t('common.pagination.rowsPerPage')}
+            labelDisplayedRows={({ from, to, count }) =>
+              t('common.pagination.range', { from, to, count })
             }
+            getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
+            onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(event) => {
+              setRows(Number(event.target.value));
+              setPage(0);
+            }}
+          />
+        )}
+      </Paper>
+      {creatingUser && (
+        <UserForm
+          onClose={() => setCreatingUser(false)}
+          onCreate={async (body, signal) => {
+            await createUser(body, signal);
+            if (signal.aborted) return;
+            setCreatingUser(false);
+            setSaved(true);
+            setQuery('');
+            setPage(0);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
           }}
         />
       )}
-      <DeleteAccessDialog
-        name={pendingDelete?.username ?? null}
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (
-            pendingDelete &&
-            persist((latest) => ({
-              ...latest,
-              users: latest.users.filter(
-                (user) => user.id !== pendingDelete.id,
-              ),
-            }))
-          ) {
-            if (form?.initial.id === pendingDelete.id) setForm(null);
-            setSaved(true);
-          }
-          setPendingDelete(null);
-        }}
-      />
+      {editingUserId && (
+        <UserEditor
+          key={editingUserId}
+          userId={editingUserId}
+          onClose={() => setEditingUserId(null)}
+          onReload={() => {
+            setEditingUserId(null);
+            setPage(0);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
+          }}
+        />
+      )}
       <Snackbar
         open={saved}
         autoHideDuration={3500}

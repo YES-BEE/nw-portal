@@ -24,7 +24,7 @@ export const meResponse: MeResponse = {
   username: 'admin',
   display_name: 'Bootstrap NW',
   enabled: true,
-  must_change_password: true,
+  must_change_password: false,
   role: 'NW',
   clientType: 'PC',
   permissions: ['READ'],
