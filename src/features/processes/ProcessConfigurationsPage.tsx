@@ -233,9 +233,6 @@ export function ProcessConfigurationsPage() {
                       <Typography sx={{ fontWeight: 600 }}>
                         {record.name}
                       </Typography>
-                      <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                        {record.description}
-                      </Typography>
                     </TableCell>
                     <TableCell>{record.stationNumber}</TableCell>
                     <TableCell>

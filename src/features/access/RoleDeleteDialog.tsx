@@ -91,7 +91,7 @@ export function RoleDeleteDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button disabled={pending} onClick={onClose}>
+        <Button variant="outlined" disabled={pending} onClick={onClose}>
           {t('access.cancel')}
         </Button>
         {failure?.action === 'signIn' ? (

@@ -109,16 +109,16 @@ describe('backend process editing', () => {
       data: deviceProcess,
     });
     const { user } = await openEditor('Drying');
-    expect(screen.getByRole('textbox', { name: /Device Name/ })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: /Machine Name/ })).toHaveValue(
       'Dryer 1',
     );
-    await user.click(screen.getByRole('button', { name: 'Add Device' }));
+    await user.click(screen.getByRole('button', { name: 'Add Machine' }));
     await user.type(
-      screen.getAllByRole('textbox', { name: /Device Name/ })[1],
+      screen.getAllByRole('textbox', { name: /Machine Name/ })[1],
       'Dryer 2',
     );
     await user.click(
-      screen.getAllByRole('combobox', { name: /Device NFC Tag/ })[1],
+      screen.getAllByRole('combobox', { name: /Machine NFC Tag/ })[1],
     );
     await user.click(screen.getByRole('option', { name: 'New tag (NEW-TAG)' }));
     await user.click(screen.getByRole('button', { name: 'Save Process' }));

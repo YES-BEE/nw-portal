@@ -133,7 +133,7 @@ export function TrolleyDialog({
       open
       onClose={saving ? undefined : onClose}
       aria-labelledby="trolley-dialog-title"
-      maxWidth="sm"
+      maxWidth={mode === 'create' ? 'xs' : 'sm'}
       fullWidth
     >
       <DialogTitle id="trolley-dialog-title">
@@ -225,7 +225,7 @@ export function TrolleyDialog({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose} disabled={saving}>
+          <Button variant="outlined" onClick={onClose} disabled={saving}>
             {t(mode === 'view' ? 'trolleys.close' : 'access.cancel')}
           </Button>
           {mode !== 'view' && (

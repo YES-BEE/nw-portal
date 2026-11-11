@@ -374,7 +374,7 @@ export function RoleForm({
           spacing={1.5}
           sx={{ justifyContent: 'flex-end', mt: 3 }}
         >
-          <Button onClick={onClose} disabled={saving}>
+          <Button variant="outlined" onClick={onClose} disabled={saving}>
             {t('access.cancel')}
           </Button>
           <Button

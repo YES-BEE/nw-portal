@@ -7,7 +7,7 @@ describe('device table', () => {
   it('shows an empty state when no devices are supplied', () => {
     renderWithProviders(<DeviceTable devices={[]} />);
     expect(
-      screen.getByText('No devices are associated with this process.'),
+      screen.getByText('No machines are associated with this process.'),
     ).toBeVisible();
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });
@@ -20,7 +20,7 @@ describe('device table', () => {
     }));
     renderWithProviders(<DeviceTable devices={devices} />);
     expect(
-      within(screen.getByRole('table', { name: 'Devices' })).getAllByRole(
+      within(screen.getByRole('table', { name: 'Machines' })).getAllByRole(
         'rowheader',
       ),
     ).toHaveLength(12);

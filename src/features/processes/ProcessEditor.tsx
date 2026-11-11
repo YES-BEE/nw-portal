@@ -144,7 +144,9 @@ export function ProcessEditor({
         </Alert>
       )}
       <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 2 }}>
-        <Button onClick={onClose}>{t('processes.cancel')}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t('processes.cancel')}
+        </Button>
       </Stack>
     </Paper>
   );

@@ -86,7 +86,7 @@ export function TagDeleteDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button disabled={pending} onClick={onClose}>
+        <Button variant="outlined" disabled={pending} onClick={onClose}>
           {t('tags.cancel')}
         </Button>
         {failure?.action === 'signIn' ? (

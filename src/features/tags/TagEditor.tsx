@@ -125,7 +125,9 @@ export function TagEditor({
         </Alert>
       )}
       <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 2 }}>
-        <Button onClick={onClose}>{t('tags.cancel')}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t('tags.cancel')}
+        </Button>
       </Stack>
     </Paper>
   );

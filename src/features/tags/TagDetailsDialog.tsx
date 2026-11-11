@@ -170,7 +170,9 @@ export function TagDetailsDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>{t('tags.close')}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t('tags.close')}
+        </Button>
       </DialogActions>
     </Dialog>
   );

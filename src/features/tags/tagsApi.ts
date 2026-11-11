@@ -163,7 +163,7 @@ function isTag(value: unknown): value is TagResponse {
   );
 }
 
-function isTagDetails(value: unknown): value is TagDetailsResponse {
+export function isTagDetails(value: unknown): value is TagDetailsResponse {
   if (!isTag(value)) return false;
   const details = value as TagResponse & Record<string, unknown>;
   const references = [

@@ -132,7 +132,9 @@ export function UserEditor({
         </Alert>
       )}
       <Stack direction="row" sx={{ justifyContent: 'flex-end', mt: 3 }}>
-        <Button onClick={onClose}>{t('access.cancel')}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t('access.cancel')}
+        </Button>
       </Stack>
     </Paper>
   );

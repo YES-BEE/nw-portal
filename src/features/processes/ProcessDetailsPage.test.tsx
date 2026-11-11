@@ -75,10 +75,10 @@ describe('backend process details', () => {
 
   it('maps backend devices to the device table on direct navigation', async () => {
     setup('/configurations/processes/' + processesResponse[1].id);
-    const devices = await screen.findByRole('table', { name: 'Devices' });
+    const devices = await screen.findByRole('table', { name: 'Machines' });
     expect(within(devices).getByText('Dryer 1')).toBeVisible();
     expect(within(devices).getByText('NFC-DRYER')).toBeVisible();
-    expect(screen.getByText('Device-level tracking')).toBeVisible();
+    expect(screen.getByText('Machine-level tracking')).toBeVisible();
     expect(screen.getByText('Inactive')).toBeVisible();
   });
 
@@ -103,7 +103,7 @@ describe('backend process details', () => {
     };
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: record });
     setup('/configurations/processes/large');
-    const devices = await screen.findByRole('table', { name: 'Devices' });
+    const devices = await screen.findByRole('table', { name: 'Machines' });
     expect(within(devices).getAllByRole('row')).toHaveLength(31);
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });

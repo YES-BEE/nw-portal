@@ -188,7 +188,9 @@ export function StyleForm({
         spacing={1.5}
         sx={{ justifyContent: 'flex-end', mt: 4 }}
       >
-        <Button onClick={onClose}>{t('access.cancel')}</Button>
+        <Button variant="outlined" onClick={onClose}>
+          {t('access.cancel')}
+        </Button>
         <Button
           type="submit"
           variant="contained"

@@ -88,7 +88,7 @@ export function ProcessDeleteDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button disabled={pending} onClick={onClose}>
+        <Button variant="outlined" disabled={pending} onClick={onClose}>
           {t('processes.cancel')}
         </Button>
         {failure?.action === 'signIn' ? (

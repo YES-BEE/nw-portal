@@ -108,18 +108,18 @@ describe('backend process creation', () => {
     const { user } = await openForm();
     await fillBase(user);
     await user.click(
-      screen.getByRole('radio', { name: /Device-level tracking/ }),
+      screen.getByRole('radio', { name: /Machine-level tracking/ }),
     );
-    await user.click(screen.getByRole('button', { name: 'Add Device' }));
+    await user.click(screen.getByRole('button', { name: 'Add Machine' }));
     await user.type(
-      screen.getByRole('textbox', { name: /Device Name/ }),
+      screen.getByRole('textbox', { name: /Machine Name/ }),
       ' Washer 1 ',
     );
     await user.type(
-      screen.getByRole('textbox', { name: /Device description/i }),
+      screen.getByRole('textbox', { name: /Machine description/i }),
       ' Main washer ',
     );
-    await selectTag(user, /Device NFC Tag/);
+    await selectTag(user, /Machine NFC Tag/);
     await user.click(screen.getByRole('button', { name: 'Save Process' }));
     expect(apiClient.post).toHaveBeenCalledWith(
       'processes',

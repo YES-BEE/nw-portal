@@ -26,9 +26,15 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestoreIcon from '@mui/icons-material/Restore';
+import NfcIcon from '@mui/icons-material/Nfc';
+import { TrolleyNfcDialog } from './TrolleyNfcDialog';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { getTrolleys, TrolleysError } from './trolleysApi';
-import type { TrolleysFailure, TrolleysResponse } from './types';
+import type {
+  TrolleyResponse,
+  TrolleysFailure,
+  TrolleysResponse,
+} from './types';
 import { TrolleyFailureAlert } from './TrolleyFailureAlert';
 import { TrolleyDialog } from './TrolleyDialog';
 import type { TrolleySelection } from './TrolleyDialog';
@@ -48,6 +54,7 @@ export function TrolleyConfigurationsPage() {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<TrolleySelection | null>(null);
   const [saved, setSaved] = useState(false);
+  const [nfcTrolley, setNfcTrolley] = useState<TrolleyResponse | null>(null);
   usePageMetadata(t('trolleys.pageTitle'), t('trolleys.description'));
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -206,6 +213,18 @@ export function TrolleyConfigurationsPage() {
                     />
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                    <Tooltip title={t('trolleys.nfc.manage')}>
+                      <IconButton
+                        color="primary"
+                        disabled={!!selection || !!nfcTrolley}
+                        aria-label={t('trolleys.nfc.title', {
+                          code: record.code,
+                        })}
+                        onClick={() => setNfcTrolley(record)}
+                      >
+                        <NfcIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title={t('common.view')}>
                       <Box component="span">
                         <IconButton
@@ -305,6 +324,12 @@ export function TrolleyConfigurationsPage() {
             setSaved(true);
             reload();
           }}
+        />
+      )}
+      {nfcTrolley && (
+        <TrolleyNfcDialog
+          trolley={nfcTrolley}
+          onClose={() => setNfcTrolley(null)}
         />
       )}
       <Snackbar
