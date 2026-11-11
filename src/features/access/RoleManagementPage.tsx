@@ -210,6 +210,7 @@ export function RoleManagementPage() {
                       <Tooltip title={t('access.edit')}>
                         <Box component="span">
                           <IconButton
+                            size="small"
                             disabled={Boolean(form || deletingRole)}
                             onClick={() => {
                               setSaved(false);
@@ -227,13 +228,14 @@ export function RoleManagementPage() {
                               name: role.name,
                             })}
                           >
-                            <EditOutlinedIcon />
+                            <EditOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </Tooltip>
                       <Tooltip title={t('access.delete')}>
                         <Box component="span">
                           <IconButton
+                            size="small"
                             disabled={Boolean(form || deletingRole)}
                             onClick={() => {
                               setDeleted(false);
@@ -244,7 +246,7 @@ export function RoleManagementPage() {
                               name: role.name,
                             })}
                           >
-                            <DeleteOutlinedIcon />
+                            <DeleteOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </Tooltip>

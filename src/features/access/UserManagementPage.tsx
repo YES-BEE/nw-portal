@@ -200,6 +200,7 @@ export function UserManagementPage() {
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>
                       <Tooltip title={t('common.view')}>
                         <IconButton
+                          size="small"
                           component={RouterLink}
                           to={`/users/${encodeURIComponent(user.id)}`}
                           color="primary"
@@ -207,12 +208,13 @@ export function UserManagementPage() {
                             name: user.username,
                           })}
                         >
-                          <VisibilityOutlinedIcon />
+                          <VisibilityOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title={t('access.edit')}>
                         <Box component="span">
                           <IconButton
+                            size="small"
                             disabled={
                               editingUserId !== null ||
                               creatingUser ||
@@ -223,13 +225,14 @@ export function UserManagementPage() {
                               name: user.username,
                             })}
                           >
-                            <EditOutlinedIcon />
+                            <EditOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </Tooltip>
                       <Tooltip title={t('access.delete')}>
                         <Box component="span">
                           <IconButton
+                            size="small"
                             disabled={
                               editingUserId !== null ||
                               creatingUser ||
@@ -245,7 +248,7 @@ export function UserManagementPage() {
                               name: user.username,
                             })}
                           >
-                            <DeleteOutlinedIcon />
+                            <DeleteOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Box>
                       </Tooltip>

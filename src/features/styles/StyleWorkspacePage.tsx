@@ -257,19 +257,21 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Tooltip title={t('common.view')}>
                           <IconButton
+                            size="small"
                             component={RouterLink}
                             to={`${basePath}/${encodeURIComponent(record.id)}`}
                             aria-label={t('styles.viewNamed', {
                               name: record.number,
                             })}
                           >
-                            <VisibilityOutlinedIcon />
+                            <VisibilityOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         {!own && (
                           <>
                             <Tooltip title={t('access.edit')}>
                               <IconButton
+                                size="small"
                                 disabled={data.storageUnavailable}
                                 aria-label={t('access.editNamed', {
                                   name: record.number,
@@ -282,11 +284,12 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                                   });
                                 }}
                               >
-                                <EditOutlinedIcon />
+                                <EditOutlinedIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title={t('access.delete')}>
                               <IconButton
+                                size="small"
                                 disabled={data.storageUnavailable}
                                 color="error"
                                 aria-label={t('access.deleteNamed', {
@@ -294,7 +297,7 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                                 })}
                                 onClick={() => setPendingDelete(record)}
                               >
-                                <DeleteOutlinedIcon />
+                                <DeleteOutlinedIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           </>
