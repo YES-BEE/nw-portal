@@ -1,4 +1,6 @@
 import { sampleProcesses, seedTestData } from '../../test/fixtures';
+import { apiClient } from '../../api/client';
+import { processesResponse } from '../../test/processes';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -34,15 +36,16 @@ function setup(path = '/configurations/processes/demo-1') {
 
 beforeEach(() => {
   seedTestData();
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: processesResponse,
+  });
 });
 
 describe('process details', () => {
-  it('opens from View as a read-only page and returns to the process list', async () => {
+  it('opens a legacy detail route as a read-only page and returns to the backend process list', async () => {
     const write = vi.spyOn(Storage.prototype, 'setItem');
-    const { user } = setup('/configurations/processes');
-    await user.click(
-      screen.getByRole('link', { name: 'View Lot Preparation' }),
-    );
+    const { user } = setup('/configurations/processes/demo-1');
     expect(
       screen.getByRole('heading', { level: 1, name: 'Lot Preparation' }),
     ).toBeVisible();

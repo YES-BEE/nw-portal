@@ -129,7 +129,13 @@ export function RoleForm({
       ref={section}
       aria-labelledby="role-form-title"
       variant="outlined"
-      sx={{ p: 3, mt: 3, borderRadius: 2, scrollMarginTop: 84 }}
+      sx={{
+        p: 3,
+        mt: 3,
+        borderRadius: 2,
+        scrollMarginTop: 84,
+        '& .MuiFormControlLabel-label': { fontSize: 13 },
+      }}
     >
       <Typography
         id="role-form-title"
@@ -237,6 +243,7 @@ export function RoleForm({
                 }}
                 control={
                   <Checkbox
+                    size="small"
                     checked={draft.modules.includes(module.key)}
                     onChange={(event) =>
                       updateDraft(
@@ -314,6 +321,7 @@ export function RoleForm({
               label={t('access.roles.padAccess')}
               control={
                 <Checkbox
+                  size="small"
                   checked={draft.padAccess}
                   onChange={(event) =>
                     updateDraft({ padAccess: event.target.checked }, [

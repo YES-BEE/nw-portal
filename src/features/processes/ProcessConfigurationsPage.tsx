@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
+  AlertTitle,
   Box,
   Breadcrumbs,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
+  CircularProgress,
   IconButton,
   Paper,
   Snackbar,
@@ -28,33 +25,44 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import { Link as RouterLink } from 'react-router-dom';
-import {
-  emptyProcess,
-  loadProcesses,
-  PROCESS_STORAGE_KEY,
-} from './processData';
-import type { ProcessConfiguration } from './types';
+import { signOut } from '../auth/session';
+import { createProcess, getProcesses, ProcessesError } from './processesApi';
 import { ProcessForm } from './ProcessForm';
-import { loadTags } from '../configurations/tagRegistry';
+import { emptyProcess } from './processData';
+import type { ProcessConfiguration } from './types';
+import type { ProcessesFailure, ProcessesResponse } from './types';
 
-type Toast = 'saved' | 'deleted';
+type ProcessesState =
+  | { status: 'loading' }
+  | { status: 'ready'; processes: ProcessesResponse }
+  | { status: 'error'; failure: ProcessesFailure };
 
 export function ProcessConfigurationsPage() {
   const { t } = useTranslation('translation');
-  const [data, setData] = useState(loadProcesses);
-  const tagNames = new Map(
-    loadTags().records.map((tag) => [tag.actual, tag.name]),
-  );
-  const [form, setForm] = useState<{
-    initial: ProcessConfiguration;
-    editing: boolean;
-  } | null>(null);
-  const [pendingDelete, setPendingDelete] =
-    useState<ProcessConfiguration | null>(null);
-  const [storageError, setStorageError] = useState(false);
-  const [toast, setToast] = useState<Toast | null>(null);
-
+  const [state, setState] = useState<ProcessesState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  const [creating, setCreating] = useState<ProcessConfiguration | null>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void getProcesses(controller.signal).then(
+      (processes) => {
+        if (!controller.signal.aborted)
+          setState({ status: 'ready', processes });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'error',
+            failure:
+              error instanceof ProcessesError
+                ? error.failure
+                : { kind: 'network', action: 'retry' },
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [attempt]);
   useEffect(() => {
     document.title = t('processes.pageTitle');
     document.documentElement.lang = 'en';
@@ -62,28 +70,6 @@ export function ProcessConfigurationsPage() {
       .querySelector('meta[name="description"]')
       ?.setAttribute('content', t('processes.pageDescription'));
   }, [t]);
-
-  function persist(records: ProcessConfiguration[], message: Toast) {
-    try {
-      localStorage.setItem(PROCESS_STORAGE_KEY, JSON.stringify(records));
-      setData({ records, storageUnavailable: false });
-      setStorageError(false);
-      setForm(null);
-      setToast(message);
-    } catch {
-      setStorageError(true);
-    }
-  }
-
-  function confirm() {
-    if (!pendingDelete) return;
-    persist(
-      data.records.filter((record) => record.id !== pendingDelete.id),
-      'deleted',
-    );
-    setPendingDelete(null);
-  }
-
   return (
     <>
       <Breadcrumbs
@@ -114,26 +100,55 @@ export function ProcessConfigurationsPage() {
             {t('processes.pageDescription')}
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setForm({ initial: emptyProcess(), editing: false });
-            setStorageError(false);
-          }}
-          sx={{ flexShrink: 0 }}
-        >
-          {t('processes.create')}
-        </Button>
+        <Box>
+          <Box component="span">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              disabled={state.status !== 'ready' || creating !== null}
+              onClick={() => {
+                setSaved(false);
+                setCreating(emptyProcess());
+              }}
+              sx={{ flexShrink: 0 }}
+            >
+              {t('processes.create')}
+            </Button>
+          </Box>
+        </Box>
       </Stack>
-      {data.storageUnavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('processes.loadWarning')}
-        </Alert>
-      )}
-      {storageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t('processes.storageError')}
+      {state.status === 'error' && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            state.failure.action === 'signIn' ? (
+              <Button color="inherit" onClick={signOut}>
+                {t('startup.signIn')}
+              </Button>
+            ) : state.failure.action === 'retry' ? (
+              <Button
+                color="inherit"
+                onClick={() => {
+                  setState({ status: 'loading' });
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                {t('startup.retry')}
+              </Button>
+            ) : undefined
+          }
+        >
+          <AlertTitle>
+            {t(`processes.failures.${state.failure.kind}.title`)}
+          </AlertTitle>
+          {state.failure.message ||
+            t(`processes.failures.${state.failure.kind}.description`)}
+          {!state.failure.message && state.failure.status !== undefined && (
+            <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+              {t('processes.failureStatus', { status: state.failure.status })}
+            </Typography>
+          )}
         </Alert>
       )}
       <Paper
@@ -142,29 +157,17 @@ export function ProcessConfigurationsPage() {
         sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}
         aria-labelledby="existing-processes-heading"
       >
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          sx={{
-            justifyContent: 'space-between',
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            gap: 2,
-            px: 3,
-            py: 2.5,
-          }}
+        <Typography
+          component="h2"
+          id="existing-processes-heading"
+          sx={{ fontSize: 17, fontWeight: 600, px: 3, py: 2.5 }}
         >
-          <Box>
-            <Typography
-              component="h2"
-              id="existing-processes-heading"
-              sx={{ fontSize: 17, fontWeight: 600 }}
-            >
-              {t('processes.existing')}
-            </Typography>
-          </Box>
-        </Stack>
+          {t('processes.existing')}
+        </Typography>
         <TableContainer>
           <Table
             aria-labelledby="existing-processes-heading"
+            aria-busy={state.status === 'loading'}
             sx={{ minWidth: 700 }}
           >
             <TableHead
@@ -184,6 +187,7 @@ export function ProcessConfigurationsPage() {
                     'stationColumn',
                     'trackingLevelColumn',
                     'tagsColumn',
+                    'statusColumn',
                     'actionsColumn',
                   ] as const
                 ).map((column) => (
@@ -194,103 +198,109 @@ export function ProcessConfigurationsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.records.map((record) => (
-                <TableRow
-                  key={record.id}
-                  sx={{ '& td, & th': { verticalAlign: 'top' } }}
-                >
-                  <TableCell component="th" scope="row">
-                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-                      {record.name}
-                    </Typography>
-                    <Typography
-                      color="text.secondary"
-                      sx={{ fontSize: 12, mt: 0.5 }}
-                    >
-                      {record.description}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{record.station}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={t(
-                        record.mode === 'process'
-                          ? 'processes.processTracking'
-                          : 'processes.deviceTracking',
-                      )}
-                      sx={{
-                        bgcolor: '#edf4ff',
-                        color: '#1556c4',
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}
+              {state.status === 'loading' && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                    <CircularProgress
+                      size={28}
+                      aria-label={t('common.loading')}
                     />
                   </TableCell>
-                  <TableCell>
-                    {record.mode === 'process' ? (
-                      (tagNames.get(record.processTag) ?? record.processTag)
-                    ) : (
-                      <Typography sx={{ fontSize: 14 }}>
-                        {t('processes.deviceCount', {
-                          count: record.devices.length,
-                        })}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" sx={{ gap: 0.5 }}>
-                      <Tooltip title={t('common.view')}>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          aria-label={t('processes.viewNamed', {
-                            name: record.name,
-                          })}
-                          component={RouterLink}
-                          to={`/configurations/processes/${encodeURIComponent(record.id)}`}
-                        >
-                          <VisibilityOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title={t('processes.editAction')}>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          aria-label={t('processes.editNamed', {
-                            name: record.name,
-                          })}
-                          onClick={() => {
-                            setForm({
-                              initial: structuredClone(record),
-                              editing: true,
-                            });
-                            setStorageError(false);
-                          }}
-                        >
-                          <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title={t('processes.deleteAction')}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          aria-label={t('processes.deleteNamed', {
-                            name: record.name,
-                          })}
-                          onClick={() => setPendingDelete(record)}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
                 </TableRow>
-              ))}
-              {data.records.length === 0 && (
+              )}
+              {state.status === 'ready' &&
+                state.processes.map((record) => (
+                  <TableRow
+                    key={record.id}
+                    sx={{ '& td, & th': { verticalAlign: 'top' } }}
+                  >
+                    <TableCell component="th" scope="row">
+                      <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+                        {record.name}
+                      </Typography>
+                      <Typography
+                        color="text.secondary"
+                        sx={{ fontSize: 12, mt: 0.5 }}
+                      >
+                        {record.description}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{record.stationNumber}</TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={t(
+                          record.nfcMode === 'PROCESS'
+                            ? 'processes.processTracking'
+                            : 'processes.deviceTracking',
+                        )}
+                        sx={{
+                          bgcolor: '#edf4ff',
+                          color: '#1556c4',
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {record.nfcMode === 'PROCESS'
+                        ? record.nfcUid || t('processes.noTag')
+                        : t('processes.deviceCount', {
+                            count: record.deviceCount,
+                          })}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={record.active ? 'success' : 'default'}
+                        variant="outlined"
+                        label={t(
+                          record.active ? 'access.active' : 'access.inactive',
+                        )}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={t('processes.actionsUnavailable')}>
+                        <Stack direction="row" sx={{ gap: 0.5 }}>
+                          <IconButton
+                            disabled
+                            size="small"
+                            color="primary"
+                            aria-label={t('processes.viewNamed', {
+                              name: record.name,
+                            })}
+                          >
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            disabled
+                            size="small"
+                            color="primary"
+                            aria-label={t('processes.editNamed', {
+                              name: record.name,
+                            })}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            disabled
+                            size="small"
+                            color="error"
+                            aria-label={t('processes.deleteNamed', {
+                              name: record.name,
+                            })}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              {state.status === 'ready' && !state.processes.length && (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     align="center"
                     sx={{ py: 5, color: 'text.secondary' }}
                   >
@@ -302,65 +312,28 @@ export function ProcessConfigurationsPage() {
           </Table>
         </TableContainer>
       </Paper>
-      {form && (
+      {creating && (
         <ProcessForm
-          key={form.initial.id}
-          initial={form.initial}
-          editing={form.editing}
-          records={data.records}
-          onClose={() => setForm(null)}
-          onSave={(record) =>
-            persist(
-              form.editing
-                ? data.records.map((existing) =>
-                    existing.id === record.id ? record : existing,
-                  )
-                : [record, ...data.records],
-              'saved',
-            )
-          }
+          initial={creating}
+          editing={false}
+          records={[]}
+          onClose={() => setCreating(null)}
+          onCreate={async (body, signal) => {
+            await createProcess(body, signal);
+            if (signal.aborted) return;
+            setCreating(null);
+            setSaved(true);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
+          }}
         />
       )}
-      <Dialog
-        open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
-        aria-labelledby="process-confirmation-title"
-        aria-describedby="process-confirmation-description"
-      >
-        <DialogTitle id="process-confirmation-title">
-          {t('processes.deleteTitle')}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="process-confirmation-description">
-            {t('processes.deleteMessage', { name: pendingDelete?.name ?? '' })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="outlined"
-            onClick={() => setPendingDelete(null)}
-            autoFocus
-          >
-            {t('processes.cancel')}
-          </Button>
-          <Button onClick={confirm} color="primary" variant="contained">
-            {t('processes.deleteAction')}
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-      >
-        <Alert
-          severity="success"
-          variant="filled"
-          onClose={() => setToast(null)}
-        >
-          {toast && t(`processes.${toast}`)}
-        </Alert>
-      </Snackbar>
+        open={saved}
+        autoHideDuration={3500}
+        onClose={() => setSaved(false)}
+        message={t('processes.saved')}
+      />
     </>
   );
 }

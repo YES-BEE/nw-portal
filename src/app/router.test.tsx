@@ -428,11 +428,6 @@ describe('application routing', () => {
 
   it.each([
     {
-      path: '/configurations/processes',
-      action: 'Create Process',
-      label: /Process-level NFC Tag ID/,
-    },
-    {
       path: '/configurations/storages',
       action: 'Add New Storage',
       label: /NFC Tag ID/,

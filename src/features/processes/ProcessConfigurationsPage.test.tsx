@@ -1,253 +1,185 @@
-import {
-  defaultTags,
-  sampleProcesses,
-  seedTestData,
-} from '../../test/fixtures';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { configurationTheme } from '../../app/theme';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
+import { processResponse, processesResponse } from '../../test/processes';
+import { readSession, setAuthenticatedSession } from '../auth/session';
 import { PROCESS_STORAGE_KEY } from './processData';
-import { TAG_STORAGE_KEY } from '../configurations/tagRegistry';
-
-function setup() {
-  return {
-    user: userEvent.setup(),
-    ...renderWithProviders(
-      <ThemeProvider theme={configurationTheme}>
-        <MemoryRouter>
-          <ProcessConfigurationsPage />
-        </MemoryRouter>
-      </ThemeProvider>,
-    ),
-  };
-}
+import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
 
 beforeEach(() => {
-  seedTestData();
+  localStorage.clear();
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: processesResponse,
+  });
 });
 
-describe('process configurations', () => {
-  it('shows the registered tag name instead of its NFC ID in the existing processes table', () => {
-    localStorage.setItem(
-      TAG_STORAGE_KEY,
-      JSON.stringify(
-        defaultTags.map((tag) =>
-          tag.actual === 'NFC-PROC-001'
-            ? { ...tag, name: 'Preparation Reader' }
-            : tag,
-        ),
-      ),
+describe('backend process listing', () => {
+  it('lists all backend processes, tracking modes, station numbers, and NFC information without local records', async () => {
+    const saved = JSON.stringify([{ id: 'local-process', name: 'Local only' }]);
+    localStorage.setItem(PROCESS_STORAGE_KEY, saved);
+    renderWithProviders(<ProcessConfigurationsPage />);
+    const row = (
+      await screen.findByRole('rowheader', { name: /Washing/ })
+    ).closest('tr')!;
+    expect(apiClient.get).toHaveBeenCalledWith(
+      'processes',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    setup();
-    const row = screen.getByRole('row', { name: /Lot Preparation/ });
-    expect(within(row).getByText('Preparation Reader')).toBeVisible();
-    expect(within(row).queryByText('NFC-PROC-001')).not.toBeInTheDocument();
+    expect(within(row).getByText('03')).toBeVisible();
+    expect(within(row).getByText('Process-level')).toBeVisible();
+    expect(within(row).getByText('NFC-WASH')).toBeVisible();
+    expect(within(row).getByText('Active')).toBeVisible();
+    const devicesRow = screen
+      .getByRole('rowheader', { name: /Drying/ })
+      .closest('tr')!;
+    expect(within(devicesRow).getByText('Device-level')).toBeVisible();
+    expect(within(devicesRow).getByText('1 device')).toBeVisible();
+    expect(within(devicesRow).getByText('Inactive')).toBeVisible();
+    expect(screen.queryByText('Local only')).not.toBeInTheDocument();
+    expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(saved);
+    expect(
+      screen.getByRole('button', { name: 'Create Process' }),
+    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit Washing' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete Washing' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'View Washing' })).toBeDisabled();
   });
 
-  it('shows all required process errors on their fields and clears corrected errors', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Create Process' }));
-    await user.click(screen.getByRole('button', { name: 'Save Process' }));
-    const name = screen.getByRole('textbox', { name: /Process Name/ });
-    expect(name).toHaveAccessibleDescription('Enter a process name.');
-    expect(
-      screen.getByRole('textbox', { name: /Station Number/ }),
-    ).toHaveAccessibleDescription('Enter a station number.');
-    expect(
-      screen.getByRole('combobox', { name: /Process-level NFC Tag ID/ }),
-    ).toHaveAccessibleDescription(
-      'Select an NFC tag for process-level tracking.',
-    );
-    await user.type(name, 'Finishing');
-    expect(name).not.toHaveAttribute('aria-invalid', 'true');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('attaches device name and duplicate NFC errors to the affected device fields', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Edit Washing' }));
-    const names = screen.getAllByRole('textbox', { name: /Device Name/ });
-    await user.clear(names[0]);
-    await user.click(screen.getByRole('button', { name: 'Save Process' }));
-    expect(names[0]).toHaveAccessibleDescription('Enter a device name.');
-    expect(names[1]).not.toHaveAttribute('aria-invalid', 'true');
-    await user.type(names[0], 'Washer 01');
-    const tags = screen.getAllByRole('combobox', { name: /Device NFC Tag/ });
-    await user.click(tags[0]);
-    await user.click(
-      screen.getByRole('option', { name: 'Washer 02 Tag (NFC-DEV-002)' }),
-    );
-    for (const tag of tags)
-      expect(tag).toHaveAccessibleDescription(
-        'NFC Tag IDs must be unique within this process.',
-      );
-    await user.click(tags[0]);
-    await user.click(
-      screen.getByRole('option', { name: 'Washer 01 Tag (NFC-DEV-001)' }),
-    );
-    for (const tag of tags)
-      expect(tag).not.toHaveAttribute('aria-invalid', 'true');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('shows invalid device-count feedback under the count field and clears it after correction', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Edit Washing' }));
-    const count = screen.getByRole('spinbutton', { name: 'Device count' });
-    await user.clear(count);
-    await user.type(count, '51');
-    await user.click(screen.getByRole('button', { name: 'Apply Count' }));
-    expect(count).toHaveAccessibleDescription(
-      'Device count must be a whole number between 0 and 50.',
-    );
-    expect(count).toHaveAttribute('aria-invalid', 'true');
-    expect(
-      screen.getAllByRole('textbox', { name: /Device Name/ }),
-    ).toHaveLength(2);
-    await user.clear(count);
-    await user.type(count, '3');
-    await user.click(screen.getByRole('button', { name: 'Apply Count' }));
-    expect(count).not.toHaveAttribute('aria-invalid', 'true');
-    expect(
-      screen.getAllByRole('textbox', { name: /Device Name/ }),
-    ).toHaveLength(3);
-  });
-
-  it('creates a process with a registered tag and reloads the saved record', async () => {
-    localStorage.setItem(PROCESS_STORAGE_KEY, '[]');
-    const { user, unmount } = setup();
-    await user.click(screen.getByRole('button', { name: 'Create Process' }));
-    expect(
-      screen.getByRole('combobox', { name: /Process-level NFC Tag ID/ }),
-    ).toHaveTextContent('Select a registered tag');
-    await user.type(
-      screen.getByRole('textbox', { name: /Process Name/ }),
-      ' Finishing ',
-    );
-    await user.type(
-      screen.getByRole('textbox', { name: /Station Number/ }),
-      '07',
-    );
-    await user.click(
-      screen.getByRole('combobox', { name: /Process-level NFC Tag ID/ }),
-    );
-    await user.click(
-      screen.getByRole('option', {
-        name: 'Lot Preparation Tag (NFC-PROC-001)',
+  it('shows loading without an empty or error state until the request finishes', async () => {
+    let resolve!: (value: { status: number; data: unknown }) => void;
+    vi.mocked(apiClient.get).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
       }),
     );
-    await user.click(screen.getByRole('button', { name: 'Save Process' }));
-
-    expect(screen.getByRole('rowheader', { name: 'Finishing' })).toBeVisible();
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(screen.getByRole('progressbar')).toBeVisible();
     expect(
-      screen.queryByRole('textbox', { name: /Process Name/ }),
+      screen.queryByText('No processes configured.'),
     ).not.toBeInTheDocument();
-    unmount();
-    setup();
-    expect(screen.getByRole('rowheader', { name: 'Finishing' })).toBeVisible();
-    expect(screen.getByRole('cell', { name: '07' })).toBeVisible();
-  });
-
-  it('retains saved process data when editing is cancelled', async () => {
-    const { user } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Edit Lot Preparation' }),
-    );
-    const name = screen.getByRole('textbox', { name: /Process Name/ });
-    await user.clear(name);
-    await user.type(name, 'Unsaved name');
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(
-      screen.getByRole('rowheader', { name: /Lot Preparation/ }),
-    ).toBeVisible();
-    expect(screen.queryByText('Unsaved name')).not.toBeInTheDocument();
-    expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(
-      JSON.stringify(sampleProcesses),
-    );
-  });
-
-  it('switches NFC modes and requires at least one device', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Create Process' }));
-    await user.type(
-      screen.getByRole('textbox', { name: /Process Name/ }),
-      'Finishing',
-    );
-    await user.type(
-      screen.getByRole('textbox', { name: /Station Number/ }),
-      '07',
-    );
-    await user.click(
-      screen.getByRole('radio', { name: /^Device-level tracking/ }),
-    );
-    expect(
-      screen.queryByRole('combobox', { name: /Process-level NFC Tag ID/ }),
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save Process' }));
-    expect(
-      screen.getByRole('spinbutton', { name: 'Device count' }),
-    ).toHaveAccessibleDescription(
-      'Add at least one device when using device-level tracking.',
-    );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add Device' }));
-    expect(
-      screen.getByRole('combobox', { name: /Device NFC Tag/ }),
-    ).toHaveTextContent('Select a registered tag');
-    expect(screen.getByRole('textbox', { name: /Device Name/ })).toBeVisible();
-    expect(
-      screen.getByRole('spinbutton', { name: 'Device count' }),
-    ).toHaveValue(1);
-    await user.click(screen.getByRole('button', { name: 'Remove device 1' }));
-    expect(
-      screen.queryByRole('textbox', { name: /Device Name/ }),
-    ).not.toBeInTheDocument();
+    await act(async () => resolve({ status: 200, data: processesResponse }));
+    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
   });
 
-  it('requires confirmation before deleting a process', async () => {
-    const { user } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Delete Lot Preparation' }),
-    );
-    const dialog = screen.getByRole('dialog', { name: 'Delete process?' });
-    expect(
-      screen.getByRole('rowheader', { name: /Lot Preparation/, hidden: true }),
-    ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-
-    expect(
-      screen.queryByRole('rowheader', { name: /Lot Preparation/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      JSON.parse(localStorage.getItem(PROCESS_STORAGE_KEY) ?? '[]'),
-    ).toHaveLength(1);
+  it('shows an empty backend list', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(await screen.findByText('No processes configured.')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('keeps the current records and edit form if saving fails', async () => {
-    const { user } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Edit Lot Preparation' }),
-    );
-    const name = screen.getByRole('textbox', { name: /Process Name/ });
-    await user.clear(name);
-    await user.type(name, 'Updated name');
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('Quota exceeded');
+  it('preserves a service error message, hides its HTTP code, and retries on request', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      status: 503,
+      data: { detail: 'Process service unavailable' },
     });
-    await user.click(screen.getByRole('button', { name: 'Save Process' }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Changes could not be saved',
+    const user = userEvent.setup();
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Process service unavailable',
     );
-    expect(
-      screen.getByRole('rowheader', { name: /Lot Preparation/ }),
-    ).toBeVisible();
-    expect(name).toHaveValue('Updated name');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 503');
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByRole('rowheader', { name: /Washing/ });
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([403, 406])(
+    'handles HTTP %s without offering a futile retry',
+    async (status) => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        status,
+        data: { detail: 'Backend reason' },
+      });
+      renderWithProviders(<ProcessConfigurationsPage />);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Backend reason',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No processes configured.'),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    { status: 401, data: '' },
+    {
+      status: 403,
+      data: {
+        type: 'about:blank',
+        title: 'Forbidden',
+        status: 403,
+        code: 'ACCESS_DENIED',
+        detail: 'Role changed; log in again',
+      },
+    },
+  ])(
+    'offers sign-in when the session must be renewed: %j',
+    async (response) => {
+      setAuthenticatedSession({
+        user: { id: 'admin', username: 'admin', role: 'NW', status: 'Active' },
+        modules: ['process'],
+      });
+      vi.mocked(apiClient.get).mockResolvedValue(response);
+      const user = userEvent.setup();
+      renderWithProviders(<ProcessConfigurationsPage />);
+      await user.click(
+        await screen.findByRole('button', { name: 'Back to sign in' }),
+      );
+      expect(readSession()).toBeNull();
+    },
+  );
+
+  it('handles HTML service failures with safe fallback text', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 502,
+      data: '<html>Proxy diagnostics</html>',
+    });
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Processes are temporarily unavailable',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 502');
+    expect(screen.queryByText('Proxy diagnostics')).not.toBeInTheDocument();
+  });
+
+  it('shows connectivity guidance when no response is available', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network Error'));
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Check your connection',
+    );
+  });
+
+  it.each([
+    { data: {} },
+    { data: [processResponse, processResponse] },
+    { data: [{ ...processResponse, nfcMode: 'INVALID' }] },
+    { data: [{ ...processResponse, devices: [{}] }] },
+  ])('rejects malformed process responses: %j', async ({ data }) => {
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+    renderWithProviders(<ProcessConfigurationsPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to read processes',
+    );
+    expect(screen.queryAllByRole('rowheader')).toHaveLength(0);
+  });
+
+  it('cancels the request on exit', () => {
+    vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+    const view = renderWithProviders(<ProcessConfigurationsPage />);
+    const signal = vi.mocked(apiClient.get).mock.calls[0][1]?.signal;
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 });

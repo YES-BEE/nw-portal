@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 
 describe('tag details', () => {
-  it('opens View using the row UUID and shows fresh details including assignment references', async () => {
+  it('opens View using the row UUID and shows fresh details without displaying UUID fields', async () => {
     const detail = {
       ...createTagResponse,
       id: tagsResponse[0].id,
@@ -41,13 +41,16 @@ describe('tag details', () => {
       'nfc-tags/' + tagsResponse[0].id,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(dialog.getByText('Machine / Device')).toBeVisible();
-    expect(dialog.getByText('machine-uuid')).toBeVisible();
-    expect(dialog.getByText('process-uuid')).toBeVisible();
+    expect(dialog.getByText('Machine')).toBeVisible();
+    expect(dialog.queryByText(detail.id)).not.toBeInTheDocument();
+    expect(dialog.queryByText('machine-uuid')).not.toBeInTheDocument();
+    expect(dialog.queryByText('process-uuid')).not.toBeInTheDocument();
+    expect(dialog.getByText(detail.uid)).toBeVisible();
     expect(dialog.getByText('Yes')).toBeVisible();
     expect(dialog.getByText('Active')).toBeVisible();
-    expect(dialog.getByText('3')).toBeVisible();
-    expect(dialog.getAllByRole('definition')).toHaveLength(13);
+    expect(dialog.queryByText('Version')).not.toBeInTheDocument();
+    expect(dialog.queryByText('3')).not.toBeInTheDocument();
+    expect(dialog.getAllByRole('definition')).toHaveLength(5);
     await user.click(dialog.getByRole('button', { name: 'Close' }));
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
@@ -74,7 +77,7 @@ describe('tag details', () => {
     expect(screen.queryByText('None')).not.toBeInTheDocument();
     await act(async () => resolve({ status: 200, data: createTagResponse }));
     expect(screen.getByText('No')).toBeVisible();
-    expect(screen.getAllByText('None')).toHaveLength(7);
+    expect(screen.getAllByText('None')).toHaveLength(1);
   });
 
   it('offers reload for the backend 409 NOT_FOUND response and hides the HTTP code', async () => {

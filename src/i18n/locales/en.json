@@ -415,6 +415,62 @@
     "edit": "Edit Process",
     "existing": "Existing Processes",
     "processColumn": "Process",
+    "quality": "Quality control (QC) process",
+    "saving": "Saving...",
+    "createFailure": "Unable to create process",
+    "loadingTags": "Loading available NFC tags...",
+    "tagsFailure": "Unable to load NFC tags",
+    "noTags": "No unassigned NFC tags are available.",
+    "statusColumn": "Status",
+    "noTag": "No tag assigned",
+    "actionsUnavailable": "Process actions are not available yet.",
+    "failureStatus": "HTTP {{status}}",
+    "failures": {
+      "validation": {
+        "title": "Check the process fields",
+        "description": "Review the process fields before saving again."
+      },
+      "invalidRequest": {
+        "title": "Invalid process settings",
+        "description": "Review the process settings and selected NFC tags before saving again."
+      },
+      "conflict": {
+        "title": "Process configuration conflict",
+        "description": "A selected NFC tag may already be assigned. Review the configuration before saving again."
+      },
+      "authentication": {
+        "title": "Sign in required",
+        "description": "Sign in again to view processes."
+      },
+      "roleChanged": {
+        "title": "Your role has changed",
+        "description": "Sign in again to load your updated access settings."
+      },
+      "access": {
+        "title": "Access denied",
+        "description": "Your account cannot view processes with its current access settings."
+      },
+      "representation": {
+        "title": "Response format unavailable",
+        "description": "The service could not return processes in the requested format. Contact your administrator."
+      },
+      "service": {
+        "title": "Processes are temporarily unavailable",
+        "description": "The process service could not complete the request. Please try again shortly."
+      },
+      "network": {
+        "title": "Unable to connect",
+        "description": "Check your connection and try again."
+      },
+      "http": {
+        "title": "Unable to load processes",
+        "description": "The process request could not be completed. Please try again."
+      },
+      "invalidResponse": {
+        "title": "Unable to read processes",
+        "description": "The service returned an unexpected response. Try again or contact your administrator."
+      }
+    },
     "stationColumn": "Station No.",
     "trackingLevelColumn": "Tracking Level",
     "tagsColumn": "Tag / Devices",
@@ -427,7 +483,7 @@
     "deleteAction": "Delete",
     "editNamed": "Edit {{name}}",
     "deleteNamed": "Delete {{name}}",
-    "empty": "No processes configured. Click Create Process.",
+    "empty": "No processes configured.",
     "formDescription": "Define the process and choose whether to track the process or its individual devices.",
     "close": "Close",
     "name": "Process Name",
@@ -543,7 +599,7 @@
     },
     "assetTypes": {
       "PROCESS": "Process",
-      "MACHINE": "Machine / Device",
+      "MACHINE": "Machine",
       "STATION": "Station",
       "TROLLEY": "Trolley",
       "STORAGE_AREA": "Storage Area",

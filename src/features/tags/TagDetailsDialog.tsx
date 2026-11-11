@@ -71,27 +71,12 @@ export function TagDetailsDialog({
         [t('tags.actual'), tag.uid],
         [t('tags.status'), t(`tags.statusValues.${tag.status}`)],
         [t('tags.assigned'), t(tag.assigned ? 'tags.yes' : 'tags.no')],
-        [t('tags.details.id'), tag.id],
         [
           t('tags.details.assetType'),
           assetType
             ? t(`tags.assetTypes.${assetType}`)
             : tag.asset_type || t('tags.details.none'),
         ],
-        ...(
-          [
-            'process_id',
-            'machine_id',
-            'station_id',
-            'trolley_id',
-            'storage_area_id',
-            'storage_location_id',
-          ] as const
-        ).map((key): [string, string] => [
-          t(`tags.details.${key}`),
-          tag[key] || t('tags.details.none'),
-        ]),
-        [t('tags.details.version'), tag.version],
       ]
     : [];
 
@@ -166,12 +151,16 @@ export function TagDetailsDialog({
           >
             {fields.map(([label, value]) => (
               <Box key={label} sx={{ display: 'contents' }}>
-                <Typography component="dt" color="text.secondary">
+                <Typography
+                  component="dt"
+                  color="text.secondary"
+                  sx={{ fontSize: 13, fontWeight: 700 }}
+                >
                   {label}
                 </Typography>
                 <Typography
                   component="dd"
-                  sx={{ m: 0, overflowWrap: 'anywhere' }}
+                  sx={{ m: 0, overflowWrap: 'anywhere', fontSize: 13 }}
                 >
                   {value}
                 </Typography>
