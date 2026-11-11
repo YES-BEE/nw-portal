@@ -33,10 +33,10 @@ function isRole(value: unknown): value is AccessRoleResponse {
   );
 }
 
-async function request(
-  operation: () => Promise<AxiosResponse<unknown>>,
+async function request<T = unknown>(
+  operation: () => Promise<AxiosResponse<T>>,
   kind: AccessRolesOperation = 'list',
-): Promise<unknown> {
+): Promise<T> {
   let response;
   try {
     response = await operation();
@@ -84,10 +84,10 @@ export async function saveAccessRole(
   roleCode: string,
   body: SaveAccessRoleRequest,
   signal?: AbortSignal,
-): Promise<void> {
-  await request(
+): Promise<AccessRolesResponse> {
+  return request(
     () =>
-      apiClient.put<unknown>(
+      apiClient.put<AccessRolesResponse>(
         `access-roles/${encodeURIComponent(roleCode)}`,
         {
           modules: body.modules,
@@ -103,10 +103,10 @@ export async function saveAccessRole(
 export async function createAccessRole(
   body: CreateAccessRoleRequest,
   signal?: AbortSignal,
-): Promise<void> {
-  await request(
+): Promise<AccessRoleResponse> {
+  return request(
     () =>
-      apiClient.post<unknown>(
+      apiClient.post<AccessRoleResponse>(
         'access-roles',
         {
           name: body.name,

@@ -3,6 +3,7 @@ import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
+import { accessRolesResponse } from '../../test/accessRoles';
 import { setAuthenticatedSession } from '../auth/session';
 import {
   createAccessRole,
@@ -123,11 +124,17 @@ describe('access roles API transport', () => {
     },
   );
   it('creates a role with its name via POST without a client-generated code', async () => {
+    const createdRole = {
+      ...accessRolesResponse[0],
+      code: 'CUSTOM_backend_generated',
+      name: 'Factory Operator',
+      description: 'Factory Operator',
+      built_in: false,
+      modules: ['dashboard'],
+      pad_access: false,
+    };
     adapter.mockImplementation(async (config) =>
-      response(config, 200, {
-        code: 'CUSTOM_backend_generated',
-        name: 'Factory Operator',
-      }),
+      response(config, 200, createdRole),
     );
     const body = {
       name: 'Factory Operator',
@@ -135,7 +142,7 @@ describe('access roles API transport', () => {
       pcAccess: true,
       padAccess: false,
     };
-    await expect(createAccessRole(body)).resolves.toBeUndefined();
+    await expect(createAccessRole(body)).resolves.toEqual(createdRole);
     const config = adapter.mock.calls[0][0];
     expect(apiClient.getUri(config)).toBe(
       'http://backend.test/api/v1/access-roles',
@@ -163,18 +170,20 @@ describe('access roles API transport', () => {
     });
     expect(adapter).toHaveBeenCalledTimes(1);
   });
-  it.each([200, 201, 204])(
+  it.each([200, 201])(
     'saves only the documented PUT body and accepts HTTP %s',
     async (status) => {
       adapter.mockImplementation(async (config) =>
-        response(config, status, status === 204 ? null : { code: 'CUSTOM' }),
+        response(config, status, accessRolesResponse),
       );
       const body = {
         modules: ['dashboard', 'reports'],
         pcAccess: true,
         padAccess: false,
       };
-      await expect(saveAccessRole('CUSTOM/OPS', body)).resolves.toBeUndefined();
+      await expect(saveAccessRole('CUSTOM/OPS', body)).resolves.toEqual(
+        accessRolesResponse,
+      );
       const config = adapter.mock.calls[0][0];
       expect(apiClient.getUri(config)).toBe(
         'http://backend.test/api/v1/access-roles/CUSTOM%2FOPS',

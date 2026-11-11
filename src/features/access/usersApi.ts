@@ -42,10 +42,10 @@ function isUser(value: unknown): value is UserResponse {
   );
 }
 
-async function requestUsers(
-  send: () => Promise<AxiosResponse<unknown>>,
+async function requestUsers<T = unknown>(
+  send: () => Promise<AxiosResponse<T>>,
   operation: UsersOperation = 'list',
-): Promise<unknown> {
+): Promise<T> {
   let response;
   try {
     response = await send();
@@ -108,10 +108,10 @@ export async function getUser(
 export async function createUser(
   body: CreateUserRequest,
   signal?: AbortSignal,
-): Promise<void> {
-  await requestUsers(
+): Promise<UserResponse> {
+  return requestUsers(
     () =>
-      apiClient.post<unknown>(
+      apiClient.post<UserResponse>(
         'users',
         {
           username: body.username,
@@ -129,10 +129,10 @@ export async function createUser(
 export async function deleteUser(
   userId: string,
   signal?: AbortSignal,
-): Promise<void> {
-  await requestUsers(
+): Promise<UserResponse> {
+  return requestUsers(
     () =>
-      apiClient.delete<unknown>(`users/${encodeURIComponent(userId)}`, {
+      apiClient.delete<UserResponse>(`users/${encodeURIComponent(userId)}`, {
         signal,
         timeout: 10000,
         validateStatus: () => true,

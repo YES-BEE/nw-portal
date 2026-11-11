@@ -542,7 +542,58 @@
     "deleted": "Tag deleted.",
     "deleteTitle": "Delete tag?",
     "deleteMessage": "Delete “{{name}}” ({{actual}})?",
-    "empty": "No NFC tags registered. Click Add New Tag.",
+    "empty": "No NFC tags registered.",
+    "assigned": "Assigned",
+    "changesUnavailable": "Tag changes are not available yet.",
+    "saving": "Saving...",
+    "createFailure": "Unable to create tag",
+    "failureStatus": "HTTP {{status}}",
+    "failures": {
+      "validation": {
+        "title": "Check the tag fields",
+        "description": "Review the tag name and NFC ID before saving again."
+      },
+      "invalidRequest": {
+        "title": "Invalid tag details",
+        "description": "Review the tag name and NFC ID before saving again."
+      },
+      "conflict": {
+        "title": "Tag data conflict",
+        "description": "The NFC ID may already be registered. Review the tag details before saving again."
+      },
+      "authentication": {
+        "title": "Sign in required",
+        "description": "Sign in again to view tags."
+      },
+      "roleChanged": {
+        "title": "Your role has changed",
+        "description": "Sign in again to load your updated access settings."
+      },
+      "access": {
+        "title": "Access denied",
+        "description": "Your account cannot view tags with its current access settings."
+      },
+      "representation": {
+        "title": "Response format unavailable",
+        "description": "The service could not return tags in the requested format. Contact your administrator."
+      },
+      "service": {
+        "title": "Tags are temporarily unavailable",
+        "description": "The tag service could not complete the request. Please try again shortly."
+      },
+      "network": {
+        "title": "Unable to connect",
+        "description": "Check your connection and try again."
+      },
+      "http": {
+        "title": "Unable to load tags",
+        "description": "The tag request could not be completed. Please try again."
+      },
+      "invalidResponse": {
+        "title": "Unable to read tags",
+        "description": "The service returned an unexpected response. Try again or contact your administrator."
+      }
+    },
     "search": "Search tags",
     "searchPlaceholder": "Search by tag name or NFC ID",
     "noMatches": "No tags match your search.",

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
+  AlertTitle,
   Box,
   Button,
   IconButton,
@@ -12,64 +13,61 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { loadTags } from '../configurations/tagRegistry';
-import type { RegisteredTag } from '../configurations/tagRegistry';
-import { loadTagAssignments, normalizeTag, getTagFieldErrors } from './tagData';
+import { signOut } from '../auth/session';
+import { TagsError } from './tagsApi';
+import type { CreateTagField, CreateTagRequest, TagsFailure } from './tagsApi';
 
 export function TagForm({
-  initial,
-  editing,
-  onSave,
+  onCreate,
   onClose,
 }: {
-  initial: RegisteredTag;
-  editing: boolean;
-  onSave: (tag: RegisteredTag) => void;
+  onCreate: (body: CreateTagRequest, signal: AbortSignal) => Promise<void>;
   onClose: () => void;
 }) {
   const { t } = useTranslation('translation');
-  const [draft, setDraft] = useState(initial);
+  const [draft, setDraft] = useState<CreateTagRequest>({ name: '', uid: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<TagsFailure | null>(null);
+  const pending = useRef<AbortController | null>(null);
   const container = useRef<HTMLElement>(null);
-  const status = loadTagAssignments();
-  const fieldErrors = submitted
-    ? getTagFieldErrors(
-        normalizeTag(draft),
-        loadTags().records,
-        new Set(status.assignments.keys()),
-        status.unavailable,
-      )
-    : {};
-  const locked =
-    editing &&
-    (status.unavailable ||
-      status.assignments.has(initial.actual.toUpperCase()));
-
   useEffect(() => {
-    container.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    container.current?.scrollIntoView?.({
+      behavior: 'instant',
+      block: 'start',
+    });
+    return () => pending.current?.abort();
   }, []);
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalized = normalizeTag(draft);
-    const latest = loadTagAssignments();
-    const issues = getTagFieldErrors(
-      normalized,
-      loadTags().records,
-      new Set(latest.assignments.keys()),
-      latest.unavailable,
+  function fieldError(field: CreateTagField) {
+    return (
+      failure?.fieldErrors?.[field] ||
+      (submitted && !draft[field].trim()
+        ? t(
+            field === 'name'
+              ? 'tags.errors.nameRequired'
+              : 'tags.errors.actualRequired',
+          )
+        : undefined)
     );
-    setSubmitted(true);
-    if (Object.keys(issues).length === 0) onSave(normalized);
   }
-
+  function update(field: CreateTagField, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+    setFailure((current) =>
+      current
+        ? {
+            ...current,
+            fieldErrors: { ...current.fieldErrors, [field]: undefined },
+          }
+        : null,
+    );
+  }
   return (
     <Paper
       component="section"
       ref={container}
       variant="outlined"
       aria-labelledby="tag-form-heading"
-      sx={{ borderRadius: 2, overflow: 'hidden', scrollMarginTop: '84px' }}
+      sx={{ borderRadius: 2, overflow: 'hidden', scrollMarginTop: 84 }}
     >
       <Stack
         direction="row"
@@ -89,24 +87,84 @@ export function TagForm({
             id="tag-form-heading"
             sx={{ fontSize: 17, fontWeight: 600 }}
           >
-            {t(editing ? 'tags.edit' : 'tags.add')}
+            {t('tags.add')}
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
             {t('tags.formDescription')}
           </Typography>
         </Box>
         <Tooltip title={t('tags.close')}>
-          <IconButton
-            size="small"
-            aria-label={t('tags.close')}
-            onClick={onClose}
-          >
-            <CloseIcon />
-          </IconButton>
+          <span>
+            <IconButton
+              size="small"
+              disabled={saving}
+              aria-label={t('tags.close')}
+              onClick={onClose}
+            >
+              <CloseIcon />
+            </IconButton>
+          </span>
         </Tooltip>
       </Stack>
-      <Box component="form" noValidate onSubmit={submit}>
+      <Box
+        component="form"
+        noValidate
+        aria-busy={saving}
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (pending.current) return;
+          setSubmitted(true);
+          if (!draft.name.trim() || !draft.uid.trim()) return;
+          const controller = new AbortController();
+          pending.current = controller;
+          setSaving(true);
+          setFailure(null);
+          try {
+            await onCreate(
+              { name: draft.name.trim(), uid: draft.uid.trim() },
+              controller.signal,
+            );
+          } catch (error: unknown) {
+            if (!controller.signal.aborted)
+              setFailure(
+                error instanceof TagsError
+                  ? error.failure
+                  : { kind: 'network', action: 'retry' },
+              );
+          } finally {
+            if (!controller.signal.aborted) {
+              pending.current = null;
+              setSaving(false);
+            }
+          }
+        }}
+      >
         <Box sx={{ p: { xs: 2, sm: 3 } }}>
+          {failure && (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                failure.action === 'signIn' ? (
+                  <Button color="inherit" onClick={signOut}>
+                    {t('startup.signIn')}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <AlertTitle>{t('tags.createFailure')}</AlertTitle>
+              {failure.message ||
+                t(`tags.failures.${failure.kind}.description`)}
+              {failure.status !== undefined && (
+                <Typography
+                  variant="caption"
+                  sx={{ display: 'block', mt: 0.5 }}
+                >
+                  {t('tags.failureStatus', { status: failure.status })}
+                </Typography>
+              )}
+            </Alert>
+          )}
           <Box
             sx={{
               display: 'grid',
@@ -116,45 +174,26 @@ export function TagForm({
           >
             <TextField
               label={t('tags.name')}
-              error={Boolean(fieldErrors.name)}
-              helperText={
-                fieldErrors.name
-                  ? t(`tags.errors.${fieldErrors.name}`)
-                  : undefined
-              }
               value={draft.name}
-              onChange={(event) =>
-                setDraft({ ...draft, name: event.target.value })
-              }
+              onChange={(event) => update('name', event.target.value)}
+              error={Boolean(fieldError('name'))}
+              helperText={fieldError('name')}
+              disabled={saving}
               placeholder={t('tags.namePlaceholder')}
               autoFocus
               required
-              slotProps={{ htmlInput: { maxLength: 80 } }}
+              slotProps={{ htmlInput: { maxLength: 150 } }}
             />
             <TextField
               label={t('tags.actual')}
-              error={Boolean(fieldErrors.actual)}
-              value={draft.actual}
-              onChange={(event) =>
-                setDraft({ ...draft, actual: event.target.value })
-              }
+              value={draft.uid}
+              onChange={(event) => update('uid', event.target.value)}
+              error={Boolean(fieldError('uid'))}
+              helperText={fieldError('uid')}
+              disabled={saving}
               placeholder={t('tags.actualPlaceholder')}
               required
-              slotProps={{
-                htmlInput: { maxLength: 120 },
-                input: { readOnly: locked },
-              }}
-              helperText={
-                fieldErrors.actual
-                  ? t(`tags.errors.${fieldErrors.actual}`)
-                  : locked
-                    ? t(
-                        status.unavailable
-                          ? 'tags.assignmentsUnavailable'
-                          : 'tags.lockedHint',
-                      )
-                    : undefined
-              }
+              slotProps={{ htmlInput: { maxLength: 128 } }}
             />
           </Box>
         </Box>
@@ -169,11 +208,20 @@ export function TagForm({
             borderColor: 'divider',
           }}
         >
-          <Button variant="outlined" onClick={onClose}>
+          <Button variant="outlined" disabled={saving} onClick={onClose}>
             {t('tags.cancel')}
           </Button>
-          <Button variant="contained" type="submit">
-            {t('tags.save')}
+          <Button
+            variant="contained"
+            type="submit"
+            disabled={
+              saving ||
+              failure?.action === 'signIn' ||
+              failure?.kind === 'access' ||
+              failure?.kind === 'representation'
+            }
+          >
+            {t(saving ? 'tags.saving' : 'tags.save')}
           </Button>
         </Stack>
       </Box>

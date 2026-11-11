@@ -21,7 +21,10 @@ type UserFormProps = { onClose: () => void } & (
   | { initial: UserResponse; onCreate?: never }
   | {
       initial?: never;
-      onCreate: (body: CreateUserRequest, signal: AbortSignal) => Promise<void>;
+      onCreate: (
+        body: CreateUserRequest,
+        signal: AbortSignal,
+      ) => Promise<UserResponse | void>;
     }
 );
 

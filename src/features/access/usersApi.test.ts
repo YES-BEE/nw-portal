@@ -44,7 +44,7 @@ describe('users API', () => {
     const controller = new AbortController();
     await expect(
       deleteUser('id/with space', controller.signal),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ ...userResponse, enabled: false });
     const config = adapter.mock.calls[0][0];
     expect(apiClient.getUri(config)).toBe(
       'http://backend.test/api/v1/users/id%2Fwith%20space',
@@ -77,11 +77,11 @@ describe('users API', () => {
     },
   );
 
-  it.each([200, 201, 204])(
+  it.each([200, 201])(
     'creates users through the authenticated POST endpoint with HTTP %s',
     async (status) => {
       adapter.mockImplementation(async (config) =>
-        response(config, status, status === 204 ? null : userResponse),
+        response(config, status, userResponse),
       );
       const body = {
         username: 'new.manager',
@@ -90,7 +90,7 @@ describe('users API', () => {
         role: 'PROCESS_MANAGER',
         processAssignments: [],
       };
-      await expect(createUser(body)).resolves.toBeUndefined();
+      await expect(createUser(body)).resolves.toEqual(userResponse);
       const config = adapter.mock.calls[0][0];
       expect(apiClient.getUri(config)).toBe('http://backend.test/api/v2/users');
       expect(config.method).toBe('post');

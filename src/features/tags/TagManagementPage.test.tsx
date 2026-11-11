@@ -1,55 +1,31 @@
-import {
-  defaultTags,
-  sampleProcesses,
-  seedTestData,
-} from '../../test/fixtures';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { configurationTheme } from '../../app/theme';
-import { loadTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
-import { PROCESS_STORAGE_KEY } from '../processes/processData';
+import { TAG_STORAGE_KEY } from '../configurations/tagRegistry';
+import { readSession, setAuthenticatedSession } from '../auth/session';
 import { TagManagementPage } from './TagManagementPage';
+import { tagsResponse } from '../../test/tags';
 
-function setup() {
-  return {
-    user: userEvent.setup(),
-    ...renderWithProviders(
-      <ThemeProvider theme={configurationTheme}>
-        <MemoryRouter>
-          <TagManagementPage />
-        </MemoryRouter>
-      </ThemeProvider>,
-    ),
-  };
-}
 beforeEach(() => {
-  seedTestData();
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
+    status: 200,
+    data: tagsResponse[1],
+  });
+  localStorage.clear();
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: tagsResponse.slice(0, 2),
+  });
 });
 
-describe('tag management', () => {
-  it('shows linked assignments and prevents deletion of assigned tags', () => {
-    setup();
-    expect(
-      screen.getByRole('link', { name: 'Process: Lot Preparation' }),
-    ).toHaveAttribute('href', '/configurations/processes/demo-1');
-    expect(
-      screen.getByRole('link', { name: 'Device: Washer 01 (Washing)' }),
-    ).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Storage: ST-001' })).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Delete tag Lot Preparation Tag' }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Delete tag Finishing Line Tag' }),
-    ).toBeEnabled();
-  });
-
-  it('registers a new tag and reloads it from browser storage', async () => {
-    const { user, unmount } = setup();
+describe('backend tag listing', () => {
+  it('creates a tag through POST and refreshes the active list without browser storage', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TagManagementPage />);
+    await screen.findByRole('rowheader', { name: 'Washing Tag' });
+    await user.type(screen.getByRole('searchbox'), 'washing');
     await user.click(screen.getByRole('button', { name: 'Add New Tag' }));
     await user.type(
       screen.getByRole('textbox', { name: /Tag Name/ }),
@@ -57,181 +33,241 @@ describe('tag management', () => {
     );
     await user.type(
       screen.getByRole('textbox', { name: /Actual NFC Tag ID/ }),
-      ' 04:AA:BB:CC ',
+      ' 04:aa:ee ',
     );
-    await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(
-      screen.getByRole('rowheader', { name: 'New Factory Tag' }),
-    ).toBeVisible();
-    unmount();
-    setup();
-    expect(
-      screen.getByRole('rowheader', { name: 'New Factory Tag' }),
-    ).toBeVisible();
-    expect(screen.getByRole('cell', { name: '04:AA:BB:CC' })).toBeVisible();
-  });
-
-  it('allows renaming an assigned tag but keeps its NFC ID read-only', async () => {
-    const { user } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Edit tag Lot Preparation Tag' }),
-    );
-    expect(
-      screen.getByRole('textbox', { name: /Actual NFC Tag ID/ }),
-    ).toHaveAttribute('readonly');
-    const name = screen.getByRole('textbox', { name: /Tag Name/ });
-    await user.clear(name);
-    await user.type(name, 'Preparation Tracking Tag');
-    await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(
-      screen.getByRole('rowheader', { name: 'Preparation Tracking Tag' }),
-    ).toBeVisible();
-    expect(
-      loadTags().records.find((tag) => tag.id === defaultTags[0].id)?.actual,
-    ).toBe('NFC-PROC-001');
-  });
-
-  it('validates required fields and case-insensitive name and ID uniqueness', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Add New Tag' }));
-    await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(
-      screen.getByRole('textbox', { name: /Tag Name/ }),
-    ).toHaveAccessibleDescription('Enter a tag name.');
-    expect(
-      screen.getByRole('textbox', { name: /Actual NFC Tag ID/ }),
-    ).toHaveAccessibleDescription('Enter the actual NFC tag ID.');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    const name = screen.getByRole('textbox', { name: /Tag Name/ });
-    const actual = screen.getByRole('textbox', { name: /Actual NFC Tag ID/ });
-    await user.type(name, 'lot preparation tag');
-    await user.type(actual, 'NEW-ID');
-    await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(name).toHaveAccessibleDescription('Tag Name already exists.');
-    await user.clear(name);
-    await user.type(name, 'New tag');
-    await user.clear(actual);
-    await user.type(actual, 'nfc-proc-001');
-    await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(actual).toHaveAccessibleDescription(
-      'Actual NFC Tag ID already exists.',
-    );
-    expect(name).not.toHaveAttribute('aria-invalid', 'true');
-  });
-
-  it('deletes an unused tag after confirmation and persists the change', async () => {
-    const { user, unmount } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Delete tag Finishing Line Tag' }),
-    );
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Delete tag?' })).getByRole(
-        'button',
-        { name: 'Delete' },
-      ),
-    );
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    );
-    expect(
-      screen.queryByRole('rowheader', { name: 'Finishing Line Tag' }),
-    ).not.toBeInTheDocument();
-    unmount();
-    setup();
-    expect(
-      screen.queryByRole('rowheader', { name: 'Finishing Line Tag' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('rechecks assignment before deleting if a process claimed the tag after confirmation opened', async () => {
-    const { user } = setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Delete tag Finishing Line Tag' }),
-    );
-    localStorage.setItem(
-      PROCESS_STORAGE_KEY,
-      JSON.stringify([
-        ...sampleProcesses,
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: [
+        ...tagsResponse.slice(0, 2),
         {
-          ...sampleProcesses[0],
-          id: 'new-process',
-          processTag: 'NFC-PROC-002',
+          ...tagsResponse[1],
+          id: 'new-tag',
+          name: 'New Factory Tag',
+          uid: '04:AA:EE',
         },
-      ]),
-    );
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Delete tag?' })).getByRole(
-        'button',
-        { name: 'Delete' },
-      ),
-    );
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    );
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Unassign this tag before deleting it.',
-    );
-    expect(
-      loadTags().records.some((tag) => tag.actual === 'NFC-PROC-002'),
-    ).toBe(true);
-    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(
-      JSON.stringify(defaultTags),
-    );
-  });
-
-  it('keeps the editor and registry if saving fails', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Add New Tag' }));
-    await user.type(
-      screen.getByRole('textbox', { name: /Tag Name/ }),
-      'New tag',
-    );
-    await user.type(
-      screen.getByRole('textbox', { name: /Actual NFC Tag ID/ }),
-      'NEW-ID',
-    );
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('Quota exceeded');
+      ],
     });
     await user.click(screen.getByRole('button', { name: 'Save Tag' }));
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Changes could not be saved',
+    expect(apiClient.post).toHaveBeenCalledWith(
+      'nfc-tags',
+      { name: 'New Factory Tag', uid: '04:aa:ee' },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(screen.getByRole('textbox', { name: /Tag Name/ })).toHaveValue(
-      'New tag',
+    expect(
+      await screen.findByRole('rowheader', { name: 'New Factory Tag' }),
+    ).toBeVisible();
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByRole('button', { name: 'Save Tag' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Tag saved successfully.')).toBeVisible();
+    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBeNull();
+  });
+  it('lists backend names, UIDs, and assignment state without reading or writing local records', async () => {
+    const local = JSON.stringify([
+      { id: 'local', name: 'Local only', actual: 'LOCAL-UID' },
+    ]);
+    localStorage.setItem(TAG_STORAGE_KEY, local);
+    renderWithProviders(<TagManagementPage />);
+    await screen.findByRole('rowheader', { name: 'Washing Tag' });
+    expect(apiClient.get).toHaveBeenCalledWith(
+      'nfc-tags',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(
-      JSON.stringify(defaultTags),
+    const row = screen
+      .getByRole('rowheader', { name: 'Washing Tag' })
+      .closest('tr')!;
+    expect(within(row).getByText('04:AA:BB')).toBeVisible();
+    expect(within(row).getByText('Assigned')).toBeVisible();
+    expect(screen.getByText('Available')).toBeVisible();
+    expect(screen.queryByText('Deleted Tag')).not.toBeInTheDocument();
+    expect(screen.queryByText('Local only')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+    expect(screen.getByText('2 tags')).toBeVisible();
+    expect(localStorage.getItem(TAG_STORAGE_KEY)).toBe(local);
+    expect(screen.getByRole('button', { name: 'Add New Tag' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Edit tag Washing Tag' }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete tag Washing Tag' }),
+    ).toBeDisabled();
+  });
+
+  it('shows a loader until the request resolves without an empty state', async () => {
+    let resolve!: (value: { status: number; data: unknown }) => void;
+    vi.mocked(apiClient.get).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    renderWithProviders(<TagManagementPage />);
+    expect(screen.getByRole('progressbar')).toBeVisible();
+    expect(screen.getByRole('searchbox')).toBeDisabled();
+    expect(
+      screen.queryByText('No NFC tags registered.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await act(async () =>
+      resolve({ status: 200, data: tagsResponse.slice(0, 2) }),
+    );
+    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+  });
+
+  it('paginates and searches by name and UID without case sensitivity', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: Array.from({ length: 30 }, (_, i) => ({
+        ...tagsResponse[0],
+        id: 'tag-' + i,
+        name: 'Factory Tag ' + (i + 1),
+        uid: 'UID-' + i,
+      })),
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<TagManagementPage />);
+    await screen.findByRole('rowheader', { name: 'Factory Tag 1' });
+    expect(screen.getAllByRole('rowheader')).toHaveLength(10);
+    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
+    expect(
+      screen.getByRole('rowheader', { name: 'Factory Tag 11' }),
+    ).toBeVisible();
+    const search = screen.getByRole('searchbox');
+    await user.type(search, ' factory tag 30 ');
+    expect(
+      screen.getByRole('rowheader', { name: 'Factory Tag 30' }),
+    ).toBeVisible();
+    await user.clear(search);
+    await user.type(search, 'uid-29');
+    expect(
+      screen.getByRole('rowheader', { name: 'Factory Tag 30' }),
+    ).toBeVisible();
+    await user.clear(search);
+    await user.type(search, 'no match');
+    expect(screen.getByText('No tags match your search.')).toBeVisible();
+  });
+
+  it.each([{ data: [] }])(
+    'shows an empty list when no active tags exist: %j',
+    async ({ data }) => {
+      vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+      renderWithProviders(<TagManagementPage />);
+      expect(await screen.findByText('No NFC tags registered.')).toBeVisible();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    },
+  );
+
+  it('preserves a backend service reason and retries only on request', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      status: 503,
+      data: { detail: 'Maintenance in progress' },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<TagManagementPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Maintenance in progress',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 503');
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByRole('rowheader', { name: 'Washing Tag' });
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each([403, 406])(
+    'does not offer a futile retry for HTTP %s',
+    async (status) => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        status,
+        data: { detail: 'Backend reason' },
+      });
+      renderWithProviders(<TagManagementPage />);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Backend reason',
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No NFC tags registered.'),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    { status: 401, data: '' },
+    {
+      status: 403,
+      data: {
+        type: 'about:blank',
+        status: 403,
+        title: 'Forbidden',
+        code: 'ACCESS_DENIED',
+        detail: 'Role changed; log in again',
+      },
+    },
+  ])(
+    'offers sign-in when authentication must be renewed: %j',
+    async (response) => {
+      setAuthenticatedSession({
+        user: { id: 'admin', username: 'admin', role: 'NW', status: 'Active' },
+        modules: ['tags'],
+      });
+      vi.mocked(apiClient.get).mockResolvedValue(response);
+      const user = userEvent.setup();
+      renderWithProviders(<TagManagementPage />);
+      await user.click(
+        await screen.findByRole('button', { name: 'Back to sign in' }),
+      );
+      expect(readSession()).toBeNull();
+    },
+  );
+
+  it('uses safe fallback text for an HTML service error', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 502,
+      data: '<html>Proxy diagnostics</html>',
+    });
+    renderWithProviders(<TagManagementPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Tags are temporarily unavailable',
+    );
+    expect(screen.queryByText('Proxy diagnostics')).not.toBeInTheDocument();
+  });
+
+  it('shows connectivity guidance on network failure', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network Error'));
+    renderWithProviders(<TagManagementPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Check your connection',
     );
   });
 
-  it('paginates and searches the registry without losing matches on later pages', async () => {
-    localStorage.setItem(
-      TAG_STORAGE_KEY,
-      JSON.stringify(
-        Array.from({ length: 30 }, (_, index) => ({
-          id: `tag-${index}`,
-          name: `Factory Tag ${index + 1}`,
-          actual: `TAG-${index + 1}`,
-        })),
-      ),
+  it.each([
+    {},
+    [tagsResponse[0], tagsResponse[0]],
+    [{ ...tagsResponse[0], assigned: 'true' }],
+    [{ ...tagsResponse[0], uid: undefined }],
+  ])('rejects an invalid response: %j', async (data) => {
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+    renderWithProviders(<TagManagementPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to read tags',
     );
-    const { user } = setup();
-    const table = screen.getByRole('table', { name: 'Existing Tags' });
-    expect(within(table).getAllByRole('row')).toHaveLength(11);
-    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
-    expect(
-      within(table).getByRole('rowheader', { name: 'Factory Tag 11' }),
-    ).toBeVisible();
-    await user.type(
-      screen.getByRole('searchbox', { name: 'Search tags' }),
-      'Factory Tag 30',
+    expect(screen.queryAllByRole('rowheader')).toHaveLength(0);
+  });
+
+  it('cancels on unmount and fetches again on return', async () => {
+    vi.mocked(apiClient.get).mockReturnValueOnce(new Promise(() => {}));
+    const { unmount } = renderWithProviders(<TagManagementPage />);
+    const signal = vi.mocked(apiClient.get).mock.calls[0][1]?.signal;
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    renderWithProviders(<TagManagementPage />);
+    await waitFor(() =>
+      expect(screen.getAllByRole('rowheader')).toHaveLength(2),
     );
-    expect(
-      within(table).getByRole('rowheader', { name: 'Factory Tag 30' }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Go to next page' }),
-    ).toBeDisabled();
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,20 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
+  AlertTitle,
   Box,
   Breadcrumbs,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
+  CircularProgress,
   IconButton,
   InputAdornment,
-  Link,
   Paper,
   Snackbar,
   Stack,
@@ -33,35 +28,61 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
-import { loadTags, TAG_STORAGE_KEY } from '../configurations/tagRegistry';
-import type { RegisteredTag } from '../configurations/tagRegistry';
-import { emptyTag, loadTagAssignments } from './tagData';
+import { signOut } from '../auth/session';
+import { createTag, getTags, TagsError } from './tagsApi';
 import { TagForm } from './TagForm';
+import type { TagResponse, TagsFailure } from './tagsApi';
+
+type TagsState =
+  | { status: 'loading' }
+  | { status: 'ready'; tags: TagResponse[] }
+  | { status: 'error'; failure: TagsFailure };
 
 export function TagManagementPage() {
   const { t } = useTranslation('translation');
-  const [data, setData] = useState(loadTags);
-  const [form, setForm] = useState<{
-    initial: RegisteredTag;
-    editing: boolean;
-  } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<RegisteredTag | null>(
-    null,
-  );
-  const [storageError, setStorageError] = useState(false);
-  const [guardError, setGuardError] = useState<
-    'deleteBlocked' | 'assignmentsUnavailable' | null
-  >(null);
-  const [toast, setToast] = useState<'saved' | 'deleted' | null>(null);
+  const [state, setState] = useState<TagsState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const status = loadTagAssignments();
+  useEffect(() => {
+    const controller = new AbortController();
+    void getTags(controller.signal).then(
+      (tags) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'ready',
+            tags,
+          });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setState({
+            status: 'error',
+            failure:
+              error instanceof TagsError
+                ? error.failure
+                : { kind: 'network', action: 'retry' },
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [attempt]);
+  useEffect(() => {
+    document.title = t('tags.pageTitle');
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', t('tags.pageDescription'));
+  }, [t]);
+
+  const tags = state.status === 'ready' ? state.tags : [];
   const search = query.trim().toLowerCase();
-  const filtered = data.records.filter(
+  const filtered = tags.filter(
     (tag) =>
       tag.name.toLowerCase().includes(search) ||
-      tag.actual.toLowerCase().includes(search),
+      tag.uid.toLowerCase().includes(search),
   );
   const currentPage = Math.min(
     page,
@@ -71,42 +92,6 @@ export function TagManagementPage() {
     currentPage * rowsPerPage,
     (currentPage + 1) * rowsPerPage,
   );
-
-  useEffect(() => {
-    document.title = t('tags.pageTitle');
-    document
-      .querySelector('meta[name="description"]')
-      ?.setAttribute('content', t('tags.pageDescription'));
-  }, [t]);
-
-  function persist(records: RegisteredTag[], message: 'saved' | 'deleted') {
-    try {
-      localStorage.setItem(TAG_STORAGE_KEY, JSON.stringify(records));
-      setData({ records, storageUnavailable: false });
-      setStorageError(false);
-      setGuardError(null);
-      setForm(null);
-      setToast(message);
-    } catch {
-      setStorageError(true);
-    }
-  }
-
-  function deleteTag() {
-    if (!pendingDelete) return;
-    const latest = loadTags().records;
-    const target = latest.find((tag) => tag.id === pendingDelete.id);
-    const assignments = loadTagAssignments();
-    if (assignments.unavailable) setGuardError('assignmentsUnavailable');
-    else if (target && assignments.assignments.has(target.actual.toUpperCase()))
-      setGuardError('deleteBlocked');
-    else
-      persist(
-        latest.filter((tag) => tag.id !== pendingDelete.id),
-        'deleted',
-      );
-    setPendingDelete(null);
-  }
 
   return (
     <>
@@ -138,35 +123,48 @@ export function TagManagementPage() {
         </Box>
         <Button
           variant="contained"
+          disabled={state.status !== 'ready' || creating}
           startIcon={<AddIcon />}
-          sx={{ flexShrink: 0 }}
           onClick={() => {
-            setForm({ initial: emptyTag(), editing: false });
-            setStorageError(false);
-            setGuardError(null);
+            setSaved(false);
+            setCreating(true);
           }}
         >
           {t('tags.add')}
         </Button>
       </Stack>
-      {data.storageUnavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('tags.loadWarning')}
-        </Alert>
-      )}
-      {status.unavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('tags.assignmentsUnavailable')}
-        </Alert>
-      )}
-      {storageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t('tags.storageError')}
-        </Alert>
-      )}
-      {guardError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t(`tags.${guardError}`)}
+      {state.status === 'error' && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            state.failure.action === 'signIn' ? (
+              <Button color="inherit" onClick={signOut}>
+                {t('startup.signIn')}
+              </Button>
+            ) : state.failure.action === 'retry' ? (
+              <Button
+                color="inherit"
+                onClick={() => {
+                  setState({ status: 'loading' });
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                {t('startup.retry')}
+              </Button>
+            ) : undefined
+          }
+        >
+          <AlertTitle>
+            {t(`tags.failures.${state.failure.kind}.title`)}
+          </AlertTitle>
+          {state.failure.message ||
+            t(`tags.failures.${state.failure.kind}.description`)}
+          {state.failure.status !== undefined && (
+            <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+              {t('tags.failureStatus', { status: state.failure.status })}
+            </Typography>
+          )}
         </Alert>
       )}
       <Paper
@@ -192,16 +190,19 @@ export function TagManagementPage() {
             >
               {t('tags.existing')}
             </Typography>
-            <Chip
-              size="small"
-              label={t('tags.count', { count: data.records.length })}
-            />
+            {state.status === 'ready' && (
+              <Chip
+                size="small"
+                label={t('tags.count', { count: tags.length })}
+              />
+            )}
           </Box>
           <TextField
             type="search"
             label={t('tags.search')}
             placeholder={t('tags.searchPlaceholder')}
             value={query}
+            disabled={state.status !== 'ready'}
             onChange={(event) => {
               setQuery(event.target.value);
               setPage(0);
@@ -219,10 +220,13 @@ export function TagManagementPage() {
           />
         </Stack>
         <TableContainer>
-          <Table aria-labelledby="existing-tags-heading" sx={{ minWidth: 700 }}>
+          <Table
+            aria-label={t('tags.existing')}
+            aria-busy={state.status === 'loading'}
+          >
             <TableHead
               sx={{
-                bgcolor: '#f7f9fc',
+                bgcolor: 'grey.50',
                 '& th': {
                   color: 'text.secondary',
                   fontSize: 11,
@@ -241,181 +245,127 @@ export function TagManagementPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {visible.map((tag) => {
-                const assignment = status.assignments.get(
-                  tag.actual.toUpperCase(),
-                );
-                const blocked = Boolean(assignment) || status.unavailable;
-                return (
-                  <TableRow key={tag.id}>
-                    <TableCell
-                      component="th"
-                      scope="row"
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {tag.name}
-                    </TableCell>
-                    <TableCell sx={{ overflowWrap: 'anywhere' }}>
-                      {tag.actual}
-                    </TableCell>
-                    <TableCell>
-                      {assignment ? (
-                        <Link
-                          component={RouterLink}
-                          to={assignment.path}
-                          underline="hover"
-                        >
-                          {t(`tags.assignment.${assignment.type}`, {
-                            name: assignment.name,
-                            process: assignment.process ?? '',
-                          })}
-                        </Link>
-                      ) : (
-                        <Chip
-                          size="small"
-                          label={t('tags.available')}
-                          color="success"
-                          variant="outlined"
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" sx={{ gap: 0.5 }}>
-                        <Tooltip title={t('tags.editAction')}>
+              {state.status === 'loading' && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                    <CircularProgress
+                      size={28}
+                      aria-label={t('common.loading')}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              {visible.map((tag) => (
+                <TableRow key={tag.id}>
+                  <TableCell
+                    component="th"
+                    scope="row"
+                    sx={{ fontWeight: 600 }}
+                  >
+                    {tag.name}
+                  </TableCell>
+                  <TableCell sx={{ overflowWrap: 'anywhere' }}>
+                    {tag.uid}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      label={
+                        tag.assigned ? t('tags.assigned') : t('tags.available')
+                      }
+                      color={tag.assigned ? 'default' : 'success'}
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" sx={{ gap: 0.5 }}>
+                      <Tooltip title={t('tags.changesUnavailable')}>
+                        <Box component="span">
                           <IconButton
                             size="small"
                             color="primary"
+                            disabled
                             aria-label={t('tags.editNamed', { name: tag.name })}
-                            onClick={() => {
-                              setForm({
-                                initial: structuredClone(tag),
-                                editing: true,
-                              });
-                              setStorageError(false);
-                              setGuardError(null);
-                            }}
                           >
                             <EditOutlinedIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
-                        <Tooltip
-                          title={t(
-                            blocked
-                              ? 'tags.deleteBlocked'
-                              : 'tags.deleteAction',
-                          )}
-                        >
-                          <Box component="span">
-                            <IconButton
-                              size="small"
-                              color="error"
-                              disabled={blocked}
-                              aria-label={t('tags.deleteNamed', {
-                                name: tag.name,
-                              })}
-                              onClick={() => setPendingDelete(tag)}
-                            >
-                              <DeleteOutlinedIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </Tooltip>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {visible.length === 0 && (
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={t(
+                          tag.assigned
+                            ? 'tags.deleteBlocked'
+                            : 'tags.changesUnavailable',
+                        )}
+                      >
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled
+                            aria-label={t('tags.deleteNamed', {
+                              name: tag.name,
+                            })}
+                          >
+                            <DeleteOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {state.status === 'ready' && !visible.length && (
                 <TableRow>
                   <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
-                    {t(
-                      data.records.length === 0
-                        ? 'tags.empty'
-                        : 'tags.noMatches',
-                    )}
+                    {t(tags.length ? 'tags.noMatches' : 'tags.empty')}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={filtered.length}
-          page={currentPage}
-          rowsPerPage={rowsPerPage}
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          onPageChange={(_, next) => setPage(next)}
-          onRowsPerPageChange={(event) => {
-            setRowsPerPage(Number(event.target.value));
-            setPage(0);
-          }}
-          labelRowsPerPage={t('common.pagination.rowsPerPage')}
-          labelDisplayedRows={({ from, to, count }) =>
-            t('common.pagination.range', { from, to, count })
-          }
-          getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
-        />
+        {state.status === 'ready' && (
+          <TablePagination
+            component="div"
+            count={filtered.length}
+            page={currentPage}
+            rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            onPageChange={(_, next) => setPage(next)}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(Number(event.target.value));
+              setPage(0);
+            }}
+            labelRowsPerPage={t('common.pagination.rowsPerPage')}
+            labelDisplayedRows={({ from, to, count }) =>
+              t('common.pagination.range', { from, to, count })
+            }
+            getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
+          />
+        )}
       </Paper>
-      {form && (
+      {creating && (
         <TagForm
-          key={form.initial.id}
-          initial={form.initial}
-          editing={form.editing}
-          onClose={() => setForm(null)}
-          onSave={(tag) => {
-            const records = loadTags().records;
-            persist(
-              form.editing
-                ? records.map((record) => (record.id === tag.id ? tag : record))
-                : [tag, ...records],
-              'saved',
-            );
+          onClose={() => setCreating(false)}
+          onCreate={async (body, signal) => {
+            await createTag(body, signal);
+            if (signal.aborted) return;
+            setCreating(false);
+            setSaved(true);
+            setQuery('');
+            setPage(0);
+            setState({ status: 'loading' });
+            setAttempt((value) => value + 1);
           }}
         />
       )}
-      <Dialog
-        open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
-        aria-labelledby="tag-confirmation-title"
-        aria-describedby="tag-confirmation-description"
-      >
-        <DialogTitle id="tag-confirmation-title">
-          {t('tags.deleteTitle')}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="tag-confirmation-description">
-            {t('tags.deleteMessage', {
-              name: pendingDelete?.name ?? '',
-              actual: pendingDelete?.actual ?? '',
-            })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="outlined"
-            onClick={() => setPendingDelete(null)}
-            autoFocus
-          >
-            {t('tags.cancel')}
-          </Button>
-          <Button color="primary" variant="contained" onClick={deleteTag}>
-            {t('tags.deleteAction')}
-          </Button>
-        </DialogActions>
-      </Dialog>
       <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-      >
-        <Alert
-          severity="success"
-          variant="filled"
-          onClose={() => setToast(null)}
-        >
-          {toast && t(`tags.${toast}`)}
-        </Alert>
-      </Snackbar>
+        open={saved}
+        autoHideDuration={3500}
+        onClose={() => setSaved(false)}
+        message={t('tags.saved')}
+      />
     </>
   );
 }
