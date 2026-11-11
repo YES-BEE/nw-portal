@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { accessRolesResponse } from '../../test/accessRoles';
+import { accessRoleOptionsResponse } from '../../test/accessRoles';
 import { userResponse } from '../../test/users';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import * as accessRolesApi from './accessRolesApi';
@@ -11,8 +11,8 @@ import { createUser } from './usersApi';
 import { UserForm } from './UserForm';
 
 beforeEach(() => {
-  vi.spyOn(accessRolesApi, 'getAccessRoles').mockResolvedValue(
-    accessRolesResponse,
+  vi.spyOn(accessRolesApi, 'getAccessRoleOptions').mockResolvedValue(
+    accessRoleOptionsResponse,
   );
   vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,

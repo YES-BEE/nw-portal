@@ -7,6 +7,11 @@ import {
 } from './accessRolesFailure';
 import type {
   AccessRoleResponse,
+  DeleteAccessRoleResponse,
+  ModuleResponse,
+  ModulesResponse,
+  AccessRoleOptionResponse,
+  AccessRoleOptionsResponse,
   AccessRolesResponse,
   AccessRolesOperation,
   CreateAccessRoleRequest,
@@ -80,6 +85,68 @@ export async function getAccessRoles(
   return data;
 }
 
+export async function getAccessRoleOptions(
+  signal?: AbortSignal,
+): Promise<AccessRoleOptionsResponse> {
+  const data = await request(() =>
+    apiClient.get<unknown>('access-roles/options', {
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    }),
+  );
+  const isOption = (value: unknown): value is AccessRoleOptionResponse => {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return false;
+    const option = value as Record<string, unknown>;
+    return (
+      typeof option.code === 'string' &&
+      !!option.code.trim() &&
+      typeof option.name === 'string' &&
+      !!option.name.trim()
+    );
+  };
+  if (
+    !Array.isArray(data) ||
+    !data.every(isOption) ||
+    new Set(data.map((role) => role.code)).size !== data.length
+  )
+    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
+}
+
+export async function getModules(
+  signal?: AbortSignal,
+): Promise<ModulesResponse> {
+  const data = await request(() =>
+    apiClient.get<unknown>('modules', {
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    }),
+  );
+  const isModule = (value: unknown): value is ModuleResponse => {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return false;
+    const module = value as Record<string, unknown>;
+    return (
+      typeof module.key === 'string' &&
+      !!module.key.trim() &&
+      typeof module.name === 'string' &&
+      !!module.name.trim() &&
+      typeof module.built_in === 'boolean' &&
+      typeof module.active === 'boolean'
+    );
+  };
+  if (
+    !Array.isArray(data) ||
+    !data.every(isModule) ||
+    new Set(data.map((module) => module.key)).size !== data.length
+  )
+    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
+}
+
 export async function saveAccessRole(
   roleCode: string,
   body: SaveAccessRoleRequest,
@@ -97,6 +164,20 @@ export async function saveAccessRole(
         { signal, timeout: 10000, validateStatus: () => true },
       ),
     'update',
+  );
+}
+
+export async function deleteAccessRole(
+  roleCode: string,
+  signal?: AbortSignal,
+): Promise<DeleteAccessRoleResponse> {
+  return request(
+    () =>
+      apiClient.delete<DeleteAccessRoleResponse>(
+        `access-roles/${encodeURIComponent(roleCode)}`,
+        { signal, timeout: 10000, validateStatus: () => true },
+      ),
+    'delete',
   );
 }
 

@@ -16,13 +16,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { moduleKeys } from './accessData';
-import type { ModuleKey } from './accessData';
 import type {
   AccessRoleDraft,
   AccessRoleField,
   AccessRolesFailure,
+  ModulesResponse,
 } from './types';
+import { getModules } from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
 import { signOut } from '../auth/session';
 
@@ -46,6 +46,32 @@ export function RoleForm({
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<AccessRolesFailure | null>(null);
+  const [modulesState, setModulesState] = useState<
+    | { status: 'loading' }
+    | { status: 'ready'; modules: ModulesResponse }
+    | { status: 'error'; failure: AccessRolesFailure }
+  >({ status: 'loading' });
+  const [modulesAttempt, setModulesAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void getModules(controller.signal).then(
+      (modules) => {
+        if (!controller.signal.aborted)
+          setModulesState({ status: 'ready', modules });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setModulesState({
+            status: 'error',
+            failure:
+              error instanceof AccessRolesError
+                ? error.failure
+                : { kind: 'network', action: 'retry' },
+          });
+      },
+    );
+    return () => controller.abort();
+  }, [modulesAttempt]);
   const pending = useRef<AbortController | null>(null);
   const section = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -82,7 +108,21 @@ export function RoleForm({
       return { ...current, fieldErrors };
     });
   }
-  const choices = [...new Set([...moduleKeys, ...initial.modules])];
+  const availableModules =
+    modulesState.status === 'ready'
+      ? modulesState.modules.filter((module) => module.active)
+      : [];
+  const choices =
+    modulesState.status === 'ready'
+      ? [
+          ...availableModules,
+          ...initial.modules
+            .filter(
+              (key) => !availableModules.some((module) => module.key === key),
+            )
+            .map((key) => ({ key, name: key, active: false, built_in: false })),
+        ]
+      : [];
   return (
     <Paper
       component="section"
@@ -105,7 +145,8 @@ export function RoleForm({
         onSubmit={async (event) => {
           event.preventDefault();
           setSubmitted(true);
-          if (nameError || pending.current) return;
+          if (nameError || pending.current || modulesState.status !== 'ready')
+            return;
           const controller = new AbortController();
           pending.current = controller;
           setSaving(true);
@@ -151,12 +192,20 @@ export function RoleForm({
         />
         <FormControl
           component="fieldset"
-          disabled={saving}
+          disabled={saving || modulesState.status !== 'ready'}
           error={Boolean(moduleError)}
           aria-describedby={moduleError ? 'role-modules-error' : undefined}
           sx={{ display: 'flex', mt: 3 }}
         >
           <FormLabel component="legend">{t('access.moduleAccess')}</FormLabel>
+          {modulesState.status === 'loading' && (
+            <Typography role="status">
+              {t('access.roles.loadingModules')}
+            </Typography>
+          )}
+          {modulesState.status === 'ready' && !availableModules.length && (
+            <Typography>{t('access.roles.noModules')}</Typography>
+          )}
           <Typography
             color="text.secondary"
             sx={{ mt: 1, mb: 2, fontSize: 13 }}
@@ -174,14 +223,11 @@ export function RoleForm({
               gap: 1,
             }}
           >
-            {choices.map((key) => (
+            {choices.map((module) => (
               <FormControlLabel
-                key={key}
-                label={
-                  moduleKeys.includes(key as ModuleKey)
-                    ? t(`access.modules.${key as ModuleKey}`)
-                    : key
-                }
+                key={module.key}
+                label={module.name}
+                disabled={!module.active}
                 sx={{
                   m: 0,
                   border: 1,
@@ -191,13 +237,15 @@ export function RoleForm({
                 }}
                 control={
                   <Checkbox
-                    checked={draft.modules.includes(key)}
+                    checked={draft.modules.includes(module.key)}
                     onChange={(event) =>
                       updateDraft(
                         {
                           modules: event.target.checked
-                            ? [...draft.modules, key]
-                            : draft.modules.filter((item) => item !== key),
+                            ? [...draft.modules, module.key]
+                            : draft.modules.filter(
+                                (item) => item !== module.key,
+                              ),
                         },
                         ['modules', 'pcAccess'],
                       )
@@ -213,6 +261,40 @@ export function RoleForm({
             </FormHelperText>
           )}
         </FormControl>
+        {modulesState.status === 'error' && (
+          <Alert
+            severity="error"
+            sx={{ mt: 2 }}
+            action={
+              modulesState.failure.action === 'signIn' ? (
+                <Button color="inherit" onClick={signOut}>
+                  {t('startup.signIn')}
+                </Button>
+              ) : modulesState.failure.action === 'retry' ? (
+                <Button
+                  color="inherit"
+                  onClick={() => {
+                    setModulesState({ status: 'loading' });
+                    setModulesAttempt((value) => value + 1);
+                  }}
+                >
+                  {t('startup.retry')}
+                </Button>
+              ) : undefined
+            }
+          >
+            <AlertTitle>{t('access.roles.modulesFailure')}</AlertTitle>
+            {modulesState.failure.message ||
+              t('access.roles.modulesFailureDescription')}
+            {modulesState.failure.status !== undefined && (
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
+                {t('access.roles.failureStatus', {
+                  status: modulesState.failure.status,
+                })}
+              </Typography>
+            )}
+          </Alert>
+        )}
         <FormControl
           component="fieldset"
           disabled={saving}
@@ -282,7 +364,11 @@ export function RoleForm({
           <Button onClick={onClose} disabled={saving}>
             {t('access.cancel')}
           </Button>
-          <Button type="submit" variant="contained" disabled={saving}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={saving || modulesState.status !== 'ready'}
+          >
             {t(saving ? 'access.roles.saving' : 'access.roles.save')}
           </Button>
         </Stack>

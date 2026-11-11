@@ -12,6 +12,27 @@ export interface AccessRoleResponse {
 
 export type AccessRolesResponse = AccessRoleResponse[];
 
+export interface DeleteAccessRoleResponse {
+  code: string;
+  active: false;
+}
+
+export interface AccessRoleOptionResponse {
+  code: string;
+  name: string;
+}
+
+export type AccessRoleOptionsResponse = AccessRoleOptionResponse[];
+
+export interface ModuleResponse {
+  key: string;
+  name: string;
+  built_in: boolean;
+  active: boolean;
+}
+
+export type ModulesResponse = ModuleResponse[];
+
 // ProcessAssignmentService.View in the backend.
 export interface UserProcessAssignment {
   processId: string;
@@ -89,7 +110,7 @@ export interface AccessRoleDraft extends Omit<
 }
 
 export type AccessRoleField = keyof CreateAccessRoleRequest;
-export type AccessRolesOperation = 'list' | 'create' | 'update';
+export type AccessRolesOperation = 'list' | 'create' | 'update' | 'delete';
 
 export interface AccessRolesValidationResponse {
   type: string;

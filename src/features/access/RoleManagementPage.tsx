@@ -33,11 +33,13 @@ import { AccessRolesError } from './accessRolesFailure';
 import { signOut } from '../auth/session';
 import type {
   AccessRoleDraft,
+  AccessRoleResponse,
   AccessRolesFailure,
   AccessRolesResponse,
 } from './types';
 import { ManagementHeader } from './ManagementScaffold';
 import { RoleForm } from './RoleForm';
+import { RoleDeleteDialog } from './RoleDeleteDialog';
 
 type RolesState =
   | { status: 'loading' }
@@ -53,6 +55,15 @@ export function RoleManagementPage() {
     editing: boolean;
   } | null>(null);
   const [saved, setSaved] = useState(false);
+  const [deletingRole, setDeletingRole] = useState<AccessRoleResponse | null>(
+    null,
+  );
+  const [deleted, setDeleted] = useState(false);
+  function reloadRoles() {
+    setDeletingRole(null);
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  }
   useEffect(() => {
     const controller = new AbortController();
     void getAccessRoles(controller.signal).then(
@@ -77,7 +88,7 @@ export function RoleManagementPage() {
       <ManagementHeader
         kind="roles"
         onAdd={
-          state.status === 'ready' && !form
+          state.status === 'ready' && !form && !deletingRole
             ? () => {
                 setSaved(false);
                 setForm({
@@ -204,7 +215,7 @@ export function RoleManagementPage() {
                       <Tooltip title={t('access.edit')}>
                         <Box component="span">
                           <IconButton
-                            disabled={Boolean(form)}
+                            disabled={Boolean(form || deletingRole)}
                             onClick={() => {
                               setSaved(false);
                               setForm({
@@ -225,10 +236,14 @@ export function RoleManagementPage() {
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={t('access.roles.deleteUnavailable')}>
+                      <Tooltip title={t('access.delete')}>
                         <Box component="span">
                           <IconButton
-                            disabled
+                            disabled={Boolean(form || deletingRole)}
+                            onClick={() => {
+                              setDeleted(false);
+                              setDeletingRole(role);
+                            }}
                             color="error"
                             aria-label={t('access.deleteNamed', {
                               name: role.name,
@@ -275,6 +290,23 @@ export function RoleManagementPage() {
           }}
         />
       )}
+      {deletingRole && (
+        <RoleDeleteDialog
+          role={deletingRole}
+          onClose={() => setDeletingRole(null)}
+          onReload={reloadRoles}
+          onDeleted={() => {
+            setDeleted(true);
+            reloadRoles();
+          }}
+        />
+      )}
+      <Snackbar
+        open={deleted}
+        autoHideDuration={3500}
+        onClose={() => setDeleted(false)}
+        message={t('access.roles.deleted')}
+      />
       <Snackbar
         open={saved}
         autoHideDuration={3500}

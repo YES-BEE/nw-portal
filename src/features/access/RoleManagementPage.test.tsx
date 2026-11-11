@@ -8,6 +8,8 @@ import {
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
+import * as accessRolesApi from './accessRolesApi';
+import { modulesResponse } from '../../test/modules';
 import en from '../../i18n/locales/en.json';
 import { renderWithProviders } from '../../test/render';
 import { defaultRoles } from '../../test/fixtures';
@@ -29,6 +31,7 @@ const roles: AccessRolesResponse = defaultRoles.map((role) => ({
 }));
 
 beforeEach(() => {
+  vi.spyOn(accessRolesApi, 'getModules').mockResolvedValue(modulesResponse);
   vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: roles });
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 204, data: null });
   vi.spyOn(apiClient, 'post').mockResolvedValue({
@@ -81,7 +84,7 @@ describe('backend role management', () => {
     expect(screen.getByRole('button', { name: 'Edit IT Admin' })).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Delete IT Admin' }),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   it('shows loading until the response arrives', async () => {

@@ -3,22 +3,22 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { accessRolesResponse } from '../../test/accessRoles';
+import { accessRoleOptionsResponse } from '../../test/accessRoles';
 import { userResponse } from '../../test/users';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import type { AccessRolesResponse } from './types';
+import type { AccessRoleOptionsResponse } from './types';
 import { UserRoleSelect } from './UserRoleSelect';
 import { UserForm } from './UserForm';
 
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: accessRolesResponse,
+    data: accessRoleOptionsResponse,
   });
 });
 
 describe('backend user role dropdown', () => {
-  it('loads role names from GET access-roles and returns the selected code', async () => {
+  it('loads role names from GET access-roles/options and returns the selected code', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(<UserRoleSelect value="NW" onChange={onChange} />);
@@ -27,7 +27,7 @@ describe('backend user role dropdown', () => {
       expect(select).not.toHaveAttribute('aria-disabled', 'true'),
     );
     expect(apiClient.get).toHaveBeenCalledWith(
-      'access-roles',
+      'access-roles/options',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     await user.click(select);
@@ -38,7 +38,7 @@ describe('backend user role dropdown', () => {
   it('disables selection while loading and then prefills the matching backend name', async () => {
     let resolve!: (response: {
       status: number;
-      data: AccessRolesResponse;
+      data: AccessRoleOptionsResponse;
     }) => void;
     vi.mocked(apiClient.get).mockReturnValue(
       new Promise((done) => {
@@ -51,7 +51,9 @@ describe('backend user role dropdown', () => {
       'true',
     );
     expect(screen.getByText('Loading roles...')).toBeVisible();
-    await act(async () => resolve({ status: 200, data: accessRolesResponse }));
+    await act(async () =>
+      resolve({ status: 200, data: accessRoleOptionsResponse }),
+    );
     expect(screen.getByRole('combobox', { name: /Role/ })).toHaveTextContent(
       'IT Admin',
     );
@@ -75,19 +77,7 @@ describe('backend user role dropdown', () => {
     expect(change).not.toHaveBeenCalled();
   });
 
-  it('preserves an unavailable assigned code and disables inactive options', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({
-      status: 200,
-      data: [
-        ...accessRolesResponse,
-        {
-          ...accessRolesResponse[0],
-          code: 'INACTIVE',
-          name: 'Inactive Role',
-          active: false,
-        },
-      ],
-    });
+  it('preserves an assigned code missing from the active options as unavailable', async () => {
     const change = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(
@@ -102,9 +92,6 @@ describe('backend user role dropdown', () => {
       'REMOVED_ROLE (unavailable)',
     );
     await user.click(screen.getByRole('combobox', { name: /Role/ }));
-    expect(
-      screen.getByRole('option', { name: 'Inactive Role' }),
-    ).toHaveAttribute('aria-disabled', 'true');
     expect(
       screen.getByRole('option', { name: 'REMOVED_ROLE (unavailable)' }),
     ).toHaveAttribute('aria-disabled', 'true');

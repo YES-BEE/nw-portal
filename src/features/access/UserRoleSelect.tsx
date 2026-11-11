@@ -10,13 +10,13 @@ import {
   Typography,
 } from '@mui/material';
 import { signOut } from '../auth/session';
-import { getAccessRoles } from './accessRolesApi';
+import { getAccessRoleOptions } from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
-import type { AccessRolesFailure, AccessRolesResponse } from './types';
+import type { AccessRolesFailure, AccessRoleOptionsResponse } from './types';
 
 type RolesState =
   | { status: 'loading' }
-  | { status: 'ready'; roles: AccessRolesResponse }
+  | { status: 'ready'; roles: AccessRoleOptionsResponse }
   | { status: 'error'; failure: AccessRolesFailure };
 
 export function UserRoleSelect({
@@ -35,7 +35,7 @@ export function UserRoleSelect({
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    void getAccessRoles(controller.signal).then(
+    void getAccessRoleOptions(controller.signal).then(
       (roles) => {
         if (!controller.signal.aborted) setState({ status: 'ready', roles });
       },
@@ -53,7 +53,7 @@ export function UserRoleSelect({
     return () => controller.abort();
   }, [attempt]);
   const roles = state.status === 'ready' ? state.roles : [];
-  const hasActiveRoles = roles.some((role) => role.active);
+  const hasActiveRoles = roles.length > 0;
   const missingCurrent = !!value && !roles.some((role) => role.code === value);
   return (
     <Box
@@ -94,7 +94,7 @@ export function UserRoleSelect({
           </MenuItem>
         )}
         {roles.map((role) => (
-          <MenuItem key={role.code} value={role.code} disabled={!role.active}>
+          <MenuItem key={role.code} value={role.code}>
             {role.name}
           </MenuItem>
         ))}

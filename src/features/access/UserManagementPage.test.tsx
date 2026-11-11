@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
 import { userResponse, usersResponse } from '../../test/users';
-import { accessRolesResponse } from '../../test/accessRoles';
+import { accessRoleOptionsResponse } from '../../test/accessRoles';
 import * as accessRolesApi from './accessRolesApi';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import { ACCESS_STORAGE_KEY } from './accessData';
@@ -20,8 +20,8 @@ beforeEach(() => {
     status: 200,
     data: userResponse,
   });
-  vi.spyOn(accessRolesApi, 'getAccessRoles').mockResolvedValue(
-    accessRolesResponse,
+  vi.spyOn(accessRolesApi, 'getAccessRoleOptions').mockResolvedValue(
+    accessRoleOptionsResponse,
   );
   localStorage.clear();
   vi.spyOn(apiClient, 'get').mockResolvedValue({

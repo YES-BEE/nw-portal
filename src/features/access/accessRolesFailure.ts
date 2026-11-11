@@ -44,7 +44,7 @@ export function parseAccessRolesFailure(
   const fieldErrors: Partial<Record<AccessRoleField, string>> = {};
   const fields = problem?.fieldErrors;
   const validation =
-    operation !== 'list' &&
+    (operation === 'create' || operation === 'update') &&
     status === 400 &&
     problem?.code === 'VALIDATION_FAILED' &&
     fields &&
@@ -63,7 +63,7 @@ export function parseAccessRolesFailure(
         ? validation
           ? 'validation'
           : 'invalidRequest'
-        : status === 404 && operation === 'update'
+        : status === 404 && (operation === 'update' || operation === 'delete')
           ? 'notFound'
           : status === 409
             ? 'conflict'
@@ -91,7 +91,8 @@ export function parseAccessRolesFailure(
     action:
       kind === 'authentication' || kind === 'roleChanged'
         ? 'signIn'
-        : kind === 'notFound'
+        : kind === 'notFound' ||
+            (operation === 'delete' && kind === 'invalidRequest')
           ? 'reload'
           : kind === 'access' ||
               kind === 'representation' ||

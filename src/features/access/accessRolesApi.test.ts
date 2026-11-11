@@ -3,10 +3,17 @@ import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
-import { accessRolesResponse } from '../../test/accessRoles';
+import {
+  accessRoleOptionsResponse,
+  accessRolesResponse,
+} from '../../test/accessRoles';
 import { setAuthenticatedSession } from '../auth/session';
+import { modulesResponse } from '../../test/modules';
 import {
   createAccessRole,
+  deleteAccessRole,
+  getAccessRoleOptions,
+  getModules,
   getAccessRoles,
   saveAccessRole,
 } from './accessRolesApi';
@@ -47,6 +54,143 @@ afterEach(() => {
 });
 
 describe('access roles API transport', () => {
+  it('deletes an encoded role code with no body and returns its inactive status', async () => {
+    const deletedRole = { code: 'CUSTOM/OPS', active: false };
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, deletedRole),
+    );
+    const controller = new AbortController();
+    await expect(
+      deleteAccessRole('CUSTOM/OPS', controller.signal),
+    ).resolves.toEqual(deletedRole);
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/access-roles/CUSTOM%2FOPS',
+    );
+    expect(config.method).toBe('delete');
+    expect(config.data).toBeUndefined();
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    [409, 'ROLE_IN_USE', 'conflict', 'none'],
+    [409, 'BUILT_IN_ROLE', 'conflict', 'none'],
+    [409, 'DATA_CONFLICT', 'conflict', 'none'],
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'reload'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])(
+    'preserves DELETE HTTP %s / %s without automatically resubmitting',
+    async (status, code, kind, action) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { code, detail: 'Backend reason' }),
+      );
+      await expect(deleteAccessRole('CUSTOM_ROLE')).rejects.toMatchObject({
+        failure: { status, kind, action, message: 'Backend reason' },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('loads the typed module catalog with bearer authentication and no request body', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, modulesResponse),
+    );
+    const controller = new AbortController();
+    await expect(getModules(controller.signal)).resolves.toEqual(
+      modulesResponse,
+    );
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe('http://backend.test/api/v1/modules');
+    expect(config.method).toBe('get');
+    expect(config.data).toBeUndefined();
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    { data: {} },
+    { data: [{ key: 'dashboard', name: 'Dashboard' }] },
+    { data: [{ ...modulesResponse[0], active: 'true' }] },
+    { data: [{ ...modulesResponse[0], key: '' }] },
+    { data: [modulesResponse[0], modulesResponse[0]] },
+  ])('rejects malformed module responses: %j', async ({ data }) => {
+    adapter.mockImplementation(async (config) => response(config, 200, data));
+    await expect(getModules()).rejects.toMatchObject({
+      failure: { kind: 'invalidResponse', action: 'retry' },
+    });
+  });
+
+  it.each([403, 503])(
+    'preserves module HTTP %s failures without automatically retrying',
+    async (status) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { detail: 'Backend reason' }),
+      );
+      await expect(getModules()).rejects.toMatchObject({
+        failure: {
+          status,
+          message: 'Backend reason',
+          action: status === 403 ? 'none' : 'retry',
+        },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('loads code/name options with bearer authentication and an abort signal', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, accessRoleOptionsResponse),
+    );
+    const controller = new AbortController();
+    await expect(getAccessRoleOptions(controller.signal)).resolves.toEqual(
+      accessRoleOptionsResponse,
+    );
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/access-roles/options',
+    );
+    expect(config.method).toBe('get');
+    expect(config.signal).toBe(controller.signal);
+    expect(config.data).toBeUndefined();
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer ' + loginResponse.accessToken,
+    );
+  });
+
+  it.each([
+    { data: {} },
+    { data: [{ code: 'NW' }] },
+    { data: [{ code: '', name: 'NW' }] },
+    { data: [{ code: 'NW', name: 42 }] },
+    { data: [accessRoleOptionsResponse[0], accessRoleOptionsResponse[0]] },
+  ])('rejects malformed or duplicate role options: %j', async ({ data }) => {
+    adapter.mockImplementation(async (config) => response(config, 200, data));
+    await expect(getAccessRoleOptions()).rejects.toMatchObject({
+      failure: { kind: 'invalidResponse', action: 'retry' },
+    });
+  });
+
+  it.each([403, 503])(
+    'preserves role options HTTP %s failures without automatic retries',
+    async (status) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { detail: 'Backend reason' }),
+      );
+      await expect(getAccessRoleOptions()).rejects.toMatchObject({
+        failure: {
+          status,
+          message: 'Backend reason',
+          action: status === 403 ? 'none' : 'retry',
+        },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
   it.each(['post', 'put'] as const)(
     'normalizes %s validation, access, conflict, and service failures without automatic resubmission',
     async (method) => {
