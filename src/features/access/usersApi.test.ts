@@ -5,7 +5,7 @@ import { apiClient } from '../../api/client';
 import { loginResponse, refreshTokenResponse } from '../../test/auth';
 import { userResponse, usersResponse } from '../../test/users';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import { createUser, getUser, getUsers } from './usersApi';
+import { createUser, deleteUser, getUser, getUsers } from './usersApi';
 
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
@@ -36,6 +36,47 @@ afterEach(() => {
 });
 
 describe('users API', () => {
+  it('deletes the encoded user ID with a bearer token and no request body', async () => {
+    vi.stubEnv('VITE_API_VERSION', 'v1');
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, { ...userResponse, enabled: false }),
+    );
+    const controller = new AbortController();
+    await expect(
+      deleteUser('id/with space', controller.signal),
+    ).resolves.toBeUndefined();
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe(
+      'http://backend.test/api/v1/users/id%2Fwith%20space',
+    );
+    expect(config.method).toBe('delete');
+    expect(config.data).toBeUndefined();
+    expect(config.signal).toBe(controller.signal);
+    expect(config.headers.get('Authorization')).toBe(
+      `Bearer ${loginResponse.accessToken}`,
+    );
+  });
+
+  it.each([
+    [400, 'INVALID_ARGUMENT', 'invalidRequest', 'reload'],
+    [404, 'NOT_FOUND', 'notFound', 'reload'],
+    [409, 'DATA_CONFLICT', 'conflict', 'reload'],
+    [403, 'ACCESS_DENIED', 'access', 'none'],
+    [406, undefined, 'representation', 'none'],
+    [503, undefined, 'service', 'retry'],
+  ])(
+    'normalizes DELETE HTTP %s without automatically retrying',
+    async (status, code, kind, action) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, status, { code, detail: 'Backend reason' }),
+      );
+      await expect(deleteUser(userResponse.id)).rejects.toMatchObject({
+        failure: { status, kind, action, message: 'Backend reason' },
+      });
+      expect(adapter).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([200, 201, 204])(
     'creates users through the authenticated POST endpoint with HTTP %s',
     async (status) => {

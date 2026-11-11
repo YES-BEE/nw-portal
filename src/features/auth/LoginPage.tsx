@@ -9,7 +9,6 @@ import {
   FormLabel,
   IconButton,
   InputAdornment,
-  Link,
   MenuItem,
   Paper,
   Select,
@@ -28,14 +27,11 @@ import type { SignInError } from './session';
 import { useSession } from './useSession';
 import './login.css';
 
-type Notice = 'recovery';
-
 export function LoginPage() {
   const { t, i18n } = useTranslation('translation');
   const session = useSession();
   const [signInError, setSignInError] = useState<SignInError | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
@@ -46,18 +42,15 @@ export function LoginPage() {
   useEffect(() => () => loginRequest.current?.abort(), []);
   const backendError = typeof signInError === 'object' ? signInError : null;
   const fieldErrors = backendError?.fieldErrors;
-  const credentialsError = backendError?.kind === 'credentials';
   const usernameRequired = submitted && !credentials.username.trim();
-  const usernameError = usernameRequired || Boolean(fieldErrors?.username);
+  const usernameError = usernameRequired;
   const passwordRequired = submitted && !credentials.password.trim();
-  const passwordError =
-    passwordRequired || Boolean(fieldErrors?.password) || credentialsError;
-  const formError =
-    signInError && !credentialsError
-      ? typeof signInError === 'string'
-        ? t(`auth.errors.${signInError}`)
-        : signInError.message
-      : null;
+  const passwordError = passwordRequired;
+  const formError = signInError
+    ? typeof signInError === 'string'
+      ? t(`auth.errors.${signInError}`)
+      : signInError.message
+    : null;
 
   useEffect(() => {
     document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
@@ -75,7 +68,6 @@ export function LoginPage() {
     const password = String(data.get('password') ?? '');
     setCredentials({ username, password });
     setSubmitted(true);
-    setNotice(null);
     setSignInError(null);
     if (!username || !password.trim()) {
       event.currentTarget
@@ -179,6 +171,16 @@ export function LoginPage() {
           {formError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {formError}
+              {fieldErrors?.username && (
+                <Box>
+                  {t('login.username')}: {fieldErrors.username}
+                </Box>
+              )}
+              {fieldErrors?.password && (
+                <Box>
+                  {t('login.password')}: {fieldErrors.password}
+                </Box>
+              )}
               {fieldErrors?.clientType && (
                 <Box>
                   {t('auth.channelError', { message: fieldErrors.clientType })}
@@ -204,14 +206,13 @@ export function LoginPage() {
                   ...credentials,
                   username: event.target.value,
                 });
-                setNotice(null);
                 setSignInError(null);
               }}
               error={usernameError}
               helperText={
                 usernameRequired
                   ? t('login.errors.usernameRequired')
-                  : fieldErrors?.username
+                  : undefined
               }
               placeholder={t('login.usernamePlaceholder')}
               autoComplete="username"
@@ -228,7 +229,7 @@ export function LoginPage() {
               }}
             />
           </Box>
-          <Box className="auth-field">
+          <Box className="auth-field auth-password-field">
             <FormLabel
               htmlFor="password"
               error={passwordError}
@@ -246,15 +247,13 @@ export function LoginPage() {
                   ...credentials,
                   password: event.target.value,
                 });
-                setNotice(null);
                 setSignInError(null);
               }}
               error={passwordError}
               helperText={
                 passwordRequired
                   ? t('login.errors.passwordRequired')
-                  : (fieldErrors?.password ??
-                    (credentialsError ? backendError?.message : undefined))
+                  : undefined
               }
               type={showPassword ? 'text' : 'password'}
               placeholder={t('login.passwordPlaceholder')}
@@ -294,16 +293,6 @@ export function LoginPage() {
               }}
             />
           </Box>
-          <Box className="auth-extras">
-            <Link
-              component="button"
-              type="button"
-              underline="hover"
-              onClick={() => setNotice('recovery')}
-            >
-              {t('login.forgot')}
-            </Link>
-          </Box>
           <Button
             type="submit"
             variant="contained"
@@ -312,9 +301,6 @@ export function LoginPage() {
           >
             {t('login.signIn')}
           </Button>
-          <Typography className="auth-notice" role="status" aria-live="polite">
-            {notice ? t(`login.notices.${notice}`) : '\u00a0'}
-          </Typography>
           <Box component="footer" className="auth-footer">
             {t('common.copyright', { year: new Date().getFullYear() })}
           </Box>

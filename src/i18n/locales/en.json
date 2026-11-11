@@ -216,6 +216,11 @@
     "storageError": "Changes could not be saved in this browser. Your records and editor have been kept.",
     "roleAssigned": "The records have changed or this role is assigned to users. Refresh the page and review the records before trying again.",
     "users": {
+      "deleteTitle": "Delete user?",
+      "deleteMessage": "{{name}}'s status will be changed to Inactive.",
+      "deleteFailure": "Unable to delete user",
+      "deleting": "Deleting...",
+      "deleted": "User account disabled.",
       "description": "View users, assigned roles, and account status.",
       "displayName": "Display Name",
       "noDisplayName": "Not provided",

@@ -7,13 +7,7 @@ import {
 } from '../../test/auth';
 import { readSession } from './session';
 import { seedTestData } from '../../test/fixtures';
-import {
-  act,
-  fireEvent,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
@@ -92,7 +86,6 @@ describe('LoginPage', () => {
     expect(password).toBeRequired();
     expect(password).toHaveAttribute('autocomplete', 'current-password');
     expect(password).toHaveAttribute('type', 'password');
-    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
   });
 
   it('offers only English in the MUI language selector and keeps removed controls absent', async () => {
@@ -146,7 +139,6 @@ describe('LoginPage', () => {
 
     expect(password).toHaveAttribute('type', 'password');
     expect(password).toHaveValue('test-password');
-    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
   });
 
   it.each([
@@ -187,7 +179,6 @@ describe('LoginPage', () => {
           ? 'Enter your username.'
           : 'Enter your password.',
       );
-      expect(screen.getByRole('status')).toHaveTextContent(/^$/);
     },
   );
 
@@ -198,41 +189,38 @@ describe('LoginPage', () => {
     await user.click(submit);
 
     expect(username).toHaveAccessibleDescription('Enter your username.');
-    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
     await user.clear(username);
     await user.type(username, 'operator');
     expect(username).not.toHaveAttribute('aria-invalid', 'true');
     expect(username).not.toHaveAccessibleDescription('Enter your username.');
   });
 
-  it('rejects incorrect credentials using password helper text without saving a session', async () => {
+  it('shows incorrect credentials in a general alert without marking fields invalid or saving a session', async () => {
     const storeValue = vi.spyOn(Storage.prototype, 'setItem');
     const { user, username, password, submit } = setup();
     await user.type(username, 'operator');
     await user.type(password, 'test-password');
     await user.click(submit);
 
-    await waitFor(() =>
-      expect(password).toHaveAccessibleDescription('Bad credentials'),
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Bad credentials',
     );
+    expect(username).not.toBeInvalid();
+    expect(password).not.toBeInvalid();
+    expect(password).not.toHaveAccessibleDescription('Bad credentials');
     expect(storeValue).not.toHaveBeenCalled();
+    await user.type(username, '2');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('submits from the keyboard and replaces earlier recovery feedback', async () => {
+  it('submits from the keyboard', async () => {
     const { user, username, password } = setup();
-    await user.click(screen.getByRole('button', { name: 'Forgot password?' }));
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Password recovery is not configured yet.',
-    );
 
     await user.type(username, 'operator');
     await user.type(password, 'test-password{Enter}');
 
-    await waitFor(() =>
-      expect(password).toHaveAccessibleDescription('Bad credentials'),
-    );
-    expect(screen.getByRole('status')).not.toHaveTextContent(
-      'Password recovery',
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Bad credentials',
     );
   });
 
@@ -248,16 +236,18 @@ describe('LoginPage', () => {
       await user.type(username, 'admin');
       await user.type(password, 'password');
       await user.click(submit);
-      await waitFor(() =>
-        expect(password).toHaveAccessibleDescription(Object.values(body)[0]),
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        Object.values(body)[0],
       );
+      expect(username).not.toBeInvalid();
+      expect(password).not.toBeInvalid();
       expect(
         screen.queryByText(/Unable to sign in|Invalid username or password/),
       ).not.toBeInTheDocument();
     },
   );
 
-  it('shows backend validation messages beside known fields and displays channel errors at form level', async () => {
+  it('shows all backend validation messages in the general alert', async () => {
     postMock.mockResolvedValue({
       status: 400,
       data: JSON.stringify({
@@ -277,13 +267,17 @@ describe('LoginPage', () => {
     await user.type(username, 'admin');
     await user.type(password, 'password');
     await user.click(submit);
-    await waitFor(() =>
-      expect(username).toHaveAccessibleDescription('must not be blank'),
-    );
-    expect(password).toHaveAccessibleDescription('Enter a valid password');
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('alert')).toHaveTextContent(
       'Request validation failed',
     );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Username: must not be blank',
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Password: Enter a valid password',
+    );
+    expect(username).not.toBeInvalid();
+    expect(password).not.toBeInvalid();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Application channel: must match "PC|PAD"',
     );
@@ -323,14 +317,11 @@ describe('LoginPage', () => {
       await user.type(username, 'admin');
       await user.type(password, 'password');
       await user.click(submit);
-      if (status === 401) {
-        await waitFor(() =>
-          expect(password).toHaveAccessibleDescription('401'),
-        );
-      } else
-        expect(await screen.findByRole('alert')).toHaveTextContent(
-          String(status),
-        );
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        String(status),
+      );
+      expect(username).not.toBeInvalid();
+      expect(password).not.toBeInvalid();
       expect(
         screen.queryByText(/unsafe page|proxy error/),
       ).not.toBeInTheDocument();
@@ -404,13 +395,8 @@ describe('LoginPage', () => {
     expect(signal.aborted).toBe(true);
   });
 
-  it('offers recovery feedback even with empty credentials without submitting the form', async () => {
-    const { user } = setup();
-    await user.click(screen.getByRole('button', { name: 'Forgot password?' }));
-
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Password recovery is not configured yet.',
-    );
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  it('does not show a forgot password link', () => {
+    setup();
+    expect(screen.queryByText('Forgot password?')).not.toBeInTheDocument();
   });
 });

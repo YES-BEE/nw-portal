@@ -51,11 +51,12 @@ export function parseUsersFailure(
         : 'invalidRequest'
       : operation === 'create' && status === 404
         ? 'invalidRequest'
-        : operation === 'create' && status === 409
+        : (operation === 'create' || operation === 'delete') && status === 409
           ? 'conflict'
-          : operation === 'detail' && status === 404
+          : (operation === 'detail' || operation === 'delete') && status === 404
             ? 'notFound'
-            : operation === 'detail' && status === 400
+            : (operation === 'detail' || operation === 'delete') &&
+                status === 400
               ? 'invalidRequest'
               : status === 401
                 ? 'authentication'
@@ -82,7 +83,9 @@ export function parseUsersFailure(
               kind === 'invalidRequest' ||
               kind === 'conflict')
           ? 'none'
-          : kind === 'notFound' || kind === 'invalidRequest'
+          : kind === 'notFound' ||
+              kind === 'invalidRequest' ||
+              (operation === 'delete' && kind === 'conflict')
             ? 'reload'
             : kind === 'access' || kind === 'representation'
               ? 'none'

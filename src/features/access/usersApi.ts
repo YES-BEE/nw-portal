@@ -125,3 +125,18 @@ export async function createUser(
     'create',
   );
 }
+
+export async function deleteUser(
+  userId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  await requestUsers(
+    () =>
+      apiClient.delete<unknown>(`users/${encodeURIComponent(userId)}`, {
+        signal,
+        timeout: 10000,
+        validateStatus: () => true,
+      }),
+    'delete',
+  );
+}

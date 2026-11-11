@@ -30,8 +30,9 @@ import { ManagementHeader } from './ManagementScaffold';
 import { createUser, getUsers } from './usersApi';
 import { UsersError } from './usersFailure';
 import { UserEditor } from './UserEditor';
+import { UserDeleteDialog } from './UserDeleteDialog';
 import { UserForm } from './UserForm';
-import type { UsersFailure, UsersResponse } from './types';
+import type { UserResponse, UsersFailure, UsersResponse } from './types';
 
 type UsersState =
   | { status: 'loading' }
@@ -48,6 +49,14 @@ export function UserManagementPage() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<UserResponse | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  function reloadUsers() {
+    setDeletingUser(null);
+    setPage(0);
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  }
   useEffect(() => {
     const controller = new AbortController();
     void getUsers(controller.signal).then(
@@ -85,7 +94,10 @@ export function UserManagementPage() {
       <ManagementHeader
         kind="users"
         onAdd={
-          state.status === 'ready' && !creatingUser && !editingUserId
+          state.status === 'ready' &&
+          !creatingUser &&
+          !editingUserId &&
+          !deletingUser
             ? () => {
                 setSaved(false);
                 setCreatingUser(true);
@@ -209,7 +221,11 @@ export function UserManagementPage() {
                         <Tooltip title={t('access.edit')}>
                           <Box component="span">
                             <IconButton
-                              disabled={editingUserId !== null || creatingUser}
+                              disabled={
+                                editingUserId !== null ||
+                                creatingUser ||
+                                deletingUser !== null
+                              }
                               onClick={() => setEditingUserId(user.id)}
                               aria-label={t('access.editNamed', {
                                 name: user.username,
@@ -219,10 +235,19 @@ export function UserManagementPage() {
                             </IconButton>
                           </Box>
                         </Tooltip>
-                        <Tooltip title={t('access.users.editingUnavailable')}>
+                        <Tooltip title={t('access.delete')}>
                           <Box component="span">
                             <IconButton
-                              disabled
+                              disabled={
+                                editingUserId !== null ||
+                                creatingUser ||
+                                deletingUser !== null ||
+                                !user.enabled
+                              }
+                              onClick={() => {
+                                setDeleted(false);
+                                setDeletingUser(user);
+                              }}
                               color="error"
                               aria-label={t('access.deleteNamed', {
                                 name: user.username,
@@ -297,6 +322,23 @@ export function UserManagementPage() {
           }}
         />
       )}
+      {deletingUser && (
+        <UserDeleteDialog
+          user={deletingUser}
+          onClose={() => setDeletingUser(null)}
+          onReload={reloadUsers}
+          onDeleted={() => {
+            setDeleted(true);
+            reloadUsers();
+          }}
+        />
+      )}
+      <Snackbar
+        open={deleted}
+        autoHideDuration={3500}
+        onClose={() => setDeleted(false)}
+        message={t('access.users.deleted')}
+      />
       <Snackbar
         open={saved}
         autoHideDuration={3500}

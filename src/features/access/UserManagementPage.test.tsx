@@ -12,6 +12,10 @@ import { UserManagementPage } from './UserManagementPage';
 import type { UsersResponse } from './types';
 
 beforeEach(() => {
+  vi.spyOn(apiClient, 'delete').mockResolvedValue({
+    status: 200,
+    data: { ...userResponse, enabled: false },
+  });
   vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
     data: userResponse,
@@ -27,6 +31,137 @@ beforeEach(() => {
 });
 
 describe('backend user listing', () => {
+  it('confirms deletion, blocks duplicate submissions, and reloads the disabled account', async () => {
+    let resolve!: (value: { status: number; data: unknown }) => void;
+    vi.mocked(apiClient.delete).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<UserManagementPage />);
+    await screen.findByRole('rowheader', { name: 'admin' });
+    await user.click(screen.getByRole('button', { name: 'Delete admin' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      "admin's status will be changed to Inactive.",
+    );
+    expect(apiClient.delete).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete admin' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+    expect(apiClient.delete).toHaveBeenCalledWith(
+      `users/${userResponse.id}`,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(screen.getByRole('button', { name: 'Deleting...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: usersResponse.map((record) => ({ ...record, enabled: false })),
+    });
+    await act(async () =>
+      resolve({ status: 200, data: { ...userResponse, enabled: false } }),
+    );
+    await screen.findByRole('rowheader', { name: 'admin' });
+    expect(
+      within(
+        screen.getByRole('rowheader', { name: 'admin' }).closest('tr')!,
+      ).getByText('Inactive'),
+    ).toBeVisible();
+    expect(screen.getByText('User account disabled.')).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(apiClient.delete).toHaveBeenCalledTimes(1);
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [400, 'Invalid UUID string', 'Reload users'],
+    [404, 'Requested resource was not found', 'Reload users'],
+    [
+      409,
+      'The operation violates a uniqueness, reference, or state constraint',
+      'Reload users',
+    ],
+    [403, 'Missing module access: users', null],
+    [503, 'Maintenance in progress', 'Try again'],
+    [401, 'Authentication failed', 'Back to sign in'],
+  ])(
+    'keeps the row and shows the backend delete failure for HTTP %s',
+    async (status, detail, action) => {
+      vi.mocked(apiClient.delete).mockResolvedValue({
+        status,
+        data: { detail },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<UserManagementPage />);
+      await screen.findByRole('rowheader', { name: 'admin' });
+      await user.click(screen.getByRole('button', { name: 'Delete admin' }));
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Delete',
+        }),
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent(detail);
+      expect(screen.getByRole('alert')).toHaveTextContent(`HTTP ${status}`);
+      expect(
+        within(
+          screen
+            .getByRole('rowheader', { name: 'admin', hidden: true })
+            .closest('tr')!,
+        ).getByText('Active'),
+      ).toBeVisible();
+      expect(apiClient.delete).toHaveBeenCalledTimes(1);
+      expect(apiClient.get).toHaveBeenCalledTimes(1);
+      if (action) {
+        expect(screen.getByRole('button', { name: action })).toBeEnabled();
+        if (action === 'Reload users') {
+          await user.click(screen.getByRole('button', { name: action }));
+          await screen.findByRole('rowheader', { name: 'admin' });
+          expect(apiClient.get).toHaveBeenCalledTimes(2);
+          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        }
+      } else {
+        expect(
+          screen.queryByRole('button', { name: 'Try again' }),
+        ).not.toBeInTheDocument();
+        expect(
+          within(screen.getByRole('dialog')).queryByRole('button', {
+            name: 'Delete',
+          }),
+        ).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it('allows a manual retry after a connection failure', async () => {
+    vi.mocked(apiClient.delete).mockRejectedValueOnce(
+      new Error('Network Error'),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<UserManagementPage />);
+    await screen.findByRole('rowheader', { name: 'admin' });
+    await user.click(screen.getByRole('button', { name: 'Delete admin' }));
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Check your connection',
+    );
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(apiClient.delete).toHaveBeenCalledTimes(2);
+  });
+
   it('creates a user with a backend role code, empty assignments, and an unchanged password', async () => {
     const user = userEvent.setup();
     renderWithProviders(<UserManagementPage />);
@@ -216,7 +351,10 @@ describe('backend user listing', () => {
     expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(local);
     expect(screen.getByRole('button', { name: 'Add User' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Edit admin' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Delete admin' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete admin' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete operator' }),
+    ).toBeDisabled();
   });
 
   it('shows a loader until the request completes, with no false empty or error state', async () => {

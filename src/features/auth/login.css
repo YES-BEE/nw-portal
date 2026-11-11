@@ -119,6 +119,9 @@
   text-align: left;
   margin-bottom: 23px;
 }
+.auth-password-field {
+  margin-bottom: 36px;
+}
 .auth-field .MuiFormLabel-root {
   font-size: 13px;
   font-weight: 700;
@@ -127,21 +130,6 @@
 }
 .auth-field .MuiInputAdornment-root {
   color: #6e7b90;
-}
-.auth-extras {
-  display: flex;
-  justify-content: flex-end;
-  margin: 1px 0 26px;
-}
-.auth-extras .MuiLink-root {
-  font-size: 12px;
-  text-align: right;
-}
-.auth-card .auth-notice {
-  font-size: 12px;
-  color: #b3261e;
-  min-height: 18px;
-  margin-top: 11px;
 }
 .auth-footer {
   margin-top: 42px;
