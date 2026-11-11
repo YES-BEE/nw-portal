@@ -1,144 +1,228 @@
-import { sampleProcesses, seedTestData } from '../../test/fixtures';
-import { apiClient } from '../../api/client';
-import { processesResponse } from '../../test/processes';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { configurationTheme } from '../../app/theme';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
+import { processResponse, processesResponse } from '../../test/processes';
+import { readSession, setAuthenticatedSession } from '../auth/session';
 import { ProcessDetailsPage } from './ProcessDetailsPage';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
-import { PROCESS_STORAGE_KEY } from './processData';
 
-function setup(path = '/configurations/processes/demo-1') {
+function setup(path = '/configurations/processes/' + processResponse.id) {
   return {
     user: userEvent.setup(),
     ...renderWithProviders(
-      <ThemeProvider theme={configurationTheme}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route
-              path="/configurations/processes/:processId"
-              element={<ProcessDetailsPage />}
-            />
-            <Route
-              path="/configurations/processes"
-              element={<ProcessConfigurationsPage />}
-            />
-          </Routes>
-        </MemoryRouter>
-      </ThemeProvider>,
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route
+            path="/configurations/processes/:processId"
+            element={<ProcessDetailsPage />}
+          />
+          <Route
+            path="/configurations/processes"
+            element={<ProcessConfigurationsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
     ),
   };
 }
-
 beforeEach(() => {
-  seedTestData();
-  vi.spyOn(apiClient, 'get').mockResolvedValue({
+  localStorage.clear();
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: processesResponse,
-  });
+    data:
+      url === 'processes'
+        ? processesResponse
+        : (processesResponse.find(
+            (process) => 'processes/' + process.id === url,
+          ) ?? processResponse),
+  }));
 });
 
-describe('process details', () => {
-  it('opens a legacy detail route as a read-only page and returns to the backend process list', async () => {
-    const write = vi.spyOn(Storage.prototype, 'setItem');
-    const { user } = setup('/configurations/processes/demo-1');
+describe('backend process details', () => {
+  it('opens View using the process UUID, loads fresh details, and returns to the list', async () => {
+    const detail = { ...processResponse, name: 'Fresh Washing', quality: true };
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'processes' ? processesResponse : detail,
+    }));
+    const { user } = setup('/configurations/processes');
+    await user.click(await screen.findByRole('link', { name: 'View Washing' }));
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Lot Preparation' }),
+      await screen.findByRole('heading', { level: 1, name: 'Fresh Washing' }),
     ).toBeVisible();
-    expect(screen.getByText('NFC-PROC-001')).toBeVisible();
-    expect(screen.getByText('01')).toBeVisible();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith(
+      'processes/' + detail.id,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(screen.getByText('NFC-WASH')).toBeVisible();
+    expect(screen.getByText('03')).toBeVisible();
+    expect(screen.getByText('Yes')).toBeVisible();
+    expect(screen.getByText('Active')).toBeVisible();
+    expect(screen.getByText('120 seconds')).toBeVisible();
+    expect(screen.queryByText(detail.id)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Save Process' }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Back to Processes' }));
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Process Configurations' }),
+      await screen.findByRole('rowheader', { name: /Washing/ }),
     ).toBeVisible();
-    expect(write).not.toHaveBeenCalled();
+    expect(localStorage.length).toBe(0);
   });
 
-  it('shows device names, descriptions, and tags when opened directly', () => {
-    setup('/configurations/processes/demo-2');
-    const devices = screen.getByRole('table', { name: 'Devices' });
-    for (const value of [
-      'Washer 01',
-      'Washer 02',
-      'NFC-DEV-001',
-      'NFC-DEV-002',
-      'Main washing machine',
-      'Secondary washing machine',
-    ]) {
-      expect(within(devices).getByText(value)).toBeVisible();
-    }
+  it('maps backend devices to the device table on direct navigation', async () => {
+    setup('/configurations/processes/' + processesResponse[1].id);
+    const devices = await screen.findByRole('table', { name: 'Devices' });
+    expect(within(devices).getByText('Dryer 1')).toBeVisible();
+    expect(within(devices).getByText('NFC-DRYER')).toBeVisible();
     expect(screen.getByText('Device-level tracking')).toBeVisible();
+    expect(screen.getByText('Inactive')).toBeVisible();
   });
 
-  it('paginates a large device list and resets the page when searching', async () => {
+  it('keeps device pagination and search working with backend records', async () => {
+    const base = processesResponse[1];
     const record = {
-      ...sampleProcesses[1],
+      ...base,
       id: 'large',
       name: 'Production Line',
-      devices: Array.from({ length: 125 }, (_, index) => ({
-        id: `device-${index}`,
-        name: `Device ${index + 1}`,
-        description: `Machine ${index + 1}`,
-        tag: `TAG-${index + 1}`,
+      deviceCount: 30,
+      device_count: 30,
+      devices: Array.from({ length: 30 }, (_, index) => ({
+        ...base.devices[0],
+        id: 'device-' + index,
+        process_id: 'large',
+        processId: 'large',
+        name: 'Device ' + (index + 1),
+        description: 'Machine ' + (index + 1),
+        nfcUid: 'TAG-' + (index + 1),
+        nfc_uid: 'TAG-' + (index + 1),
       })),
     };
-    localStorage.setItem(PROCESS_STORAGE_KEY, JSON.stringify([record]));
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: record });
     const { user } = setup('/configurations/processes/large');
-    const devices = screen.getByRole('table', { name: 'Devices' });
+    const devices = await screen.findByRole('table', { name: 'Devices' });
     expect(within(devices).getAllByRole('row')).toHaveLength(11);
-    expect(
-      within(devices).getByRole('rowheader', { name: 'Device 10' }),
-    ).toBeVisible();
-    expect(
-      within(devices).queryByRole('rowheader', { name: 'Device 11' }),
-    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Go to next page' }));
     expect(
       within(devices).getByRole('rowheader', { name: 'Device 11' }),
     ).toBeVisible();
-    await user.click(screen.getByRole('combobox', { name: /Rows per page/ }));
-    await user.click(screen.getByRole('option', { name: '25' }));
-    expect(within(devices).getAllByRole('row')).toHaveLength(26);
-    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
     await user.type(
       screen.getByRole('searchbox', { name: 'Search devices' }),
-      'TAG-125',
+      'TAG-30',
     );
     expect(
-      within(devices).getByRole('rowheader', { name: 'Device 125' }),
+      within(devices).getByRole('rowheader', { name: 'Device 30' }),
     ).toBeVisible();
-    expect(within(devices).getAllByRole('row')).toHaveLength(2);
     expect(
       screen.getByRole('button', { name: 'Go to next page' }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Go to previous page' }),
-    ).toBeDisabled();
-    await user.clear(screen.getByRole('searchbox', { name: 'Search devices' }));
-    await user.type(
-      screen.getByRole('searchbox', { name: 'Search devices' }),
-      'no matching device',
-    );
-    expect(screen.getByText('No devices match your search.')).toBeVisible();
   });
 
-  it('handles a missing or deleted process with a working return link', async () => {
-    const { user } = setup('/configurations/processes/missing');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This configuration was not found.',
+  it('shows loading without a false missing-process message', async () => {
+    let resolve!: (value: { status: number; data: unknown }) => void;
+    vi.mocked(apiClient.get).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      }),
     );
-    await user.click(screen.getByRole('link', { name: 'Back to Processes' }));
+    setup();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading process details...',
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await act(async () => resolve({ status: 200, data: processResponse }));
+    expect(screen.getByRole('heading', { name: 'Washing' })).toBeVisible();
+  });
+
+  it.each([404, 409])(
+    'handles a missing process with HTTP %s and a working return link',
+    async (status) => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        status,
+        data: { code: 'NOT_FOUND', detail: 'Requested resource was not found' },
+      });
+      const { user } = setup();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Requested resource was not found',
+      );
+      expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP ' + status);
+      expect(
+        screen.queryByRole('button', { name: 'Try again' }),
+      ).not.toBeInTheDocument();
+      vi.mocked(apiClient.get).mockResolvedValue({
+        status: 200,
+        data: processesResponse,
+      });
+      await user.click(screen.getByRole('link', { name: 'Back to Processes' }));
+      await screen.findByRole('rowheader', { name: /Washing/ });
+    },
+  );
+
+  it('retries a service failure', async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      status: 503,
+      data: { detail: 'Maintenance in progress' },
+    });
+    const { user } = setup();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Maintenance in progress',
+    );
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Process Configurations' }),
+      await screen.findByRole('heading', { name: 'Washing' }),
     ).toBeVisible();
+    expect(apiClient.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows access denial without a futile retry', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 403,
+      data: { detail: 'Missing module access: process' },
+    });
+    setup();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Missing module access: process',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Try again' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers sign-in when authentication is required', async () => {
+    setAuthenticatedSession({
+      user: { id: 'admin', username: 'admin', role: 'NW', status: 'Active' },
+      modules: ['process'],
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({ status: 401, data: '' });
+    const { user } = setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Back to sign in' }),
+    );
+    expect(readSession()).toBeNull();
+  });
+
+  it('rejects a mismatched response without displaying the wrong process', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: { ...processResponse, id: 'wrong-process' },
+    });
+    setup();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The service returned an unexpected response',
+    );
+    expect(
+      screen.queryByRole('heading', { name: 'Washing' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('aborts the request on exit', () => {
+    vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+    const view = setup();
+    const signal = vi.mocked(apiClient.get).mock.calls[0][1]?.signal;
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 });

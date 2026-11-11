@@ -150,6 +150,7 @@ export function UserManagementPage() {
           <TextField
             type="search"
             label={t('access.users.search')}
+            placeholder={t('access.users.searchPlaceholder')}
             value={query}
             disabled={state.status !== 'ready'}
             onChange={(event) => {

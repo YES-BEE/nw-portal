@@ -24,8 +24,36 @@ export const theme = createTheme({
     MuiSelect: {
       defaultProps: { displayEmpty: true, notched: false },
     },
+    MuiMenuItem: {
+      styleOverrides: { root: { fontSize: 13 } },
+    },
     MuiTableCell: {
-      styleOverrides: { head: { textTransform: 'capitalize' } },
+      styleOverrides: {
+        body: {
+          fontSize: 13,
+          '& .MuiTypography-root, & .MuiChip-root, & .MuiLink-root, & .MuiButton-root':
+            {
+              fontSize: 'inherit',
+            },
+        },
+        head: {
+          textTransform: 'capitalize',
+          fontSize: 11,
+          fontWeight: 500,
+          letterSpacing: 0.4,
+          color: '#697b96',
+          backgroundColor: '#f7f9fc',
+        },
+        stickyHeader: { backgroundColor: '#f7f9fc' },
+      },
+    },
+    MuiTablePagination: {
+      styleOverrides: {
+        root: { fontSize: 13 },
+        selectLabel: { fontSize: 13 },
+        displayedRows: { fontSize: 13 },
+        select: { fontSize: 13 },
+      },
     },
     MuiTextField: {
       defaultProps: {

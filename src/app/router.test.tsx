@@ -1,4 +1,5 @@
 import { apiClient } from '../api/client';
+import { processResponse } from '../test/processes';
 import { seedTestData, signIn } from '../test/fixtures';
 import { defaultTags, sampleStyles } from '../test/fixtures';
 import { act, screen, waitFor, within } from '@testing-library/react';
@@ -24,7 +25,13 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: [] });
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      typeof url === 'string' && url.startsWith('processes/')
+        ? { ...processResponse, id: url.slice('processes/'.length) }
+        : [],
+  }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
   sessionStorage.clear();

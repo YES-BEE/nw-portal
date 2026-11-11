@@ -199,7 +199,6 @@
     "inactive": "Inactive",
     "actions": "Actions",
     "selectRole": "Select a role",
-    "selectStatus": "Select a status",
     "assignedModules": "Assigned Modules",
     "moduleAccess": "Module Access",
     "moduleHint": "Select the modules and configuration screens available to this role.",
@@ -209,12 +208,7 @@
     "cancel": "Cancel",
     "editNamed": "Edit {{name}}",
     "deleteNamed": "Delete {{name}}",
-    "deleteTitle": "Delete record?",
-    "deleteMessage": "Delete {{name}}? This action cannot be undone.",
     "saved": "Changes saved successfully.",
-    "loadWarning": "Saved user and role records could not be loaded. No records are shown; saving will replace the local records.",
-    "storageError": "Changes could not be saved in this browser. Your records and editor have been kept.",
-    "roleAssigned": "The records have changed or this role is assigned to users. Refresh the page and review the records before trying again.",
     "users": {
       "deleteTitle": "Delete user?",
       "deleteMessage": "{{name}}'s status will be changed to Inactive.",
@@ -226,7 +220,6 @@
       "noDisplayName": "Not provided",
       "noRole": "No role assigned",
       "noUsers": "No users found.",
-      "editingUnavailable": "User changes are not available yet.",
       "loadingDetails": "Loading user details...",
       "loadingRoles": "Loading roles...",
       "noRolesAvailable": "No roles are available for selection.",
@@ -300,6 +293,7 @@
       "edit": "Edit User",
       "save": "Save User",
       "search": "Search users",
+      "searchPlaceholder": "Search by username, display name or role",
       "empty": "No users match your search."
     },
     "roles": {
@@ -390,16 +384,18 @@
       "newstyle": "New Style"
     },
     "errors": {
-      "usernameRequired": "Enter a username.",
-      "usernameDuplicate": "This username already exists.",
-      "roleRequired": "Select a valid role.",
       "roleNameRequired": "Enter a role name.",
-      "statusRequired": "Select a status.",
       "roleDuplicate": "This role already exists."
     }
   },
   "processes": {
     "detailsTitle": "Process Details",
+    "loadingDetails": "Loading process details...",
+    "detailsFailure": "Unable to load process details",
+    "targetDuration": "Target duration",
+    "durationSeconds": "{{count}} seconds",
+    "yes": "Yes",
+    "no": "No",
     "detailsPageTitle": "NW Track | Process Details",
     "detailsDescription": "View process tracking settings and browse associated devices.",
     "backToList": "Back to Processes",
@@ -418,12 +414,17 @@
     "quality": "Quality control (QC) process",
     "saving": "Saving...",
     "createFailure": "Unable to create process",
+    "updateFailure": "Unable to update process",
+    "deleteFailure": "Unable to delete process",
+    "deleteBlocked": "The process cannot be deleted in its current state.",
+    "deleting": "Deleting...",
+    "reload": "Reload processes",
     "loadingTags": "Loading available NFC tags...",
+    "currentTag": "Current tag",
     "tagsFailure": "Unable to load NFC tags",
     "noTags": "No unassigned NFC tags are available.",
     "statusColumn": "Status",
     "noTag": "No tag assigned",
-    "actionsUnavailable": "Process actions are not available yet.",
     "failureStatus": "HTTP {{status}}",
     "failures": {
       "validation": {
@@ -437,6 +438,10 @@
       "conflict": {
         "title": "Process configuration conflict",
         "description": "A selected NFC tag may already be assigned. Review the configuration before saving again."
+      },
+      "notFound": {
+        "title": "Process no longer available",
+        "description": "This process could not be found. Return to the process list to view available processes."
       },
       "authentication": {
         "title": "Sign in required",
@@ -479,7 +484,6 @@
     "deviceTracking": "Device-level",
     "deviceCount_one": "{{count}} device",
     "deviceCount_other": "{{count}} devices",
-    "editAction": "Edit",
     "deleteAction": "Delete",
     "editNamed": "Edit {{name}}",
     "deleteNamed": "Delete {{name}}",
@@ -519,8 +523,6 @@
     "deleted": "Process deleted.",
     "deleteTitle": "Delete process?",
     "deleteMessage": "Delete “{{name}}”? Its NFC tags will become available for other processes.",
-    "loadWarning": "Saved data could not be loaded. No records are shown; saving will replace the local records.",
-    "storageError": "Changes could not be saved in this browser. Your existing records have been kept. Check browser storage and try again.",
     "errors": {
       "nameRequired": "Enter a process name.",
       "stationRequired": "Enter a station number.",
@@ -586,16 +588,8 @@
       "loading": "Loading tag details...",
       "failure": "Unable to load tag details",
       "reload": "Reload tags",
-      "id": "Tag ID",
       "assetType": "Asset Type",
-      "none": "None",
-      "process_id": "Process ID",
-      "machine_id": "Machine / Device ID",
-      "station_id": "Station ID",
-      "trolley_id": "Trolley ID",
-      "storage_area_id": "Storage Area ID",
-      "storage_location_id": "Storage Unit ID",
-      "version": "Version"
+      "none": "None"
     },
     "assetTypes": {
       "PROCESS": "Process",
@@ -621,13 +615,11 @@
     "yes": "Yes",
     "no": "No",
     "actions": "Actions",
-    "available": "Available",
     "count_one": "{{count}} tag",
     "count_other": "{{count}} tags",
     "formDescription": "Enter a friendly tag name and the physical NFC tag identifier.",
     "namePlaceholder": "e.g. Washing Line Tag 01",
     "actualPlaceholder": "e.g. 04:A1:B2:C3:D4",
-    "lockedHint": "Unassign this tag before changing its NFC ID.",
     "editNamed": "Edit tag {{name}}",
     "deleteNamed": "Delete tag {{name}}",
     "deleteBlocked": "Unassign this tag before deleting it.",
@@ -642,7 +634,6 @@
     "deleteMessage": "Delete “{{name}}” ({{actual}})?",
     "empty": "No NFC tags registered.",
     "assigned": "Assigned",
-    "changesUnavailable": "Tag changes are not available yet.",
     "saving": "Saving...",
     "createFailure": "Unable to create tag",
     "updateFailure": "Unable to update tag",
@@ -702,21 +693,9 @@
     "search": "Search tags",
     "searchPlaceholder": "Search by tag name or NFC ID",
     "noMatches": "No tags match your search.",
-    "loadWarning": "Saved tag data could not be loaded. No tags are shown; saving will replace the local tag registry.",
-    "storageError": "Changes could not be saved in this browser. Your existing tags and form have been kept. Check browser storage and try again.",
-    "assignmentsUnavailable": "Assignments could not be verified. Existing NFC IDs and tag deletions are locked until process and storage records can be loaded.",
-    "assignment": {
-      "process": "Process: {{name}}",
-      "device": "Device: {{name}} ({{process}})",
-      "storage": "Storage: {{name}}"
-    },
     "errors": {
       "nameRequired": "Enter a tag name.",
-      "actualRequired": "Enter the actual NFC tag ID.",
-      "duplicateName": "Tag Name already exists.",
-      "duplicateId": "Actual NFC Tag ID already exists.",
-      "assignedId": "This tag is assigned. Unassign it before changing its NFC ID.",
-      "assignmentsUnavailable": "Assignments could not be verified. Try again after process and storage records can be loaded."
+      "actualRequired": "Enter the actual NFC tag ID."
     }
   },
   "login": {
@@ -734,11 +713,7 @@
     "password": "Password",
     "usernamePlaceholder": "Enter your username",
     "passwordPlaceholder": "Enter your password",
-    "forgot": "Forgot password?",
     "showPassword": "Show password",
-    "hidePassword": "Hide password",
-    "notices": {
-      "recovery": "Password recovery is not configured yet."
-    }
+    "hidePassword": "Hide password"
   }
 }

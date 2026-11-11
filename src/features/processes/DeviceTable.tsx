@@ -99,15 +99,7 @@ export function DeviceTable({ devices }: { devices: DeviceConfiguration[] }) {
             <TableRow>
               {(['deviceName', 'deviceDescription', 'deviceTag'] as const).map(
                 (key) => (
-                  <TableCell
-                    key={key}
-                    scope="col"
-                    sx={{
-                      bgcolor: '#f7f9fc',
-                      color: 'text.secondary',
-                      fontSize: 12,
-                    }}
-                  >
+                  <TableCell key={key} scope="col">
                     {t(`processes.${key}`)}
                   </TableCell>
                 ),

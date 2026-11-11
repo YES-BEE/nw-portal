@@ -116,7 +116,7 @@ export function TagForm({
           </Typography>
         </Box>
         <Tooltip title={t('tags.close')}>
-          <span>
+          <Box component="span">
             <IconButton
               size="small"
               disabled={saving}
@@ -125,7 +125,7 @@ export function TagForm({
             >
               <CloseIcon />
             </IconButton>
-          </span>
+          </Box>
         </Tooltip>
       </Stack>
       <Box

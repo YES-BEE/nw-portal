@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Alert,
   AlertTitle,
@@ -28,9 +29,15 @@ import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
 import { createProcess, getProcesses, ProcessesError } from './processesApi';
 import { ProcessForm } from './ProcessForm';
+import { ProcessEditor } from './ProcessEditor';
+import { ProcessDeleteDialog } from './ProcessDeleteDialog';
 import { emptyProcess } from './processData';
 import type { ProcessConfiguration } from './types';
-import type { ProcessesFailure, ProcessesResponse } from './types';
+import type {
+  ProcessResponse,
+  ProcessesFailure,
+  ProcessesResponse,
+} from './types';
 
 type ProcessesState =
   | { status: 'loading' }
@@ -43,12 +50,25 @@ export function ProcessConfigurationsPage() {
   const [attempt, setAttempt] = useState(0);
   const [creating, setCreating] = useState<ProcessConfiguration | null>(null);
   const [saved, setSaved] = useState(false);
+  const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
+  const [deletingProcess, setDeletingProcess] =
+    useState<ProcessResponse | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  function reloadProcesses() {
+    setEditingProcessId(null);
+    setDeletingProcess(null);
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  }
   useEffect(() => {
     const controller = new AbortController();
     void getProcesses(controller.signal).then(
       (processes) => {
         if (!controller.signal.aborted)
-          setState({ status: 'ready', processes });
+          setState({
+            status: 'ready',
+            processes: processes.filter((process) => process.active),
+          });
       },
       (error: unknown) => {
         if (!controller.signal.aborted)
@@ -105,7 +125,12 @@ export function ProcessConfigurationsPage() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              disabled={state.status !== 'ready' || creating !== null}
+              disabled={
+                state.status !== 'ready' ||
+                creating !== null ||
+                editingProcessId !== null ||
+                deletingProcess !== null
+              }
               onClick={() => {
                 setSaved(false);
                 setCreating(emptyProcess());
@@ -170,16 +195,7 @@ export function ProcessConfigurationsPage() {
             aria-busy={state.status === 'loading'}
             sx={{ minWidth: 700 }}
           >
-            <TableHead
-              sx={{
-                bgcolor: '#f7f9fc',
-                '& th': {
-                  color: 'text.secondary',
-                  fontSize: 11,
-                  letterSpacing: 0.4,
-                },
-              }}
-            >
+            <TableHead>
               <TableRow>
                 {(
                   [
@@ -215,13 +231,10 @@ export function ProcessConfigurationsPage() {
                     sx={{ '& td, & th': { verticalAlign: 'top' } }}
                   >
                     <TableCell component="th" scope="row">
-                      <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
+                      <Typography sx={{ fontWeight: 600 }}>
                         {record.name}
                       </Typography>
-                      <Typography
-                        color="text.secondary"
-                        sx={{ fontSize: 12, mt: 0.5 }}
-                      >
+                      <Typography color="text.secondary" sx={{ mt: 0.5 }}>
                         {record.description}
                       </Typography>
                     </TableCell>
@@ -237,7 +250,6 @@ export function ProcessConfigurationsPage() {
                         sx={{
                           bgcolor: '#edf4ff',
                           color: '#1556c4',
-                          fontSize: 11,
                           fontWeight: 600,
                         }}
                       />
@@ -260,40 +272,58 @@ export function ProcessConfigurationsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Tooltip title={t('processes.actionsUnavailable')}>
-                        <Stack direction="row" sx={{ gap: 0.5 }}>
+                      <Stack direction="row" sx={{ gap: 0.5 }}>
+                        <Tooltip title={t('common.view')}>
                           <IconButton
-                            disabled
                             size="small"
                             color="primary"
                             aria-label={t('processes.viewNamed', {
                               name: record.name,
                             })}
+                            component={RouterLink}
+                            to={`/configurations/processes/${encodeURIComponent(record.id)}`}
                           >
                             <VisibilityOutlinedIcon fontSize="small" />
                           </IconButton>
-                          <IconButton
-                            disabled
-                            size="small"
-                            color="primary"
-                            aria-label={t('processes.editNamed', {
-                              name: record.name,
-                            })}
-                          >
-                            <EditOutlinedIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            disabled
-                            size="small"
-                            color="error"
-                            aria-label={t('processes.deleteNamed', {
-                              name: record.name,
-                            })}
-                          >
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      </Tooltip>
+                        </Tooltip>
+                        <IconButton
+                          disabled={
+                            creating !== null ||
+                            editingProcessId !== null ||
+                            deletingProcess !== null
+                          }
+                          onClick={() => {
+                            setSaved(false);
+                            setEditingProcessId(record.id);
+                          }}
+                          size="small"
+                          color="primary"
+                          aria-label={t('processes.editNamed', {
+                            name: record.name,
+                          })}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          disabled={
+                            creating !== null ||
+                            editingProcessId !== null ||
+                            deletingProcess !== null
+                          }
+                          onClick={() => {
+                            setSaved(false);
+                            setDeleted(false);
+                            setDeletingProcess(record);
+                          }}
+                          size="small"
+                          color="error"
+                          aria-label={t('processes.deleteNamed', {
+                            name: record.name,
+                          })}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -312,6 +342,35 @@ export function ProcessConfigurationsPage() {
           </Table>
         </TableContainer>
       </Paper>
+      {deletingProcess && (
+        <ProcessDeleteDialog
+          process={deletingProcess}
+          onClose={() => setDeletingProcess(null)}
+          onReload={reloadProcesses}
+          onDeleted={() => {
+            setDeleted(true);
+            reloadProcesses();
+          }}
+        />
+      )}
+      <Snackbar
+        open={deleted}
+        autoHideDuration={3500}
+        onClose={() => setDeleted(false)}
+        message={t('processes.deleted')}
+      />
+      {editingProcessId && (
+        <ProcessEditor
+          key={editingProcessId}
+          processId={editingProcessId}
+          onClose={() => setEditingProcessId(null)}
+          onReload={reloadProcesses}
+          onUpdated={() => {
+            setSaved(true);
+            reloadProcesses();
+          }}
+        />
+      )}
       {creating && (
         <ProcessForm
           initial={creating}

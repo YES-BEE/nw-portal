@@ -2,6 +2,7 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
+import { MemoryRouter } from 'react-router-dom';
 import { renderWithProviders } from '../../test/render';
 import { processResponse, processesResponse } from '../../test/processes';
 import { readSession, setAuthenticatedSession } from '../auth/session';
@@ -17,10 +18,14 @@ beforeEach(() => {
 });
 
 describe('backend process listing', () => {
-  it('lists all backend processes, tracking modes, station numbers, and NFC information without local records', async () => {
+  it('lists only active backend processes without local records', async () => {
     const saved = JSON.stringify([{ id: 'local-process', name: 'Local only' }]);
     localStorage.setItem(PROCESS_STORAGE_KEY, saved);
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     const row = (
       await screen.findByRole('rowheader', { name: /Washing/ })
     ).closest('tr')!;
@@ -32,22 +37,22 @@ describe('backend process listing', () => {
     expect(within(row).getByText('Process-level')).toBeVisible();
     expect(within(row).getByText('NFC-WASH')).toBeVisible();
     expect(within(row).getByText('Active')).toBeVisible();
-    const devicesRow = screen
-      .getByRole('rowheader', { name: /Drying/ })
-      .closest('tr')!;
-    expect(within(devicesRow).getByText('Device-level')).toBeVisible();
-    expect(within(devicesRow).getByText('1 device')).toBeVisible();
-    expect(within(devicesRow).getByText('Inactive')).toBeVisible();
+    expect(
+      screen.queryByRole('rowheader', { name: /Drying/ }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Local only')).not.toBeInTheDocument();
     expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(saved);
     expect(
       screen.getByRole('button', { name: 'Create Process' }),
     ).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Edit Washing' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit Washing' })).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Delete Washing' }),
-    ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'View Washing' })).toBeDisabled();
+    ).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'View Washing' })).toHaveAttribute(
+      'href',
+      '/configurations/processes/' + processResponse.id,
+    );
   });
 
   it('shows loading without an empty or error state until the request finishes', async () => {
@@ -57,22 +62,36 @@ describe('backend process listing', () => {
         resolve = done;
       }),
     );
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole('progressbar')).toBeVisible();
     expect(
       screen.queryByText('No processes configured.'),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await act(async () => resolve({ status: 200, data: processesResponse }));
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
   });
 
-  it('shows an empty backend list', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
-    renderWithProviders(<ProcessConfigurationsPage />);
-    expect(await screen.findByText('No processes configured.')).toBeVisible();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
+  it.each([
+    { data: [] },
+    { data: processesResponse.filter((process) => !process.active) },
+  ])(
+    'shows an empty table when no active processes exist: %j',
+    async ({ data }) => {
+      vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+      renderWithProviders(
+        <MemoryRouter>
+          <ProcessConfigurationsPage />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText('No processes configured.')).toBeVisible();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    },
+  );
 
   it('preserves a service error message, hides its HTTP code, and retries on request', async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({
@@ -80,7 +99,11 @@ describe('backend process listing', () => {
       data: { detail: 'Process service unavailable' },
     });
     const user = userEvent.setup();
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Process service unavailable',
     );
@@ -98,7 +121,11 @@ describe('backend process listing', () => {
         status,
         data: { detail: 'Backend reason' },
       });
-      renderWithProviders(<ProcessConfigurationsPage />);
+      renderWithProviders(
+        <MemoryRouter>
+          <ProcessConfigurationsPage />
+        </MemoryRouter>,
+      );
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'Backend reason',
       );
@@ -132,7 +159,11 @@ describe('backend process listing', () => {
       });
       vi.mocked(apiClient.get).mockResolvedValue(response);
       const user = userEvent.setup();
-      renderWithProviders(<ProcessConfigurationsPage />);
+      renderWithProviders(
+        <MemoryRouter>
+          <ProcessConfigurationsPage />
+        </MemoryRouter>,
+      );
       await user.click(
         await screen.findByRole('button', { name: 'Back to sign in' }),
       );
@@ -145,7 +176,11 @@ describe('backend process listing', () => {
       status: 502,
       data: '<html>Proxy diagnostics</html>',
     });
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Processes are temporarily unavailable',
     );
@@ -155,7 +190,11 @@ describe('backend process listing', () => {
 
   it('shows connectivity guidance when no response is available', async () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('Network Error'));
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Check your connection',
     );
@@ -168,7 +207,11 @@ describe('backend process listing', () => {
     { data: [{ ...processResponse, devices: [{}] }] },
   ])('rejects malformed process responses: %j', async ({ data }) => {
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to read processes',
     );
@@ -177,7 +220,11 @@ describe('backend process listing', () => {
 
   it('cancels the request on exit', () => {
     vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
-    const view = renderWithProviders(<ProcessConfigurationsPage />);
+    const view = renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     const signal = vi.mocked(apiClient.get).mock.calls[0][1]?.signal;
     view.unmount();
     expect(signal?.aborted).toBe(true);

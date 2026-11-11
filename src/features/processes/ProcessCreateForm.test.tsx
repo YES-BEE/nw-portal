@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
+import { MemoryRouter } from 'react-router-dom';
 import { renderWithProviders } from '../../test/render';
 import { processResponse } from '../../test/processes';
 import { createTagResponse } from '../../test/tags';
@@ -22,7 +23,11 @@ beforeEach(() => {
 
 async function openForm() {
   const user = userEvent.setup();
-  const view = renderWithProviders(<ProcessConfigurationsPage />);
+  const view = renderWithProviders(
+    <MemoryRouter>
+      <ProcessConfigurationsPage />
+    </MemoryRouter>,
+  );
   const add = screen.getByRole('button', { name: 'Create Process' });
   await waitFor(() => expect(add).toBeEnabled());
   await user.click(add);
@@ -228,7 +233,11 @@ describe('backend process creation', () => {
         : { status: 403, data: { detail: 'Missing module access: tags' } },
     );
     const user = userEvent.setup();
-    renderWithProviders(<ProcessConfigurationsPage />);
+    renderWithProviders(
+      <MemoryRouter>
+        <ProcessConfigurationsPage />
+      </MemoryRouter>,
+    );
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Create Process' }),

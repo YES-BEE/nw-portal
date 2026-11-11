@@ -77,6 +77,24 @@ export interface CreateProcessRequest {
 }
 
 export type CreateProcessResponse = ProcessResponse;
+
+export interface UpdateProcessDeviceRequest extends CreateProcessDeviceRequest {
+  id?: string;
+}
+
+export interface UpdateProcessRequest extends Omit<
+  CreateProcessRequest,
+  'devices' | 'targetDurationSeconds'
+> {
+  devices: UpdateProcessDeviceRequest[];
+  targetDurationSeconds: number | null;
+}
+
+export type UpdateProcessResponse = ProcessResponse;
+
+export interface DeleteProcessResponse extends ProcessResponse {
+  active: false;
+}
 export interface ProcessTagOptionResponse {
   id: string;
   name: string;
@@ -112,8 +130,9 @@ export interface ProcessesFailure {
     | 'invalidResponse'
     | 'validation'
     | 'invalidRequest'
+    | 'notFound'
     | 'conflict';
-  action: 'signIn' | 'retry' | 'none';
+  action: 'signIn' | 'retry' | 'reload' | 'none';
   status?: number;
   code?: string;
   message?: string;

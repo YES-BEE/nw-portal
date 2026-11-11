@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  ACCESS_STORAGE_KEY,
-  canDeleteRole,
-  getRoleNameError,
-  getUserErrors,
-  isAccessData,
-  loadAccessData,
-} from './accessData';
+import { ACCESS_STORAGE_KEY, isAccessData, loadAccessData } from './accessData';
 import type { AccessData } from './accessData';
 
 const records: AccessData = {
@@ -82,40 +75,5 @@ describe('access records without frontend defaults', () => {
         ],
       }),
     ).toBe(false);
-  });
-  it('validates names and status without rules tied to role names', () => {
-    expect(
-      getUserErrors(
-        { ...records.users[0], username: '', role: '', status: '' },
-        records,
-      ),
-    ).toEqual({
-      username: 'usernameRequired',
-      role: 'roleRequired',
-      status: 'statusRequired',
-    });
-    expect(
-      getUserErrors(
-        { ...records.users[0], id: 'two', username: ' OPERATOR ' },
-        records,
-      ),
-    ).toEqual({ username: 'usernameDuplicate' });
-    const data: AccessData = {
-      users: [],
-      roles: [{ name: 'Process Manager', modules: [] }],
-    };
-    expect(
-      getUserErrors({ ...records.users[0], role: 'Process Manager' }, data),
-    ).toEqual({});
-    expect(getRoleNameError(' factory role ', records.roles, false)).toBe(
-      'roleDuplicate',
-    );
-    expect(getRoleNameError('', records.roles, false)).toBe('roleNameRequired');
-  });
-  it('protects assigned roles and allows any unassigned role to be deleted', () => {
-    expect(canDeleteRole('Factory role', records)).toBe(false);
-    expect(
-      canDeleteRole('NW', { users: [], roles: [{ name: 'NW', modules: [] }] }),
-    ).toBe(true);
   });
 });

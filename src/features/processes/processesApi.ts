@@ -9,6 +9,9 @@ import type {
   CreateProcessRequest,
   CreateProcessResponse,
   CreateProcessField,
+  UpdateProcessRequest,
+  UpdateProcessResponse,
+  DeleteProcessResponse,
   ProcessTagOptionResponse,
   ProcessFormLookupsResponse,
 } from './types';
@@ -25,12 +28,12 @@ export class ProcessesError extends Error {
 export function parseProcessesFailure(
   body: unknown,
   status: number,
-  operation: 'list' | 'create' = 'list',
+  operation: 'list' | 'create' | 'detail' | 'update' | 'delete' = 'list',
 ): ProcessesFailure {
   const { problem, message } = readProblemDetails(body);
   const fields = problem?.fieldErrors;
   const validation =
-    operation === 'create' &&
+    (operation === 'create' || operation === 'update') &&
     status === 400 &&
     problem?.code === 'VALIDATION_FAILED' &&
     fields &&
@@ -69,25 +72,35 @@ export function parseProcessesFailure(
     typeof problem.title === 'string' &&
     (problem.instance === undefined || typeof problem.instance === 'string');
   const kind: ProcessesFailure['kind'] =
-    operation === 'create' && status === 400
-      ? validation
-        ? 'validation'
-        : 'invalidRequest'
-      : operation === 'create' && status === 404
+    (operation === 'detail' ||
+      operation === 'update' ||
+      operation === 'delete') &&
+    (status === 404 || (status === 409 && problem?.code === 'NOT_FOUND'))
+      ? 'notFound'
+      : (operation === 'detail' || operation === 'delete') && status === 400
         ? 'invalidRequest'
-        : operation === 'create' && status === 409
-          ? 'conflict'
-          : status === 401
-            ? 'authentication'
-            : status === 403
-              ? roleChanged
-                ? 'roleChanged'
-                : 'access'
-              : status === 406
-                ? 'representation'
-                : status >= 500 && status <= 599
-                  ? 'service'
-                  : 'http';
+        : (operation === 'create' || operation === 'update') && status === 400
+          ? validation
+            ? 'validation'
+            : 'invalidRequest'
+          : operation === 'create' && status === 404
+            ? 'invalidRequest'
+            : (operation === 'create' ||
+                  operation === 'update' ||
+                  operation === 'delete') &&
+                status === 409
+              ? 'conflict'
+              : status === 401
+                ? 'authentication'
+                : status === 403
+                  ? roleChanged
+                    ? 'roleChanged'
+                    : 'access'
+                  : status === 406
+                    ? 'representation'
+                    : status >= 500 && status <= 599
+                      ? 'service'
+                      : 'http';
   return {
     kind,
     status,
@@ -97,13 +110,17 @@ export function parseProcessesFailure(
     action:
       kind === 'authentication' || kind === 'roleChanged'
         ? 'signIn'
-        : kind === 'access' ||
-            kind === 'representation' ||
-            kind === 'validation' ||
-            kind === 'invalidRequest' ||
-            kind === 'conflict'
-          ? 'none'
-          : 'retry',
+        : (operation === 'update' || operation === 'delete') &&
+            kind === 'notFound'
+          ? 'reload'
+          : kind === 'access' ||
+              kind === 'representation' ||
+              kind === 'validation' ||
+              kind === 'invalidRequest' ||
+              kind === 'notFound' ||
+              kind === 'conflict'
+            ? 'none'
+            : 'retry',
   };
 }
 
@@ -190,6 +207,40 @@ export async function getProcesses(
   return data;
 }
 
+export async function getProcess(
+  processId: string,
+  signal?: AbortSignal,
+): Promise<ProcessResponse> {
+  let response;
+  try {
+    response = await apiClient.get<unknown>(
+      `processes/${encodeURIComponent(processId)}`,
+      { signal, timeout: 10000, validateStatus: () => true },
+    );
+  } catch (error: unknown) {
+    if (axios.isCancel(error)) throw error;
+    if (axios.isAxiosError(error) && error.response)
+      throw new ProcessesError(
+        parseProcessesFailure(
+          error.response.data,
+          error.response.status,
+          'detail',
+        ),
+      );
+    throw new ProcessesError({ kind: 'network', action: 'retry' });
+  }
+  if (response.status < 200 || response.status >= 300)
+    throw new ProcessesError(
+      parseProcessesFailure(response.data, response.status, 'detail'),
+    );
+  if (
+    !isProcess(response.data) ||
+    response.data.id.toLowerCase() !== processId.toLowerCase()
+  )
+    throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+  return response.data;
+}
+
 export async function getProcessTagOptions(
   signal?: AbortSignal,
 ): Promise<ProcessTagOptionResponse[]> {
@@ -232,6 +283,78 @@ export async function getProcessTagOptions(
   )
     throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
   return tags.filter((tag) => tag.status === 'ACTIVE' && !tag.assigned);
+}
+
+export async function updateProcess(
+  processId: string,
+  body: UpdateProcessRequest,
+  signal?: AbortSignal,
+): Promise<UpdateProcessResponse> {
+  let response;
+  try {
+    response = await apiClient.put<unknown>(
+      `processes/${encodeURIComponent(processId)}`,
+      body,
+      { signal, timeout: 10000, validateStatus: () => true },
+    );
+  } catch (error: unknown) {
+    if (axios.isCancel(error)) throw error;
+    if (axios.isAxiosError(error) && error.response)
+      throw new ProcessesError(
+        parseProcessesFailure(
+          error.response.data,
+          error.response.status,
+          'update',
+        ),
+      );
+    throw new ProcessesError({ kind: 'network', action: 'retry' });
+  }
+  if (response.status < 200 || response.status >= 300)
+    throw new ProcessesError(
+      parseProcessesFailure(response.data, response.status, 'update'),
+    );
+  if (
+    !isProcess(response.data) ||
+    response.data.id.toLowerCase() !== processId.toLowerCase()
+  )
+    throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+  return response.data;
+}
+
+export async function deleteProcess(
+  processId: string,
+  signal?: AbortSignal,
+): Promise<DeleteProcessResponse> {
+  let response;
+  try {
+    response = await apiClient.delete<unknown>(
+      `processes/${encodeURIComponent(processId)}`,
+      { signal, timeout: 10000, validateStatus: () => true },
+    );
+  } catch (error: unknown) {
+    if (axios.isCancel(error)) throw error;
+    if (axios.isAxiosError(error) && error.response)
+      throw new ProcessesError(
+        parseProcessesFailure(
+          error.response.data,
+          error.response.status,
+          'delete',
+        ),
+      );
+    throw new ProcessesError({ kind: 'network', action: 'retry' });
+  }
+  if (response.status < 200 || response.status >= 300)
+    throw new ProcessesError(
+      parseProcessesFailure(response.data, response.status, 'delete'),
+    );
+  const data = response.data;
+  if (
+    !isProcess(data) ||
+    data.id.toLowerCase() !== processId.toLowerCase() ||
+    data.active !== false
+  )
+    throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+  return { ...data, active: false };
 }
 
 export async function createProcess(

@@ -243,16 +243,7 @@ export function TagManagementPage() {
             aria-label={t('tags.existing')}
             aria-busy={state.status === 'loading'}
           >
-            <TableHead
-              sx={{
-                bgcolor: 'grey.50',
-                '& th': {
-                  color: 'text.secondary',
-                  fontSize: 11,
-                  letterSpacing: 0.4,
-                },
-              }}
-            >
+            <TableHead>
               <TableRow>
                 {(
                   ['name', 'actual', 'status', 'assigned', 'actions'] as const

@@ -139,16 +139,7 @@ export function StorageConfigurationsPage() {
             aria-labelledby="existing-storages-heading"
             sx={{ minWidth: 650 }}
           >
-            <TableHead
-              sx={{
-                bgcolor: '#f7f9fc',
-                '& th': {
-                  color: 'text.secondary',
-                  fontSize: 11,
-                  letterSpacing: 0.4,
-                },
-              }}
-            >
+            <TableHead>
               <TableRow>
                 {(['number', 'description', 'tag', 'actions'] as const).map(
                   (column) => (
@@ -182,7 +173,6 @@ export function StorageConfigurationsPage() {
                       sx={{
                         bgcolor: '#edf4ff',
                         color: '#1556c4',
-                        fontSize: 11,
                         fontWeight: 600,
                       }}
                     />

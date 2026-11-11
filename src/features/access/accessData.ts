@@ -27,9 +27,6 @@ export interface AccessData {
   users: AccessUser[];
   roles: AccessRole[];
 }
-export type UserDraft = Omit<AccessUser, 'status'> & {
-  status: AccessUser['status'] | '';
-};
 
 const folded = (value: string) => value.trim().toLowerCase();
 const unique = (values: string[]) =>
@@ -99,44 +96,4 @@ export function loadAccessData(): {
       unavailable: true,
     };
   }
-}
-
-export function getUserErrors(user: UserDraft, data: AccessData) {
-  const errors: Partial<
-    Record<
-      'username' | 'role' | 'status',
-      | 'usernameRequired'
-      | 'usernameDuplicate'
-      | 'roleRequired'
-      | 'statusRequired'
-    >
-  > = {};
-  if (!user.username.trim()) errors.username = 'usernameRequired';
-  else if (
-    data.users.some(
-      (saved) =>
-        saved.id !== user.id &&
-        folded(saved.username) === folded(user.username),
-    )
-  )
-    errors.username = 'usernameDuplicate';
-  if (!data.roles.some((role) => role.name === user.role))
-    errors.role = 'roleRequired';
-  if (!['Active', 'Inactive'].includes(user.status))
-    errors.status = 'statusRequired';
-  return errors;
-}
-
-export function getRoleNameError(
-  name: string,
-  roles: AccessRole[],
-  editing: boolean,
-) {
-  if (!name.trim()) return 'roleNameRequired' as const;
-  if (!editing && roles.some((role) => folded(role.name) === folded(name)))
-    return 'roleDuplicate' as const;
-}
-
-export function canDeleteRole(name: string, data: AccessData) {
-  return !data.users.some((user) => user.role === name);
 }

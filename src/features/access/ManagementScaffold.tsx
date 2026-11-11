@@ -1,15 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Stack,
-  Typography,
-} from '@mui/material';
+import { Button, Stack, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 
 export function ManagementHeader({
@@ -54,42 +45,5 @@ export function ManagementHeader({
         {t(`access.${kind}.add`)}
       </Button>
     </Stack>
-  );
-}
-
-export function DeleteAccessDialog({
-  name,
-  onCancel,
-  onConfirm,
-}: {
-  name: string | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const { t } = useTranslation('translation');
-  return (
-    <Dialog
-      open={name !== null}
-      onClose={onCancel}
-      aria-labelledby="access-delete-title"
-      aria-describedby="access-delete-description"
-    >
-      <DialogTitle id="access-delete-title">
-        {t('access.deleteTitle')}
-      </DialogTitle>
-      <DialogContent>
-        <DialogContentText id="access-delete-description">
-          {t('access.deleteMessage', { name })}
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outlined" onClick={onCancel}>
-          {t('access.cancel')}
-        </Button>
-        <Button color="primary" variant="contained" onClick={onConfirm}>
-          {t('access.delete')}
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 }

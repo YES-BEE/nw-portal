@@ -30,6 +30,8 @@ import type {
   ProcessConfiguration,
   ProcessesFailure,
   ProcessTagOptionResponse,
+  ProcessResponse,
+  UpdateProcessRequest,
 } from './types';
 import { getProcessTagOptions, ProcessesError } from './processesApi';
 import { signOut } from '../auth/session';
@@ -42,14 +44,31 @@ type ProcessFormProps = {
   editing: boolean;
   records: ProcessConfiguration[];
   onClose: () => void;
+  onReload?: () => void;
 } & (
-  | { onSave: (record: ProcessConfiguration) => void; onCreate?: never }
+  | {
+      onSave: (record: ProcessConfiguration) => void;
+      onCreate?: never;
+      onUpdate?: never;
+      source?: never;
+    }
   | {
       onCreate: (
         body: CreateProcessRequest,
         signal: AbortSignal,
       ) => Promise<void>;
       onSave?: never;
+      onUpdate?: never;
+      source?: never;
+    }
+  | {
+      source: ProcessResponse;
+      onUpdate: (
+        body: UpdateProcessRequest,
+        signal: AbortSignal,
+      ) => Promise<void>;
+      onSave?: never;
+      onCreate?: never;
     }
 );
 
@@ -71,6 +90,9 @@ export function ProcessForm({
   records,
   onSave,
   onCreate,
+  onUpdate,
+  source,
+  onReload,
   onClose,
 }: ProcessFormProps) {
   const { t } = useTranslation('translation');
@@ -78,7 +100,7 @@ export function ProcessForm({
   const [count, setCount] = useState(String(initial.devices.length));
   const [submitted, setSubmitted] = useState(false);
   const [countError, setCountError] = useState(false);
-  const [quality, setQuality] = useState(false);
+  const [quality, setQuality] = useState(source?.quality ?? false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<ProcessesFailure | null>(null);
   const pending = useRef<AbortController | null>(null);
@@ -88,7 +110,7 @@ export function ProcessForm({
     | { status: 'error'; failure: ProcessesFailure }
   >({ status: 'loading' });
   const [tagAttempt, setTagAttempt] = useState(0);
-  const backendMode = Boolean(onCreate);
+  const backendMode = Boolean(onCreate || onUpdate);
   useEffect(() => {
     if (!backendMode) return;
     const controller = new AbortController();
@@ -109,7 +131,26 @@ export function ProcessForm({
     );
     return () => controller.abort();
   }, [backendMode, tagAttempt]);
-  const availableTags = tagState.status === 'ready' ? tagState.tags : [];
+  const retainedUids = source
+    ? [source.nfcUid, ...source.devices.map((device) => device.nfcUid)].filter(
+        (uid): uid is string => !!uid,
+      )
+    : [];
+  const availableTags: ProcessTagOptionResponse[] =
+    tagState.status === 'ready'
+      ? [
+          ...tagState.tags,
+          ...retainedUids
+            .filter((uid) => !tagState.tags.some((tag) => tag.uid === uid))
+            .map((uid) => ({
+              id: `current-${uid}`,
+              name: t('processes.currentTag'),
+              uid,
+              status: 'ACTIVE' as const,
+              assigned: false,
+            })),
+        ]
+      : [];
   const validationTags = backendMode
     ? {
         registered: new Set(availableTags.map((tag) => tag.uid)),
@@ -232,7 +273,7 @@ export function ProcessForm({
     const issues = getProcessFieldErrors(normalized, records, validationTags);
     setSubmitted(true);
     if (Object.keys(issues).length || (countError && invalidCount)) return;
-    if (!onCreate) {
+    if (!onCreate && !onUpdate) {
       onSave?.(normalized);
       return;
     }
@@ -241,23 +282,40 @@ export function ProcessForm({
     setSaving(true);
     setFailure(null);
     try {
-      await onCreate(
-        {
-          name: normalized.name,
-          description: normalized.description,
-          stationNumber: normalized.station,
-          nfcMode: normalized.mode === 'process' ? 'PROCESS' : 'DEVICES',
-          quality,
-          nfcUid: normalized.mode === 'process' ? normalized.processTag : null,
-          deviceCount: normalized.devices.length,
-          devices: normalized.devices.map((device) => ({
-            name: device.name,
-            description: device.description,
-            nfcUid: device.tag,
-          })),
-        },
-        controller.signal,
-      );
+      const body: CreateProcessRequest = {
+        name: normalized.name,
+        description: normalized.description,
+        stationNumber: normalized.station,
+        nfcMode: normalized.mode === 'process' ? 'PROCESS' : 'DEVICES',
+        quality,
+        nfcUid: normalized.mode === 'process' ? normalized.processTag : null,
+        deviceCount: normalized.devices.length,
+        devices: normalized.devices.map((device) => ({
+          name: device.name,
+          description: device.description,
+          nfcUid: device.tag,
+        })),
+      };
+      if (onUpdate && source) {
+        const existingDevices = new Map(
+          source.devices.map((device) => [device.id, device]),
+        );
+        await onUpdate(
+          {
+            ...body,
+            targetDurationSeconds: source.target_duration_seconds,
+            devices: body.devices.map((device, index) => {
+              const existing = existingDevices.get(
+                normalized.devices[index].id,
+              );
+              return existing
+                ? { ...device, id: existing.id, type: existing.type }
+                : device;
+            }),
+          },
+          controller.signal,
+        );
+      } else if (onCreate) await onCreate(body, controller.signal);
     } catch (error: unknown) {
       if (!controller.signal.aborted)
         setFailure(
@@ -371,10 +429,20 @@ export function ProcessForm({
                     <Button color="inherit" onClick={signOut}>
                       {t('startup.signIn')}
                     </Button>
+                  ) : failure.action === 'reload' && onReload ? (
+                    <Button color="inherit" onClick={onReload}>
+                      {t('processes.reload')}
+                    </Button>
                   ) : undefined
                 }
               >
-                <AlertTitle>{t('processes.createFailure')}</AlertTitle>
+                <AlertTitle>
+                  {t(
+                    onUpdate
+                      ? 'processes.updateFailure'
+                      : 'processes.createFailure',
+                  )}
+                </AlertTitle>
                 {failure.message ||
                   t(`processes.failures.${failure.kind}.description`)}
                 {!failure.message && failure.status !== undefined && (
@@ -710,6 +778,7 @@ export function ProcessForm({
                 saving ||
                 (backendMode && tagState.status !== 'ready') ||
                 failure?.action === 'signIn' ||
+                failure?.action === 'reload' ||
                 failure?.kind === 'access' ||
                 failure?.kind === 'representation'
               }

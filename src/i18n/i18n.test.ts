@@ -11,9 +11,6 @@ describe('English translations', () => {
 
     expect(i18n.resolvedLanguage).toBe('en');
     expect(i18n.t('login.signIn')).toBe('Sign In');
-    expect(i18n.t('login.notices.recovery')).toBe(
-      'Password recovery is not configured yet.',
-    );
   });
 
   it('resolves regional English variants to the supported English resources', async () => {
