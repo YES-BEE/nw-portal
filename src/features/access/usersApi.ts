@@ -105,6 +105,7 @@ export async function createUser(
           initialPassword: body.initialPassword,
           role: body.role,
           processAssignments: body.processAssignments,
+          ...(body.status !== undefined ? { status: body.status } : {}),
         },
         { signal, timeout: 10000, validateStatus: () => true },
       ),

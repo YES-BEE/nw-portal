@@ -461,3 +461,23 @@ describe('users API', () => {
     await expect(getUsers()).rejects.toBe(error);
   });
 });
+
+it.each(['ACTIVE', 'INACTIVE'] as const)(
+  'serializes the supported user status %s for POST and PUT',
+  async (status) => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, { ...userResponse, enabled: status === 'ACTIVE' }),
+    );
+    const body = {
+      username: 'admin',
+      displayName: 'Admin',
+      role: 'NW',
+      processAssignments: [],
+      status,
+    };
+    await createUser({ ...body, initialPassword: 'temporary-password' });
+    await updateUser(userResponse.id, body);
+    expect(JSON.parse(adapter.mock.calls[0][0].data)).toMatchObject({ status });
+    expect(JSON.parse(adapter.mock.calls[1][0].data)).toMatchObject({ status });
+  },
+);

@@ -57,12 +57,15 @@ export interface UserProcessAssignmentRequest {
   processId: string;
   activeOnShift: boolean;
 }
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+
 export interface CreateUserRequest {
   username: string;
   displayName: string;
   initialPassword: string;
   role: string;
   processAssignments: UserProcessAssignmentRequest[];
+  status?: UserStatus | null;
 }
 export type CreateUserField = keyof CreateUserRequest;
 export type UpdateUserRequest = Omit<CreateUserRequest, 'initialPassword'>;

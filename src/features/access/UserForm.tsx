@@ -5,6 +5,9 @@ import {
   Alert,
   AlertTitle,
   Button,
+  Checkbox,
+  FormControlLabel,
+  FormHelperText,
   Paper,
   Stack,
   TextField,
@@ -57,6 +60,7 @@ export function UserForm({
       }),
     ),
     initialPassword: '',
+    active: initial?.enabled ?? true,
   });
   const [processesReady, setProcessesReady] = useState(false);
   const isProcessManager = draft.role === 'PROCESS_MANAGER';
@@ -136,6 +140,7 @@ export function UserForm({
               displayName: draft.displayName.trim(),
               role: draft.role,
               processAssignments: draft.processAssignments,
+              status: draft.active ? 'ACTIVE' : 'INACTIVE',
             };
             if (onCreate)
               await onCreate(
@@ -229,6 +234,39 @@ export function UserForm({
             sx={{ mt: 2.5, width: { xs: '100%', sm: 320 } }}
           />
         )}
+        <Box sx={{ mt: 2 }}>
+          <FormControlLabel
+            label={t('access.active')}
+            sx={{ '& .MuiFormControlLabel-label': { fontSize: 13 } }}
+            control={
+              <Checkbox
+                size="small"
+                checked={draft.active}
+                disabled={saving}
+                onChange={(event) => {
+                  setDraft((current) => ({
+                    ...current,
+                    active: event.target.checked,
+                  }));
+                  setFailure((current) =>
+                    current
+                      ? {
+                          ...current,
+                          fieldErrors: {
+                            ...current.fieldErrors,
+                            status: undefined,
+                          },
+                        }
+                      : null,
+                  );
+                }}
+              />
+            }
+          />
+          {failure?.fieldErrors?.status && (
+            <FormHelperText error>{failure.fieldErrors.status}</FormHelperText>
+          )}
+        </Box>
         {failure && (
           <Alert
             severity="error"

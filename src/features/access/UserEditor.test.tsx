@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
@@ -258,3 +258,41 @@ describe('user detail prefill', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it.each([true, false])(
+  'prefills the active state %s and sends the changed status on PUT',
+  async (enabled) => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: { ...userResponse, enabled },
+    });
+    const put = vi
+      .spyOn(apiClient, 'put')
+      .mockResolvedValue({
+        status: 200,
+        data: { ...userResponse, enabled: !enabled },
+      });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <UserEditor
+        userId={userResponse.id}
+        onClose={vi.fn()}
+        onReload={vi.fn()}
+      />,
+    );
+    const checkbox = await screen.findByRole('checkbox', { name: 'Active' });
+    expect(checkbox).toHaveProperty('checked', enabled);
+    await waitFor(() =>
+      expect(
+        screen.getByRole('combobox', { name: /Role/ }),
+      ).not.toHaveAttribute('aria-disabled', 'true'),
+    );
+    await user.click(checkbox);
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    expect(put).toHaveBeenCalledWith(
+      'users/' + userResponse.id,
+      expect.objectContaining({ status: enabled ? 'INACTIVE' : 'ACTIVE' }),
+      expect.anything(),
+    );
+  },
+);

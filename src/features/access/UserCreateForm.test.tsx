@@ -223,3 +223,36 @@ describe('user creation failures', () => {
     expect(signal?.aborted).toBe(true);
   });
 });
+
+it.each([true, false])(
+  'creates a user with the selected active state: %s',
+  async (active) => {
+    const { user } = await fillForm();
+    const checkbox = screen.getByRole('checkbox', { name: 'Active' });
+    expect(checkbox).toBeChecked();
+    if (!active) await user.click(checkbox);
+    vi.mocked(apiClient.post).mockResolvedValue({
+      status: 200,
+      data: { ...userResponse, enabled: active },
+    });
+    await user.click(screen.getByRole('button', { name: 'Save User' }));
+    expect(apiClient.post).toHaveBeenCalledWith(
+      'users',
+      expect.objectContaining({ status: active ? 'ACTIVE' : 'INACTIVE' }),
+      expect.anything(),
+    );
+  },
+);
+it('retains the selected inactive state when creation fails', async () => {
+  const { user } = await fillForm();
+  await user.click(screen.getByRole('checkbox', { name: 'Active' }));
+  vi.mocked(apiClient.post).mockResolvedValue({
+    status: 409,
+    data: { detail: 'Username already exists' },
+  });
+  await user.click(screen.getByRole('button', { name: 'Save User' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Username already exists',
+  );
+  expect(screen.getByRole('checkbox', { name: 'Active' })).not.toBeChecked();
+});

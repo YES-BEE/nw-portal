@@ -149,6 +149,7 @@ describe('user process assignments', () => {
       {
         username: manager.username,
         displayName: manager.display_name,
+        status: manager.enabled ? 'ACTIVE' : 'INACTIVE',
         role: 'PROCESS_MANAGER',
         processAssignments: [{ processId: 'wash', activeOnShift: false }],
       },

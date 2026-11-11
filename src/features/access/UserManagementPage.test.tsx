@@ -215,6 +215,7 @@ describe('backend user listing', () => {
         username: 'new.manager',
         displayName: 'Process Manager',
         initialPassword: ' password with spaces ',
+        status: 'ACTIVE',
         role: 'ADMIN_IT',
         processAssignments: [],
       },

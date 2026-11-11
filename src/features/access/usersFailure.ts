@@ -32,6 +32,7 @@ export function parseUsersFailure(
       'initialPassword',
       'role',
       'processAssignments',
+      'status',
     ] as const) {
       const text = safeApiText((fields as Record<string, unknown>)[field]);
       if (text) fieldErrors[field] = text;
