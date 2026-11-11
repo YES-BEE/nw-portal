@@ -1,7 +1,4 @@
-import type {
-  ProcessesResponse,
-  ProcessResponse,
-} from '../features/processes/types';
+import type { ProcessResponse } from '../features/processes/types';
 
 export const processResponse: ProcessResponse = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -24,7 +21,7 @@ export const processResponse: ProcessResponse = {
   devices: [],
 };
 
-export const processesResponse: ProcessesResponse = [
+export const processesResponse: ProcessResponse[] = [
   processResponse,
   {
     ...processResponse,

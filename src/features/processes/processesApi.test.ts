@@ -9,13 +9,15 @@ import {
   createProcess,
   deleteProcess,
   getProcess,
-  getProcessTagOptions,
-  getProcesses,
+  getProcessTags,
+  getProcessesPage,
   parseProcessesFailure,
   updateProcess,
 } from './processesApi';
 import type { CreateProcessRequest } from './types';
 
+const getProcesses = async (signal?: AbortSignal) =>
+  (await getProcessesPage({ page: 0, size: 10, search: '' }, signal)).items;
 const createBody: CreateProcessRequest = {
   name: 'QC Washing',
   description: 'Final inspection',
@@ -72,7 +74,7 @@ describe('processes API', () => {
       deleted,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/processes/process%2Fwith%20space',
     );
     expect(config.method).toBe('delete');
@@ -127,7 +129,7 @@ describe('processes API', () => {
       updateProcess(updated.id, body, controller.signal),
     ).resolves.toEqual(updated);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/processes/process%2Fwith%20space',
     );
     expect(config.method).toBe('put');
@@ -199,7 +201,7 @@ describe('processes API', () => {
       detail,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/processes/id%2Fwith%20space',
     );
     expect(config.method).toBe('get');
@@ -247,7 +249,7 @@ describe('processes API', () => {
       created,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/processes',
     );
     expect(config.method).toBe('post');
@@ -301,7 +303,7 @@ describe('processes API', () => {
     });
   });
 
-  it('loads unassigned active tag choices from the process-accessible lookup endpoint', async () => {
+  it('loads tag names and assignment states from the process-accessible lookup endpoint', async () => {
     const tags = [
       {
         id: 'tag1',
@@ -321,26 +323,26 @@ describe('processes API', () => {
     adapter.mockImplementation(async (config) =>
       response(config, 200, { tags, processes: [] }),
     );
-    await expect(getProcessTagOptions()).resolves.toEqual([tags[0]]);
+    await expect(getProcessTags()).resolves.toEqual(tags);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/ui/lookups',
     );
     expect(config.method).toBe('get');
     expect(config.data).toBeUndefined();
   });
-  it('requests all processes with bearer authentication, no body, and no filters', async () => {
+  it('requests a process page with bearer authentication and no body', async () => {
     const controller = new AbortController();
     await expect(getProcesses(controller.signal)).resolves.toEqual(
       processesResponse,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/processes',
     );
     expect(config.method).toBe('get');
     expect(config.data).toBeUndefined();
-    expect(config.params).toBeUndefined();
+    expect(config.params).toEqual({ page: 0, size: 10, search: '' });
     expect(config.signal).toBe(controller.signal);
     expect(config.headers.get('Authorization')).toBe(
       'Bearer ' + loginResponse.accessToken,

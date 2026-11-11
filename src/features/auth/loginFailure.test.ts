@@ -82,6 +82,7 @@ describe('documented login failure responses', () => {
         status: 401,
         kind: 'credentials',
         message,
+        messageSource: 'backend',
       });
     },
   );
@@ -98,6 +99,7 @@ describe('documented login failure responses', () => {
       expect(parseLoginFailure(body, 401, 'Unauthorized')).toMatchObject({
         status: 401,
         message: 'Unauthorized',
+        messageSource: 'http',
       });
       expect(parseLoginFailure(body, 401).message).toBe('401');
     },

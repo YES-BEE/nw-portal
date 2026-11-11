@@ -9,11 +9,13 @@ import {
   createTag,
   deleteTag,
   getTag,
-  getTags,
+  getTagsPage,
   updateTag,
   parseTagsFailure,
 } from './tagsApi';
 
+const getTags = async (signal?: AbortSignal) =>
+  (await getTagsPage({ page: 0, size: 10, search: '' }, signal)).items;
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
@@ -58,7 +60,7 @@ describe('tags API', () => {
       deleted,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/nfc-tags/tag%2Fwith%20space',
     );
     expect(config.method).toBe('delete');
@@ -116,7 +118,7 @@ describe('tags API', () => {
       ),
     ).resolves.toEqual(updated);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/nfc-tags/tag%2Fwith%20space',
     );
     expect(config.method).toBe('put');
@@ -170,7 +172,7 @@ describe('tags API', () => {
     const controller = new AbortController();
     await expect(getTag(detail.id, controller.signal)).resolves.toEqual(detail);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/nfc-tags/id%2Fwith%20space',
     );
     expect(config.method).toBe('get');
@@ -224,7 +226,7 @@ describe('tags API', () => {
       createTag({ name: 'Factory tag', uid: '04:AA:BB' }, controller.signal),
     ).resolves.toEqual(createTagResponse);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/nfc-tags',
     );
     expect(config.method).toBe('post');
@@ -290,12 +292,17 @@ describe('tags API', () => {
     const controller = new AbortController();
     expect(await getTags(controller.signal)).toEqual(tagsResponse);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
-      'http://backend.test/api/v1/nfc-tags?status=ACTIVE',
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
+      'http://backend.test/api/v1/nfc-tags',
     );
     expect(config.method).toBe('get');
     expect(config.data).toBeUndefined();
-    expect(config.params).toEqual({ status: 'ACTIVE' });
+    expect(config.params).toEqual({
+      status: 'ACTIVE',
+      page: 0,
+      size: 10,
+      search: '',
+    });
     expect(config.signal).toBe(controller.signal);
     expect(config.headers.get('Authorization')).toBe(
       'Bearer ' + loginResponse.accessToken,

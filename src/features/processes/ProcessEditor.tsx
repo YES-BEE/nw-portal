@@ -72,7 +72,6 @@ export function ProcessEditor({
           })),
         }}
         editing
-        records={[]}
         onClose={onClose}
         onReload={onReload}
         onUpdate={async (body, signal) => {

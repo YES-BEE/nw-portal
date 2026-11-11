@@ -14,11 +14,11 @@ import en from '../../i18n/locales/en.json';
 import { renderWithProviders } from '../../test/render';
 import { defaultRoles } from '../../test/fixtures';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import { ACCESS_STORAGE_KEY } from './accessData';
+import { ACCESS_STORAGE_KEY } from '../../test/accessData';
 import { RoleManagementPage } from './RoleManagementPage';
-import type { AccessRolesResponse } from './types';
+import type { AccessRoleResponse } from './types';
 
-const roles: AccessRolesResponse = defaultRoles.map((role) => ({
+const roles: AccessRoleResponse[] = defaultRoles.map((role) => ({
   code: role.name.toUpperCase().replaceAll(' ', '_'),
   name: role.name,
   description: role.name,
@@ -90,7 +90,7 @@ describe('backend role management', () => {
   it('shows loading until the response arrives', async () => {
     let resolve!: (value: {
       status: number;
-      data: AccessRolesResponse;
+      data: AccessRoleResponse[];
     }) => void;
     vi.mocked(apiClient.get).mockReturnValue(
       new Promise((done) => {

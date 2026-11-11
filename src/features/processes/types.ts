@@ -52,8 +52,6 @@ export interface ProcessResponse {
   devices: ProcessDeviceResponse[];
 }
 
-export type ProcessesResponse = ProcessResponse[];
-
 export interface CreateProcessDeviceRequest {
   name: string;
   description: string;

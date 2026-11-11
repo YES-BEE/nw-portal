@@ -77,38 +77,11 @@ export interface MeResponse {
   modules: LoginModule[];
 }
 
-export interface LoginProblemBase {
-  type: string;
-  title: string;
-  detail: string;
-  instance?: string;
-}
-
-export interface LoginAuthenticationFailure extends LoginProblemBase {
-  status: 401;
-  code: 'AUTHENTICATION_FAILED';
-}
-
-export interface LoginValidationFailure extends LoginProblemBase {
-  status: 400;
-  code: 'VALIDATION_FAILED';
-  fieldErrors: Partial<Record<LoginField, string>>;
-}
-
-export interface LoginAccessFailure extends LoginProblemBase {
-  status: 403;
-  code: 'ACCESS_DENIED';
-}
-
-// Only recognized application Problem Details belong to this union.
-// Empty, HTML, malformed, or unfamiliar responses must be checked as unknown.
-export type LoginFailure =
-  LoginAuthenticationFailure | LoginValidationFailure | LoginAccessFailure;
-
 export interface LoginUiError {
   kind: 'validation' | 'credentials' | 'access' | 'http' | 'network';
   status?: number;
   code?: string;
   message: string;
+  messageSource?: 'backend' | 'http';
   fieldErrors?: Partial<Record<LoginField, string>>;
 }

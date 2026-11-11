@@ -49,7 +49,9 @@ export function LoginPage() {
   const formError = signInError
     ? typeof signInError === 'string'
       ? t(`auth.errors.${signInError}`)
-      : signInError.message
+      : signInError.status === 401 && signInError.messageSource === 'http'
+        ? t('auth.errors.credentials')
+        : signInError.message
     : null;
 
   useEffect(() => {

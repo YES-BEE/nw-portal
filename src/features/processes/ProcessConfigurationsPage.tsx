@@ -381,7 +381,6 @@ export function ProcessConfigurationsPage() {
         <ProcessForm
           initial={creating}
           editing={false}
-          records={[]}
           onClose={() => setCreating(null)}
           onCreate={async (body, signal) => {
             await createProcess(body, signal);

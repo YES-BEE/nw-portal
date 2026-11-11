@@ -7,7 +7,6 @@ import { apiClient } from '../../api/client';
 import type {
   UserProcessAssignment,
   UserResponse,
-  UsersResponse,
   UsersOperation,
   CreateUserRequest,
   UpdateUserRequest,
@@ -71,25 +70,6 @@ async function requestUsers<T = unknown>(
       parseUsersFailure(response.data, response.status, operation),
     );
   return response.data;
-}
-
-export async function getUsers(signal?: AbortSignal): Promise<UsersResponse> {
-  return collectApiItems(
-    (params) =>
-      requestUsers(() =>
-        apiClient.get<unknown>('users', {
-          ...(params ? { params } : {}),
-          signal,
-          timeout: 10000,
-          validateStatus: () => true,
-        }),
-      ),
-    isUser,
-    (item) => item.id,
-    () => {
-      throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
-    },
-  );
 }
 
 export async function getUser(

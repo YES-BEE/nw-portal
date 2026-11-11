@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadProcesses } from '../processes/processData';
-import { loadStorages } from '../storages/storageData';
 import { loadStyles } from '../styles/styleData';
-import { loadTags } from './tagRegistry';
 
 beforeEach(() => localStorage.clear());
-const loaders = [loadProcesses, loadStorages, loadStyles, loadTags];
+const loaders = [loadProcesses, loadStyles];
 
 describe('configuration data without frontend seeds', () => {
   it.each(loaders)('starts empty when no records are saved: %s', (load) => {

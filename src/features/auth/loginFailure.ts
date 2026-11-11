@@ -30,13 +30,13 @@ export function parseLoginFailure(
     !/<\/?[a-z][^>]*>/i.test(candidate)
       ? candidate
       : undefined;
-  const message =
+  const backendMessage =
     text(problem?.detail) ??
     text(problem?.message) ??
     text(problem?.title) ??
     text(problem?.error) ??
-    text(value) ??
-    (statusText.trim() || String(status));
+    text(value);
+  const message = backendMessage ?? (statusText.trim() || String(status));
   const code = typeof problem?.code === 'string' ? problem.code : undefined;
   const fieldErrors: Partial<Record<LoginField, string>> = {};
   const fields = problem?.fieldErrors;
@@ -58,6 +58,7 @@ export function parseLoginFailure(
     status,
     code,
     message,
+    messageSource: backendMessage ? 'backend' : 'http',
     ...(Object.keys(fieldErrors).length ? { fieldErrors } : {}),
   };
 }

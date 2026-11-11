@@ -1,87 +1,69 @@
-import { seedTestData } from '../../test/fixtures';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { configurationTheme } from '../../app/theme';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
+import { storageAreaResponse as area, storageTags } from '../../test/storages';
 import { StorageDetailsPage } from './StorageDetailsPage';
-import { StorageConfigurationsPage } from './StorageConfigurationsPage';
-import { STORAGE_STORAGE_KEY } from './storageData';
-
-function setup(path = '/configurations/storages') {
-  return {
-    user: userEvent.setup(),
-    ...renderWithProviders(
-      <ThemeProvider theme={configurationTheme}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route
-              path="/configurations/storages/:storageId"
-              element={<StorageDetailsPage />}
-            />
-            <Route
-              path="/configurations/storages"
-              element={<StorageConfigurationsPage />}
-            />
-          </Routes>
-        </MemoryRouter>
-      </ThemeProvider>,
-    ),
-  };
-}
-
 beforeEach(() => {
-  seedTestData();
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
+    status: 200,
+    data: url === 'ui/lookups' ? { tags: storageTags } : area,
+  }));
 });
-
-describe('storage details', () => {
-  it('opens View as a read-only page and returns without writing records', async () => {
-    const write = vi.spyOn(Storage.prototype, 'setItem');
-    const { user } = setup();
-    await user.click(screen.getByRole('link', { name: 'View storage ST-001' }));
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'ST-001' }),
-    ).toBeVisible();
-    expect(screen.getByText('Intermediate storage bay A')).toBeVisible();
-    expect(screen.getByText('Storage Bay A Tag')).toBeVisible();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: 'Back to Storages' }));
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Storage Configurations' }),
-    ).toBeVisible();
-    expect(write).not.toHaveBeenCalled();
+function setup() {
+  renderWithProviders(
+    <MemoryRouter initialEntries={['/configurations/storages/area-1']}>
+      <Routes>
+        <Route
+          path="/configurations/storages/:storageId"
+          element={<StorageDetailsPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+  return userEvent.setup();
+}
+it('loads a fresh storage area on direct navigation and displays names without UUIDs or UIDs', async () => {
+  setup();
+  expect(await screen.findByRole('heading', { name: 'ST-001' })).toBeVisible();
+  expect(screen.getByText('03')).toBeVisible();
+  expect(screen.getByText('Holding Area Tag')).toBeVisible();
+  expect(screen.queryByText(area.id)).not.toBeInTheDocument();
+  expect(screen.queryByText(area.nfcUid!)).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('link', { name: 'Back to Storages' }),
+  ).toHaveAttribute('href', '/configurations/storages');
+});
+it.each([
+  [404, 'notFound', 'Requested resource was not found'],
+  [403, 'access', 'Missing module access: storage'],
+])('shows a backend failure for status %s', async (status, _kind, detail) => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: url === 'ui/lookups' ? 200 : status,
+    data: url === 'ui/lookups' ? { tags: storageTags } : { detail },
+  }));
+  setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(detail);
+  expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
+});
+it('retries service failures', async () => {
+  vi.mocked(apiClient.get).mockResolvedValueOnce({
+    status: 503,
+    data: { detail: 'Maintenance in progress' },
   });
-
-  it('loads a saved storage from a direct detail URL', () => {
-    localStorage.setItem(
-      STORAGE_STORAGE_KEY,
-      JSON.stringify([
-        {
-          id: 'saved',
-          number: 'ST-009',
-          description: 'New bay',
-          tag: 'NFC-STORE-003',
-        },
-      ]),
-    );
-    setup('/configurations/storages/saved');
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'ST-009' }),
-    ).toBeVisible();
-    expect(screen.getByText('New bay')).toBeVisible();
-    expect(screen.getByText('Storage Bay C Tag')).toBeVisible();
-  });
-
-  it('handles a missing or deleted storage', () => {
-    setup('/configurations/storages/missing');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This configuration was not found.',
-    );
-    expect(
-      screen.getByRole('link', { name: 'Back to Storages' }),
-    ).toHaveAttribute('href', '/configurations/storages');
-  });
+  const user = setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Maintenance in progress',
+  );
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByRole('heading', { name: 'ST-001' })).toBeVisible();
+});
+it('rejects an incomplete 200 response instead of presenting invented storage details', async () => {
+  vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: {} });
+  setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'unexpected response',
+  );
 });

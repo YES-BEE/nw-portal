@@ -9,11 +9,13 @@ import {
   createUser,
   deleteUser,
   getUser,
-  getUsers,
+  getUsersPage,
   updateUser,
   getUserProcessOptions,
 } from './usersApi';
 
+const getUsers = async (signal?: AbortSignal) =>
+  (await getUsersPage({ page: 0, size: 10, search: '' }, signal)).items;
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
@@ -170,7 +172,7 @@ describe('users API', () => {
       deleteUser('id/with space', controller.signal),
     ).resolves.toEqual({ ...userResponse, enabled: false });
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/users/id%2Fwith%20space',
     );
     expect(config.method).toBe('delete');
@@ -216,7 +218,9 @@ describe('users API', () => {
       };
       await expect(createUser(body)).resolves.toEqual(userResponse);
       const config = adapter.mock.calls[0][0];
-      expect(apiClient.getUri(config)).toBe('http://backend.test/api/v2/users');
+      expect(apiClient.getUri(config).split('?')[0]).toBe(
+        'http://backend.test/api/v2/users',
+      );
       expect(config.method).toBe('post');
       expect(JSON.parse(config.data)).toEqual(body);
       expect(config.headers.get('Authorization')).toBe(
@@ -258,7 +262,7 @@ describe('users API', () => {
     );
     expect(await getUser(userResponse.id)).toEqual(userResponse);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       `http://backend.test/api/v2/users/${userResponse.id}`,
     );
     expect(config.method).toBe('get');
@@ -336,7 +340,9 @@ describe('users API', () => {
   it('uses the configured version, bearer token, and JSON headers without a GET body', async () => {
     expect(await getUsers()).toEqual(usersResponse);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe('http://backend.test/api/v2/users');
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
+      'http://backend.test/api/v2/users',
+    );
     expect(config.method).toBe('get');
     expect(config.data).toBeUndefined();
     expect(config.headers.get('Authorization')).toBe(

@@ -22,7 +22,7 @@ export const theme = createTheme({
       styleOverrides: { root: { fontSize: 13 } },
     },
     MuiSelect: {
-      defaultProps: { displayEmpty: true, notched: false },
+      defaultProps: { displayEmpty: true },
     },
     MuiMenuItem: {
       styleOverrides: { root: { fontSize: 13 } },

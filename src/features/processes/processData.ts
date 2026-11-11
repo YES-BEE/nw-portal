@@ -1,6 +1,4 @@
 import type { ProcessConfiguration } from './types';
-import { loadTags } from '../configurations/tagRegistry';
-import { loadStorages } from '../storages/storageData';
 
 export const PROCESS_STORAGE_KEY = 'nw-track-process-config-v4';
 
@@ -105,31 +103,14 @@ type ProcessFieldErrors = Partial<Record<string, ProcessFieldError>>;
 
 export function getProcessFieldErrors(
   record: ProcessConfiguration,
-  records: ProcessConfiguration[],
-  tagState?: { registered: ReadonlySet<string>; assigned: ReadonlySet<string> },
+  tagState: { registered: ReadonlySet<string>; assigned: ReadonlySet<string> },
 ): ProcessFieldErrors {
   const errors: ProcessFieldErrors = {};
   if (!record.name.trim()) errors.name = 'nameRequired';
   if (!record.station.trim()) errors.station = 'stationRequired';
   if (record.mode === 'devices' && record.devices.length === 0)
     errors.deviceCount = 'devicesRequired';
-  const registered =
-    tagState?.registered ??
-    new Set(loadTags().records.map((tag) => tag.actual));
-  const assigned =
-    tagState?.assigned ??
-    new Set(
-      [
-        ...loadStorages().records.map((storage) => storage.tag),
-        ...records
-          .filter((process) => process.id !== record.id)
-          .flatMap((process) =>
-            process.mode === 'process'
-              ? [process.processTag]
-              : process.devices.map((device) => device.tag),
-          ),
-      ].map((tag) => tag.toUpperCase()),
-    );
+  const { registered, assigned } = tagState;
   if (record.mode === 'process') {
     if (!record.processTag) errors.processTag = 'processTag';
     else if (!registered.has(record.processTag))

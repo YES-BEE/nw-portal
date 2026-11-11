@@ -1,4 +1,4 @@
-import type { UserResponse, UsersResponse } from '../features/access/types';
+import type { UserResponse } from '../features/access/types';
 
 export const userResponse: UserResponse = {
   id: '6864cd44-c699-4f03-b39c-f1ee4315f839',
@@ -11,7 +11,7 @@ export const userResponse: UserResponse = {
   processAssignments: [],
 };
 
-export const usersResponse: UsersResponse = [
+export const usersResponse: UserResponse[] = [
   userResponse,
   {
     ...userResponse,

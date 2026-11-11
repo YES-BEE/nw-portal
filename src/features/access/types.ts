@@ -10,8 +10,6 @@ export interface AccessRoleResponse {
   modules: string[];
 }
 
-export type AccessRolesResponse = AccessRoleResponse[];
-
 export interface DeleteAccessRoleResponse {
   code: string;
   active: false;
@@ -55,7 +53,6 @@ export interface UserResponse {
   processAssignments: UserProcessAssignment[];
 }
 
-export type UsersResponse = UserResponse[];
 export interface UserProcessAssignmentRequest {
   processId: string;
   activeOnShift: boolean;
@@ -112,16 +109,6 @@ export interface AccessRoleDraft extends Omit<
 
 export type AccessRoleField = keyof CreateAccessRoleRequest;
 export type AccessRolesOperation = 'list' | 'create' | 'update' | 'delete';
-
-export interface AccessRolesValidationResponse {
-  type: string;
-  title: string;
-  status: 400;
-  detail: string;
-  instance?: string;
-  code: 'VALIDATION_FAILED';
-  fieldErrors: Partial<Record<AccessRoleField, string>>;
-}
 
 // Only application-defined 403 responses have a guaranteed JSON contract.
 export interface AccessRolesDeniedResponse {

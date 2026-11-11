@@ -6,7 +6,7 @@ import {
   meResponse,
 } from '../../test/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ACCESS_STORAGE_KEY } from '../access/accessData';
+import { ACCESS_STORAGE_KEY } from '../../test/accessData';
 import {
   SESSION_STORAGE_KEY,
   initializeSession,

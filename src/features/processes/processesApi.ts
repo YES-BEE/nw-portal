@@ -8,7 +8,6 @@ import { readProblemDetails, safeApiText } from '../../api/problemDetails';
 import type {
   ProcessDeviceResponse,
   ProcessResponse,
-  ProcessesResponse,
   ProcessesFailure,
   CreateProcessRequest,
   CreateProcessResponse,
@@ -179,19 +178,6 @@ function isProcess(value: unknown): value is ProcessResponse {
   );
 }
 
-export async function getProcesses(
-  signal?: AbortSignal,
-): Promise<ProcessesResponse> {
-  return collectApiItems(
-    (params) => fetchProcesses(params, signal),
-    isProcess,
-    (item) => item.id,
-    () => {
-      throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
-    },
-  );
-}
-
 export async function getProcess(
   processId: string,
   signal?: AbortSignal,
@@ -273,13 +259,6 @@ export async function getProcessTags(
     },
   );
   return tags;
-}
-
-export async function getProcessTagOptions(
-  signal?: AbortSignal,
-): Promise<ProcessTagOptionResponse[]> {
-  const tags = await getProcessTags(signal);
-  return tags.filter((tag) => tag.status === 'ACTIVE' && !tag.assigned);
 }
 
 export async function updateProcess(

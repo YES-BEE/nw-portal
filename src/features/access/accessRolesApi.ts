@@ -16,7 +16,6 @@ import type {
   ModulesResponse,
   AccessRoleOptionResponse,
   AccessRoleOptionsResponse,
-  AccessRolesResponse,
   AccessRolesOperation,
   CreateAccessRoleRequest,
   SaveAccessRoleRequest,
@@ -70,26 +69,6 @@ async function request<T = unknown>(
   return response.data;
 }
 
-export async function getAccessRoles(
-  signal?: AbortSignal,
-): Promise<AccessRolesResponse> {
-  return collectApiItems(
-    (params) =>
-      request(() =>
-        apiClient.get<unknown>('access-roles', {
-          ...(params ? { params } : {}),
-          signal,
-          timeout: 10000,
-          validateStatus: () => true,
-        }),
-      ),
-    isRole,
-    (item) => item.code,
-    () => {
-      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
-    },
-  );
-}
 export async function getAccessRoleOptions(
   signal?: AbortSignal,
 ): Promise<AccessRoleOptionsResponse> {

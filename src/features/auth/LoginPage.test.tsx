@@ -318,7 +318,9 @@ describe('LoginPage', () => {
       await user.type(password, 'password');
       await user.click(submit);
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        String(status),
+        status === 401
+          ? 'Unable to sign in. Check your username and password and try again.'
+          : String(status),
       );
       expect(username).not.toBeInvalid();
       expect(password).not.toBeInvalid();
@@ -326,6 +328,28 @@ describe('LoginPage', () => {
         screen.queryByText(/unsafe page|proxy error/),
       ).not.toBeInTheDocument();
       expect(readSession()).toBeNull();
+    },
+  );
+  it.each([null, '', {}, { detail: '   ' }])(
+    'shows the client credentials message for an empty backend 401 response: %j',
+    async (body) => {
+      postMock.mockResolvedValue({
+        status: 401,
+        statusText: 'Unauthorized',
+        data: body,
+      });
+      const { user, username, password, submit } = setup();
+      await user.type(username, 'admin');
+      await user.type(password, 'password');
+      await user.click(submit);
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Unable to sign in. Check your username and password and try again.',
+      );
+      expect(screen.getByRole('alert')).not.toHaveTextContent(
+        /401|Unauthorized/,
+      );
+      expect(username).not.toBeInvalid();
+      expect(password).not.toBeInvalid();
     },
   );
   it('shows a connection message for a rejected request', async () => {

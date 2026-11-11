@@ -1,6 +1,5 @@
 import { readApiPage } from '../../api/collections';
 import type { ApiPage, ListQuery } from '../../api/collections';
-import { collectApiItems } from '../../api/collections';
 import type { PageQuery } from '../../api/collections';
 import axios from 'axios';
 import { apiClient } from '../../api/client';
@@ -183,17 +182,6 @@ export function isTagDetails(value: unknown): value is TagDetailsResponse {
     typeof details.version === 'number' &&
     Number.isSafeInteger(details.version) &&
     details.version >= 0
-  );
-}
-
-export async function getTags(signal?: AbortSignal): Promise<TagResponse[]> {
-  return collectApiItems(
-    (params) => fetchTags(params, signal),
-    isTag,
-    (item) => item.id,
-    () => {
-      throw new TagsError({ kind: 'invalidResponse', action: 'retry' });
-    },
   );
 }
 

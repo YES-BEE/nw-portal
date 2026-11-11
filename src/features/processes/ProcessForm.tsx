@@ -36,28 +36,18 @@ import type {
 import { getProcessTags, ProcessesError } from './processesApi';
 import { signOut } from '../auth/session';
 import { normalizeProcess, getProcessFieldErrors } from './processData';
-import { loadTags } from '../configurations/tagRegistry';
-import { loadStorages } from '../storages/storageData';
 
 type ProcessFormProps = {
   initial: ProcessConfiguration;
   editing: boolean;
-  records: ProcessConfiguration[];
   onClose: () => void;
   onReload?: () => void;
 } & (
-  | {
-      onSave: (record: ProcessConfiguration) => void;
-      onCreate?: never;
-      onUpdate?: never;
-      source?: never;
-    }
   | {
       onCreate: (
         body: CreateProcessRequest,
         signal: AbortSignal,
       ) => Promise<void>;
-      onSave?: never;
       onUpdate?: never;
       source?: never;
     }
@@ -67,7 +57,6 @@ type ProcessFormProps = {
         body: UpdateProcessRequest,
         signal: AbortSignal,
       ) => Promise<void>;
-      onSave?: never;
       onCreate?: never;
     }
 );
@@ -87,8 +76,6 @@ const dropdownStyles = {
 export function ProcessForm({
   initial,
   editing,
-  records,
-  onSave,
   onCreate,
   onUpdate,
   source,
@@ -110,9 +97,7 @@ export function ProcessForm({
     | { status: 'error'; failure: ProcessesFailure }
   >({ status: 'loading' });
   const [tagAttempt, setTagAttempt] = useState(0);
-  const backendMode = Boolean(onCreate || onUpdate);
   useEffect(() => {
-    if (!backendMode) return;
     const controller = new AbortController();
     void getProcessTags(controller.signal).then(
       (tags) => {
@@ -130,7 +115,7 @@ export function ProcessForm({
       },
     );
     return () => controller.abort();
-  }, [backendMode, tagAttempt]);
+  }, [tagAttempt]);
   const retainedUids = source
     ? [source.nfcUid, ...source.devices.map((device) => device.nfcUid)].filter(
         (uid): uid is string => !!uid,
@@ -157,18 +142,16 @@ export function ProcessForm({
             })),
         ]
       : [];
-  const validationTags = backendMode
-    ? {
-        registered: new Set(availableTags.map((tag) => tag.uid)),
-        assigned: new Set(
-          availableTags
-            .filter((tag) => tag.assigned)
-            .map((tag) => tag.uid.toUpperCase()),
-        ),
-      }
-    : undefined;
+  const validationTags = {
+    registered: new Set(availableTags.map((tag) => tag.uid)),
+    assigned: new Set(
+      availableTags
+        .filter((tag) => tag.assigned)
+        .map((tag) => tag.uid.toUpperCase()),
+    ),
+  };
   const fieldErrors = submitted
-    ? getProcessFieldErrors(normalizeProcess(draft), records, validationTags)
+    ? getProcessFieldErrors(normalizeProcess(draft), validationTags)
     : {};
   const invalidCount =
     !count.trim() ||
@@ -211,32 +194,13 @@ export function ProcessForm({
     return () => pending.current?.abort();
   }, []);
 
-  const unavailable = backendMode
-    ? new Set(availableTags.filter((tag) => tag.assigned).map((tag) => tag.uid))
-    : new Set([
-        ...loadStorages().records.map((storage) => storage.tag),
-        ...records
-          .filter((record) => record.id !== draft.id)
-          .flatMap((record) =>
-            record.mode === 'process'
-              ? [record.processTag]
-              : record.devices.map((device) => device.tag),
-          ),
-      ]);
   const tagOptions = [
     <MenuItem key="empty" value="">
       {t('processes.selectTag')}
     </MenuItem>,
-    ...(backendMode
-      ? availableTags.map((tag) => ({ name: tag.name, actual: tag.uid }))
-      : loadTags().records
-    ).map((tag) => (
-      <MenuItem
-        key={tag.actual}
-        value={tag.actual}
-        disabled={unavailable.has(tag.actual)}
-      >
-        {t('processes.tagOption', { name: tag.name, id: tag.actual })}
+    ...availableTags.map((tag) => (
+      <MenuItem key={tag.id} value={tag.uid} disabled={tag.assigned}>
+        {tag.name}
       </MenuItem>
     )),
   ];
@@ -274,15 +238,11 @@ export function ProcessForm({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending.current || (backendMode && tagState.status !== 'ready')) return;
+    if (pending.current || tagState.status !== 'ready') return;
     const normalized = normalizeProcess(draft);
-    const issues = getProcessFieldErrors(normalized, records, validationTags);
+    const issues = getProcessFieldErrors(normalized, validationTags);
     setSubmitted(true);
     if (Object.keys(issues).length || (countError && invalidCount)) return;
-    if (!onCreate && !onUpdate) {
-      onSave?.(normalized);
-      return;
-    }
     const controller = new AbortController();
     pending.current = controller;
     setSaving(true);
@@ -387,19 +347,17 @@ export function ProcessForm({
           sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
         >
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
-            {backendMode && tagState.status === 'loading' && (
+            {tagState.status === 'loading' && (
               <Typography role="status" sx={{ mb: 2 }}>
                 {t('processes.loadingTags')}
               </Typography>
             )}
-            {backendMode &&
-              tagState.status === 'ready' &&
-              !availableTags.length && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  {t('processes.noTags')}
-                </Alert>
-              )}
-            {backendMode && tagState.status === 'error' && (
+            {tagState.status === 'ready' && !availableTags.length && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {t('processes.noTags')}
+              </Alert>
+            )}
+            {tagState.status === 'error' && (
               <Alert
                 severity="error"
                 sx={{ mb: 2 }}
@@ -787,7 +745,7 @@ export function ProcessForm({
               variant="contained"
               disabled={
                 saving ||
-                (backendMode && tagState.status !== 'ready') ||
+                tagState.status !== 'ready' ||
                 failure?.action === 'signIn' ||
                 failure?.action === 'reload' ||
                 failure?.kind === 'access' ||

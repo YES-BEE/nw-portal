@@ -1,18 +1,18 @@
+import type { AccessRole } from './accessData';
 // Test-only records. Never imported by application code.
 
 import type { ProcessConfiguration } from '../features/processes/types';
 
-import type { StorageConfiguration } from '../features/storages/types';
-
-import type { RegisteredTag } from '../features/configurations/tagRegistry';
+interface RegisteredTag {
+  id: string;
+  name: string;
+  actual: string;
+}
+export const TAG_STORAGE_KEY = 'nw-track-tags-v2';
 
 import type { StyleRecord } from '../features/styles/styleData';
 
-import type {
-  AccessRole,
-  AccessUser,
-  ModuleKey,
-} from '../features/access/accessData';
+import type { AccessUser, ModuleKey } from '../features/access/accessData';
 
 export const sampleProcesses: ProcessConfiguration[] = [
   {
@@ -45,21 +45,6 @@ export const sampleProcesses: ProcessConfiguration[] = [
         tag: 'NFC-DEV-002',
       },
     ],
-  },
-];
-
-export const sampleStorages: StorageConfiguration[] = [
-  {
-    id: 'storage-demo-1',
-    number: 'ST-001',
-    description: 'Intermediate storage bay A',
-    tag: 'NFC-STORE-001',
-  },
-  {
-    id: 'storage-demo-2',
-    number: 'ST-002',
-    description: 'Finished goods holding area',
-    tag: 'NFC-STORE-002',
   },
 ];
 
@@ -128,13 +113,8 @@ export const defaultUsers: AccessUser[] = [
   status: 'Active',
 }));
 
-import {
-  ACCESS_STORAGE_KEY,
-  loadAccessData,
-} from '../features/access/accessData';
+import { ACCESS_STORAGE_KEY, loadAccessData } from './accessData';
 import { PROCESS_STORAGE_KEY } from '../features/processes/processData';
-import { STORAGE_STORAGE_KEY } from '../features/storages/storageData';
-import { TAG_STORAGE_KEY } from '../features/configurations/tagRegistry';
 import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 import { setAuthenticatedSession } from '../features/auth/session';
 import { orderedNavigationItems } from '../app/navigation';
@@ -148,8 +128,6 @@ export function seedTestData() {
     JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
   );
   localStorage.setItem(PROCESS_STORAGE_KEY, JSON.stringify(sampleProcesses));
-  localStorage.setItem(STORAGE_STORAGE_KEY, JSON.stringify(sampleStorages));
-  localStorage.setItem(TAG_STORAGE_KEY, JSON.stringify(defaultTags));
   localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(sampleStyles));
 }
 

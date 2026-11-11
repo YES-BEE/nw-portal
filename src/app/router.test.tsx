@@ -1,12 +1,12 @@
+import { storageAreaResponse, storageTags } from '../test/storages';
 import { apiClient } from '../api/client';
 import { processResponse } from '../test/processes';
 import { userResponse, usersResponse } from '../test/users';
 import { seedTestData, signIn } from '../test/fixtures';
-import { defaultTags, sampleStyles } from '../test/fixtures';
+import { sampleStyles } from '../test/fixtures';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TAG_STORAGE_KEY } from '../features/configurations/tagRegistry';
 import App from '../App';
 import { renderWithProviders } from '../test/render';
 import { router } from './router';
@@ -15,10 +15,7 @@ import {
   setAuthenticatedSession,
   signOut,
 } from '../features/auth/session';
-import {
-  ACCESS_STORAGE_KEY,
-  loadAccessData,
-} from '../features/access/accessData';
+import { ACCESS_STORAGE_KEY, loadAccessData } from '../test/accessData';
 import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 
 afterAll(() => {
@@ -29,9 +26,13 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
     data:
-      typeof url === 'string' && url.startsWith('processes/')
-        ? { ...processResponse, id: url.slice('processes/'.length) }
-        : [],
+      url === 'ui/lookups'
+        ? { tags: storageTags }
+        : url.startsWith('storage-areas/')
+          ? { ...storageAreaResponse, id: url.slice('storage-areas/'.length) }
+          : url.startsWith('processes/')
+            ? { ...processResponse, id: url.slice('processes/'.length) }
+            : [],
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -533,25 +534,38 @@ describe('application routing', () => {
     {
       path: '/configurations/storages',
       action: 'Add New Storage',
-      label: /NFC Tag ID/,
+      label: /NFC Tag/,
     },
   ])(
     'offers newly registered tags in $path',
     async ({ path, action, label }) => {
-      localStorage.setItem(
-        TAG_STORAGE_KEY,
-        JSON.stringify([
-          ...defaultTags,
-          { id: 'new-tag', name: 'New Factory Tag', actual: '04:AA:BB:CC' },
-        ]),
+      const originalGet = vi.mocked(apiClient.get).getMockImplementation()!;
+      vi.mocked(apiClient.get).mockImplementation(async (url, config) =>
+        url === 'ui/lookups'
+          ? {
+              status: 200,
+              data: {
+                tags: [
+                  ...storageTags,
+                  {
+                    id: 'new-tag',
+                    name: 'New Factory Tag',
+                    uid: '04:AA:BB:CC',
+                    status: 'ACTIVE',
+                    assigned: false,
+                  },
+                ],
+              },
+            }
+          : originalGet(url, config),
       );
       const user = userEvent.setup();
       await router.navigate(path);
       renderWithProviders(<App />);
       await user.click(screen.getByRole('button', { name: action }));
-      await user.click(screen.getByRole('combobox', { name: label }));
+      await user.click(await screen.findByRole('combobox', { name: label }));
       expect(
-        screen.getByRole('option', { name: 'New Factory Tag (04:AA:BB:CC)' }),
+        screen.getByRole('option', { name: 'New Factory Tag' }),
       ).not.toHaveAttribute('aria-disabled', 'true');
     },
   );

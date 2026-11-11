@@ -2,15 +2,18 @@ import type { PageQuery } from './collections';
 import { describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
 import {
-  getAccessRoles,
+  getAccessRolesPage,
   getAccessRoleOptions,
   getModules,
 } from '../features/access/accessRolesApi';
-import { getUsers, getUserProcessOptions } from '../features/access/usersApi';
-import { getTags } from '../features/tags/tagsApi';
 import {
-  getProcesses,
-  getProcessTagOptions,
+  getUsersPage,
+  getUserProcessOptions,
+} from '../features/access/usersApi';
+import { getTagsPage } from '../features/tags/tagsApi';
+import {
+  getProcessesPage,
+  getProcessTags,
 } from '../features/processes/processesApi';
 import {
   accessRolesResponse,
@@ -21,13 +24,33 @@ import { tagsResponse } from '../test/tags';
 import { processesResponse } from '../test/processes';
 import { modulesResponse } from '../test/modules';
 
-const cases = [
+const pageCases = [
   {
     name: 'roles',
     path: 'access-roles',
-    get: getAccessRoles,
+    get: getAccessRolesPage,
     items: accessRolesResponse.slice(0, 2),
   },
+  {
+    name: 'users',
+    path: 'users',
+    get: getUsersPage,
+    items: usersResponse.slice(0, 2),
+  },
+  {
+    name: 'tags',
+    path: 'nfc-tags',
+    get: getTagsPage,
+    items: tagsResponse.slice(0, 2),
+  },
+  {
+    name: 'processes',
+    path: 'processes',
+    get: getProcessesPage,
+    items: processesResponse.slice(0, 2),
+  },
+];
+const cases = [
   {
     name: 'role options',
     path: 'access-roles/options',
@@ -39,24 +62,6 @@ const cases = [
     path: 'modules',
     get: getModules,
     items: modulesResponse.slice(0, 2),
-  },
-  {
-    name: 'users',
-    path: 'users',
-    get: getUsers,
-    items: usersResponse.slice(0, 2),
-  },
-  {
-    name: 'tags',
-    path: 'nfc-tags',
-    get: getTags,
-    items: tagsResponse.slice(0, 2),
-  },
-  {
-    name: 'processes',
-    path: 'processes',
-    get: getProcesses,
-    items: processesResponse.slice(0, 2),
   },
 ];
 describe('paginated list integrations', () => {
@@ -96,16 +101,6 @@ describe('paginated list integrations', () => {
           params: expect.objectContaining({ page: 1, size: 1 }),
         }),
       );
-      if (path === 'nfc-tags')
-        expect(
-          vi
-            .mocked(apiClient.get)
-            .mock.calls.every(
-              (call) =>
-                (call[1]?.params as { status?: string } | undefined)?.status ===
-                'ACTIVE',
-            ),
-        ).toBe(true);
     },
   );
   it.each(['processes', 'tags'] as const)(
@@ -116,9 +111,7 @@ describe('paginated list integrations', () => {
         data: { [field]: { items: [], page: 0, size: 20, totalElements: 0 } },
       });
       await expect(
-        field === 'processes'
-          ? getUserProcessOptions()
-          : getProcessTagOptions(),
+        field === 'processes' ? getUserProcessOptions() : getProcessTags(),
       ).resolves.toEqual([]);
     },
   );
@@ -144,7 +137,7 @@ describe('paginated list integrations', () => {
     });
     await expect(getUserProcessOptions()).resolves.toEqual(options);
   });
-  it('loads all tag lookup pages before filtering assigned tags', async () => {
+  it('loads all tag lookup pages with assignment states', async () => {
     const tags = [
       { id: 't1', name: 'Tag 1', uid: 'ABC', status: 'ACTIVE', assigned: true },
       {
@@ -165,6 +158,39 @@ describe('paginated list integrations', () => {
         },
       };
     });
-    await expect(getProcessTagOptions()).resolves.toEqual([tags[1]]);
+    await expect(getProcessTags()).resolves.toEqual(tags);
   });
+});
+
+describe('server-paged module list APIs', () => {
+  it.each(pageCases)(
+    'accepts an empty backend page for $name',
+    async ({ get }) => {
+      const data = { items: [], page: 0, size: 20, totalElements: 0 };
+      vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data });
+      expect(await get({ page: 0, size: 20, search: '' })).toEqual(data);
+    },
+  );
+  it.each(pageCases)(
+    'fetches only the requested page for $name',
+    async ({ get, path, items }) => {
+      const data = { items: [items[0]], page: 0, size: 1, totalElements: 2 };
+      vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data });
+      const controller = new AbortController();
+      expect(
+        await get({ page: 0, size: 1, search: 'lookup' }, controller.signal),
+      ).toEqual(data);
+      expect(apiClient.get).toHaveBeenCalledExactlyOnceWith(
+        path,
+        expect.objectContaining({
+          signal: controller.signal,
+          params: expect.objectContaining({
+            page: 0,
+            size: 1,
+            search: 'lookup',
+          }),
+        }),
+      );
+    },
+  );
 });

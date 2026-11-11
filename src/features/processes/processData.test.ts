@@ -1,13 +1,35 @@
-import { sampleProcesses, seedTestData } from '../../test/fixtures';
+import {
+  sampleProcesses,
+  seedTestData,
+  defaultTags,
+} from '../../test/fixtures';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   loadProcesses,
   normalizeProcess,
   PROCESS_STORAGE_KEY,
-  getProcessFieldErrors,
+  getProcessFieldErrors as validateProcess,
 } from './processData';
 import type { ProcessConfiguration } from './types';
 
+function getProcessFieldErrors(
+  record: ProcessConfiguration,
+  records: ProcessConfiguration[],
+) {
+  return validateProcess(record, {
+    registered: new Set(defaultTags.map((tag) => tag.actual)),
+    assigned: new Set([
+      'NFC-STORE-001',
+      ...records
+        .filter((item) => item.id !== record.id)
+        .flatMap((item) =>
+          item.mode === 'process'
+            ? [item.processTag]
+            : item.devices.map((device) => device.tag),
+        ),
+    ]),
+  });
+}
 beforeEach(() => {
   seedTestData();
 });

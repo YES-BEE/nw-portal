@@ -8,10 +8,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../test/render';
 import { ConfigurationLayout } from './ConfigurationLayout';
-import {
-  ACCESS_STORAGE_KEY,
-  loadAccessData,
-} from '../features/access/accessData';
+import { ACCESS_STORAGE_KEY, loadAccessData } from '../test/accessData';
 
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({

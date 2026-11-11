@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { TAG_STORAGE_KEY } from '../configurations/tagRegistry';
+import { TAG_STORAGE_KEY } from '../../test/fixtures';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import { TagManagementPage } from './TagManagementPage';
 import { tagsResponse } from '../../test/tags';

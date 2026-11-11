@@ -1,17 +1,12 @@
-import { loadTags } from '../configurations/tagRegistry';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link as RouterLink } from 'react-router-dom';
 import {
-  Alert,
   Box,
   Breadcrumbs,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
+  CircularProgress,
   IconButton,
   Paper,
   Snackbar,
@@ -22,52 +17,48 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import RestoreIcon from '@mui/icons-material/Restore';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
-import { Link as RouterLink } from 'react-router-dom';
-import { emptyStorage, loadStorages, STORAGE_STORAGE_KEY } from './storageData';
+import { usePagedList } from '../../api/usePagedList';
+import { ListPagination } from '../../api/ListPagination';
+import { usePageMetadata } from '../../app/usePageMetadata';
+import { getStorageAreas, storageFailure } from './storagesApi';
+import { StorageFailureAlert } from './StorageFailureAlert';
 import { StorageForm } from './StorageForm';
-import type { StorageConfiguration } from './types';
-
-type Toast = 'saved' | 'deleted';
+import { StorageStatusDialog } from './StorageStatusDialog';
+import { useStorageTagName } from './useStorageTagName';
+import type { StorageAreaResponse } from './types';
 
 export function StorageConfigurationsPage() {
   const { t } = useTranslation('translation');
-  const [data, setData] = useState(loadStorages);
-  const [form, setForm] = useState<{
-    initial: StorageConfiguration;
-    editing: boolean;
-  } | null>(null);
-  const [pendingDelete, setPendingDelete] =
-    useState<StorageConfiguration | null>(null);
-  const [storageError, setStorageError] = useState(false);
-  const [toast, setToast] = useState<Toast | null>(null);
-
-  useEffect(() => {
-    document.title = t('storages.pageTitle');
-    document.documentElement.lang = 'en';
-    document
-      .querySelector('meta[name="description"]')
-      ?.setAttribute('content', t('storages.pageDescription'));
-  }, [t]);
-
-  function persist(records: StorageConfiguration[], message: Toast) {
-    try {
-      localStorage.setItem(STORAGE_STORAGE_KEY, JSON.stringify(records));
-      setData({ records, storageUnavailable: false });
-      setStorageError(false);
-      setForm(null);
-      setToast(message);
-    } catch {
-      setStorageError(true);
-    }
+  const list = usePagedList(getStorageAreas);
+  const [form, setForm] = useState<{ id?: string } | null>(null);
+  const [pendingStatus, setPendingStatus] =
+    useState<StorageAreaResponse | null>(null);
+  const [toast, setToast] = useState(false);
+  const tagName = useStorageTagName(
+    list.state.status === 'ready' &&
+      list.state.data.items.some((record) => !!record.nfcUid),
+  );
+  usePageMetadata(t('storages.pageTitle'), t('storages.pageDescription'));
+  const items = list.state.status === 'ready' ? list.state.data.items : [];
+  const busy = !!form || !!pendingStatus;
+  function reload() {
+    setForm(null);
+    setPendingStatus(null);
+    list.reload();
   }
-
+  function saved() {
+    setToast(true);
+    reload();
+  }
   return (
     <>
       <Breadcrumbs
@@ -101,24 +92,21 @@ export function StorageConfigurationsPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          sx={{ flexShrink: 0 }}
+          disabled={busy}
           onClick={() => {
-            setForm({ initial: emptyStorage(), editing: false });
-            setStorageError(false);
+            setToast(false);
+            setForm({});
           }}
         >
           {t('storages.add')}
         </Button>
       </Stack>
-      {data.storageUnavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('storages.loadWarning')}
-        </Alert>
-      )}
-      {storageError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t('storages.storageError')}
-        </Alert>
+      {list.state.status === 'error' && (
+        <StorageFailureAlert
+          failure={storageFailure(list.state.error)}
+          onReload={reload}
+          onRetry={reload}
+        />
       )}
       <Paper
         component="section"
@@ -126,7 +114,10 @@ export function StorageConfigurationsPage() {
         aria-labelledby="existing-storages-heading"
         sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}
       >
-        <Box sx={{ px: 3, py: 2.5 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{ px: 3, py: 2.5, gap: 2, justifyContent: 'space-between' }}
+        >
           <Typography
             component="h2"
             id="existing-storages-heading"
@@ -134,192 +125,188 @@ export function StorageConfigurationsPage() {
           >
             {t('storages.existing')}
           </Typography>
-        </Box>
+          <TextField
+            type="search"
+            label={t('storages.search')}
+            placeholder={t('storages.searchPlaceholder')}
+            value={list.input}
+            onChange={(e) => list.setInput(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            sx={{ width: '100%', maxWidth: 420 }}
+          />
+        </Stack>
         <TableContainer>
           <Table
             aria-labelledby="existing-storages-heading"
+            aria-busy={list.state.status === 'loading'}
             sx={{ minWidth: 650 }}
           >
             <TableHead>
               <TableRow>
-                {(['number', 'description', 'tag', 'actions'] as const).map(
-                  (column) => (
-                    <TableCell key={column} scope="col">
-                      {t(`storages.${column}`)}
-                    </TableCell>
-                  ),
-                )}
+                {(
+                  [
+                    'number',
+                    'station',
+                    'description',
+                    'tag',
+                    'status',
+                    'actions',
+                  ] as const
+                ).map((key) => (
+                  <TableCell key={key}>{t(`storages.${key}`)}</TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
-              {data.records.map((record) => (
-                <TableRow
-                  key={record.id}
-                  sx={{ '& td, & th': { verticalAlign: 'top' } }}
-                >
+              {list.state.status === 'loading' && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <CircularProgress
+                      size={28}
+                      aria-label={t('common.loading')}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              {items.map((record) => (
+                <TableRow key={record.id}>
                   <TableCell
                     component="th"
                     scope="row"
                     sx={{ fontWeight: 600 }}
                   >
-                    {record.number}
+                    {record.storageNumber}
                   </TableCell>
+                  <TableCell>{record.stationNumber}</TableCell>
                   <TableCell>
-                    {record.description || t('storages.noDescription')}
+                    {record.description || t('common.notProvided')}
                   </TableCell>
+                  <TableCell>{tagName(record.nfcUid)}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
-                      label={
-                        loadTags().records.find(
-                          (tag) => tag.actual === record.tag,
-                        )?.name || t('tags.nameUnavailable')
-                      }
-                      sx={{
-                        bgcolor: '#edf4ff',
-                        color: '#1556c4',
-                        fontWeight: 600,
-                      }}
+                      variant="outlined"
+                      color={record.active ? 'success' : 'default'}
+                      label={t(
+                        record.active ? 'access.active' : 'access.inactive',
+                      )}
                     />
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" sx={{ gap: 0.5 }}>
+                    <Stack direction="row" spacing={0.5}>
                       <Tooltip title={t('common.view')}>
                         <IconButton
                           size="small"
                           color="primary"
-                          aria-label={t('storages.viewNamed', {
-                            number: record.number,
-                          })}
+                          disabled={busy}
                           component={RouterLink}
                           to={`/configurations/storages/${encodeURIComponent(record.id)}`}
+                          aria-label={t('storages.viewNamed', {
+                            number: record.storageNumber,
+                          })}
                         >
                           <VisibilityOutlinedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title={t('storages.editAction')}>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          aria-label={t('storages.editNamed', {
-                            number: record.number,
-                          })}
-                          onClick={() => {
-                            setForm({
-                              initial: structuredClone(record),
-                              editing: true,
-                            });
-                            setStorageError(false);
-                          }}
-                        >
-                          <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            disabled={busy}
+                            onClick={() => {
+                              setToast(false);
+                              setForm({ id: record.id });
+                            }}
+                            aria-label={t('storages.editNamed', {
+                              number: record.storageNumber,
+                            })}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </Tooltip>
-                      <Tooltip title={t('storages.deleteAction')}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          aria-label={t('storages.deleteNamed', {
-                            number: record.number,
-                          })}
-                          onClick={() => setPendingDelete(record)}
-                        >
-                          <DeleteOutlinedIcon fontSize="small" />
-                        </IconButton>
+                      <Tooltip
+                        title={t(
+                          record.active
+                            ? 'storages.deleteAction'
+                            : 'storages.restore',
+                        )}
+                      >
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color={record.active ? 'error' : 'primary'}
+                            disabled={busy}
+                            onClick={() => {
+                              setToast(false);
+                              setPendingStatus(record);
+                            }}
+                            aria-label={t(
+                              record.active
+                                ? 'storages.deleteNamed'
+                                : 'storages.restoreNamed',
+                              { number: record.storageNumber },
+                            )}
+                          >
+                            {record.active ? (
+                              <DeleteOutlinedIcon fontSize="small" />
+                            ) : (
+                              <RestoreIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Box>
                       </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
-              {data.records.length === 0 && (
+              {list.state.status === 'ready' && !items.length && (
                 <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    align="center"
-                    sx={{ py: 5, color: 'text.secondary' }}
-                  >
-                    {t('storages.empty')}
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    {t(
+                      list.query.search
+                        ? 'storages.noMatches'
+                        : 'storages.empty',
+                    )}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+        {list.state.status === 'ready' && items.length > 0 && (
+          <ListPagination
+            query={list.query}
+            total={list.state.data.totalElements}
+            onPage={list.setPage}
+            onSize={list.setSize}
+          />
+        )}
       </Paper>
       {form && (
         <StorageForm
-          key={form.initial.id}
-          initial={form.initial}
-          editing={form.editing}
-          records={data.records}
+          key={form.id || 'create'}
+          storageId={form.id}
           onClose={() => setForm(null)}
-          onSave={(record) =>
-            persist(
-              form.editing
-                ? data.records.map((existing) =>
-                    existing.id === record.id ? record : existing,
-                  )
-                : [record, ...data.records],
-              'saved',
-            )
-          }
+          onSaved={saved}
+          onReload={reload}
         />
       )}
-      <Dialog
-        open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
-        aria-labelledby="storage-confirmation-title"
-        aria-describedby="storage-confirmation-description"
-      >
-        <DialogTitle id="storage-confirmation-title">
-          {t('storages.deleteTitle')}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="storage-confirmation-description">
-            {t('storages.deleteMessage', {
-              number: pendingDelete?.number ?? '',
-            })}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            variant="outlined"
-            onClick={() => setPendingDelete(null)}
-            autoFocus
-          >
-            {t('storages.cancel')}
-          </Button>
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={() => {
-              if (pendingDelete)
-                persist(
-                  data.records.filter(
-                    (record) => record.id !== pendingDelete.id,
-                  ),
-                  'deleted',
-                );
-              setPendingDelete(null);
-            }}
-          >
-            {t('storages.deleteAction')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {pendingStatus && (
+        <StorageStatusDialog
+          record={pendingStatus}
+          onClose={() => setPendingStatus(null)}
+          onSaved={saved}
+          onReload={reload}
+        />
+      )}
       <Snackbar
-        open={toast !== null}
-        autoHideDuration={4000}
-        onClose={() => setToast(null)}
-      >
-        <Alert
-          severity="success"
-          variant="filled"
-          onClose={() => setToast(null)}
-        >
-          {toast && t(`storages.${toast}`)}
-        </Alert>
-      </Snackbar>
+        open={toast}
+        autoHideDuration={3500}
+        onClose={() => setToast(false)}
+        message={t('storages.saved')}
+      />
     </>
   );
 }

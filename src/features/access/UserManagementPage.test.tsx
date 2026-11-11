@@ -8,9 +8,9 @@ import { userResponse, usersResponse } from '../../test/users';
 import { accessRoleOptionsResponse } from '../../test/accessRoles';
 import * as accessRolesApi from './accessRolesApi';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import { ACCESS_STORAGE_KEY } from './accessData';
+import { ACCESS_STORAGE_KEY } from '../../test/accessData';
 import { UserManagementPage } from './UserManagementPage';
-import type { UsersResponse } from './types';
+import type { UserResponse } from './types';
 
 function renderPage() {
   return renderWithProviders(
@@ -364,7 +364,7 @@ describe('backend user listing', () => {
   });
 
   it('shows a loader until the request completes, with no false empty or error state', async () => {
-    let resolve!: (response: { status: number; data: UsersResponse }) => void;
+    let resolve!: (response: { status: number; data: UserResponse[] }) => void;
     vi.mocked(apiClient.get).mockReturnValue(
       new Promise((done) => {
         resolve = done;

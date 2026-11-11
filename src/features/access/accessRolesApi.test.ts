@@ -14,10 +14,12 @@ import {
   deleteAccessRole,
   getAccessRoleOptions,
   getModules,
-  getAccessRoles,
+  getAccessRolesPage,
   saveAccessRole,
 } from './accessRolesApi';
 
+const getAccessRoles = async (signal?: AbortSignal) =>
+  (await getAccessRolesPage({ page: 0, size: 10, search: '' }, signal)).items;
 const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
@@ -64,7 +66,7 @@ describe('access roles API transport', () => {
       deleteAccessRole('CUSTOM/OPS', controller.signal),
     ).resolves.toEqual(deletedRole);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/access-roles/CUSTOM%2FOPS',
     );
     expect(config.method).toBe('delete');
@@ -104,7 +106,9 @@ describe('access roles API transport', () => {
       modulesResponse,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe('http://backend.test/api/v1/modules');
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
+      'http://backend.test/api/v1/modules',
+    );
     expect(config.method).toBe('get');
     expect(config.data).toBeUndefined();
     expect(config.signal).toBe(controller.signal);
@@ -151,7 +155,7 @@ describe('access roles API transport', () => {
       accessRoleOptionsResponse,
     );
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/access-roles/options',
     );
     expect(config.method).toBe('get');
@@ -288,7 +292,7 @@ describe('access roles API transport', () => {
     };
     await expect(createAccessRole(body)).resolves.toEqual(createdRole);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/access-roles',
     );
     expect(config.method).toBe('post');
@@ -329,7 +333,7 @@ describe('access roles API transport', () => {
         accessRolesResponse,
       );
       const config = adapter.mock.calls[0][0];
-      expect(apiClient.getUri(config)).toBe(
+      expect(apiClient.getUri(config).split('?')[0]).toBe(
         'http://backend.test/api/v1/access-roles/CUSTOM%2FOPS',
       );
       expect(config.method).toBe('put');
@@ -376,7 +380,7 @@ describe('access roles API transport', () => {
   it('uses the configured endpoint, bearer token and supported Accept types with no body', async () => {
     expect(await getAccessRoles()).toEqual([]);
     const config = adapter.mock.calls[0][0];
-    expect(apiClient.getUri(config)).toBe(
+    expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/access-roles',
     );
     expect(config.method).toBe('get');

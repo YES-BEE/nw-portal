@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ACCESS_STORAGE_KEY, isAccessData, loadAccessData } from './accessData';
-import type { AccessData } from './accessData';
+import {
+  ACCESS_STORAGE_KEY,
+  isAccessData,
+  loadAccessData,
+} from '../../test/accessData';
+import type { AccessData } from '../../test/accessData';
 
 const records: AccessData = {
   users: [
