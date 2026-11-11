@@ -180,6 +180,7 @@ export function ChangePasswordPage() {
           {!finishing &&
             (['currentPassword', 'newPassword'] as const).map((field) => (
               <TextField
+                placeholder={t(`passwordChange.placeholders.${field}`)}
                 key={field}
                 fullWidth
                 required

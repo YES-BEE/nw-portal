@@ -1,3 +1,7 @@
+import { readApiPage } from '../../api/collections';
+import type { ApiPage, ListQuery } from '../../api/collections';
+import { collectApiItems } from '../../api/collections';
+import type { PageQuery } from '../../api/collections';
 import axios from 'axios';
 import { apiClient } from '../../api/client';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
@@ -183,32 +187,14 @@ function isTagDetails(value: unknown): value is TagDetailsResponse {
 }
 
 export async function getTags(signal?: AbortSignal): Promise<TagResponse[]> {
-  let response;
-  try {
-    response = await apiClient.get<unknown>('nfc-tags', {
-      params: { status: 'ACTIVE' },
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    });
-  } catch (error: unknown) {
-    if (axios.isCancel(error)) throw error;
-    if (axios.isAxiosError(error) && error.response)
-      throw new TagsError(
-        parseTagsFailure(error.response.data, error.response.status),
-      );
-    throw new TagsError({ kind: 'network', action: 'retry' });
-  }
-  if (response.status < 200 || response.status >= 300)
-    throw new TagsError(parseTagsFailure(response.data, response.status));
-  const data = response.data;
-  if (
-    !Array.isArray(data) ||
-    !data.every(isTag) ||
-    new Set(data.map((tag) => tag.id)).size !== data.length
-  )
-    throw new TagsError({ kind: 'invalidResponse', action: 'retry' });
-  return data;
+  return collectApiItems(
+    (params) => fetchTags(params, signal),
+    isTag,
+    (item) => item.id,
+    () => {
+      throw new TagsError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }
 
 export async function getTag(
@@ -336,4 +322,44 @@ export async function createTag(
       parseTagsFailure(response.data, response.status, 'create'),
     );
   return response.data;
+}
+
+async function fetchTags(
+  params?: PageQuery,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  let response;
+  try {
+    response = await apiClient.get<unknown>('nfc-tags', {
+      params: { status: 'ACTIVE', ...params },
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    });
+  } catch (error: unknown) {
+    if (axios.isCancel(error)) throw error;
+    if (axios.isAxiosError(error) && error.response)
+      throw new TagsError(
+        parseTagsFailure(error.response.data, error.response.status),
+      );
+    throw new TagsError({ kind: 'network', action: 'retry' });
+  }
+  if (response.status < 200 || response.status >= 300)
+    throw new TagsError(parseTagsFailure(response.data, response.status));
+  return response.data;
+}
+
+export async function getTagsPage(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<TagResponse>> {
+  return readApiPage(
+    await fetchTags(query, signal),
+    query,
+    isTag,
+    (item) => item.id,
+    () => {
+      throw new TagsError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }

@@ -1,3 +1,6 @@
+import { readApiPage } from '../../api/collections';
+import type { ApiPage, ListQuery } from '../../api/collections';
+import { collectApiItems } from '../../api/collections';
 import axios from 'axios';
 import type { AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
@@ -71,21 +74,22 @@ async function requestUsers<T = unknown>(
 }
 
 export async function getUsers(signal?: AbortSignal): Promise<UsersResponse> {
-  const data = await requestUsers(() =>
-    apiClient.get<unknown>('users', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    }),
+  return collectApiItems(
+    (params) =>
+      requestUsers(() =>
+        apiClient.get<unknown>('users', {
+          ...(params ? { params } : {}),
+          signal,
+          timeout: 10000,
+          validateStatus: () => true,
+        }),
+      ),
+    isUser,
+    (item) => item.id,
+    () => {
+      throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+    },
   );
-  if (
-    !Array.isArray(data) ||
-    !data.every(isUser) ||
-    new Set(data.map((user) => user.id)).size !== data.length
-  ) {
-    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
-  }
-  return data;
 }
 
 export async function getUser(
@@ -166,17 +170,6 @@ export async function updateUser(
 export async function getUserProcessOptions(
   signal?: AbortSignal,
 ): Promise<ProcessLookupResponse[]> {
-  const data = await requestUsers(() =>
-    apiClient.get<unknown>('ui/lookups', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    }),
-  );
-  const processes =
-    data && typeof data === 'object' && !Array.isArray(data)
-      ? (data as Record<string, unknown>).processes
-      : undefined;
   const isOption = (value: unknown): value is ProcessLookupResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -185,11 +178,47 @@ export async function getUserProcessOptions(
       (key) => typeof option[key] === 'string' && !!option[key].trim(),
     );
   };
-  if (
-    !Array.isArray(processes) ||
-    !processes.every(isOption) ||
-    new Set(processes.map((option) => option.id)).size !== processes.length
-  )
-    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
-  return processes;
+  return collectApiItems(
+    async (params) => {
+      const data = await requestUsers(() =>
+        apiClient.get<unknown>('ui/lookups', {
+          ...(params ? { params } : {}),
+          signal,
+          timeout: 10000,
+          validateStatus: () => true,
+        }),
+      );
+      return data && typeof data === 'object' && !Array.isArray(data)
+        ? (data as Record<string, unknown>).processes
+        : undefined;
+    },
+    isOption,
+    (item) => item.id,
+    () => {
+      throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
+}
+
+export async function getUsersPage(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<UserResponse>> {
+  const data = await requestUsers(() =>
+    apiClient.get<unknown>('users', {
+      params: query,
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    }),
+  );
+  return readApiPage(
+    data,
+    query,
+    isUser,
+    (item) => item.id,
+    () => {
+      throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }

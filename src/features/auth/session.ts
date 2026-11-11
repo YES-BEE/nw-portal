@@ -204,10 +204,13 @@ async function completeStartup(
     applySession(session, true);
     if (session.expiresAt! <= Date.now()) await refreshAccessToken();
     if (run !== startupRun) return null;
-    const [refresh, profile] = await Promise.all([
-      issueRefreshToken(controller.signal),
-      getMe(controller.signal),
-    ]);
+    // Initial-password accounts may call /me and /change-password, but the
+    // backend blocks refresh-token issuance until their password is changed.
+    const profile = await getMe(controller.signal);
+    if (run !== startupRun) return null;
+    const refresh = profileRequiresPasswordChange(profile)
+      ? undefined
+      : await issueRefreshToken(controller.signal);
     if (run !== startupRun) return null;
     if (!currentSession) throw new CanceledError();
     applySession(
@@ -402,9 +405,16 @@ export function refreshAccessToken(): Promise<string | null> {
   return request;
 }
 
+function profileRequiresPasswordChange(profile: MeResponse | undefined) {
+  return (
+    profile?.must_change_password === true ||
+    profile?.initial_password_expires_at != null
+  );
+}
+
 export function requiresPasswordChange(session: AuthSession) {
   return (
-    session.profile?.must_change_password === true ||
+    profileRequiresPasswordChange(session.profile) ||
     session.passwordChangePending === true
   );
 }
@@ -462,7 +472,7 @@ export async function completePasswordChange(
   }
   const profile = await getMe(signal);
   check();
-  if (profile.must_change_password)
+  if (profileRequiresPasswordChange(profile))
     throw new PasswordChangeError({ kind: 'invalidResponse' });
   const session = currentSession!;
   applySession(

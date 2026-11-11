@@ -1,5 +1,6 @@
-import { formatRoleName } from './formatRoleName';
-import { useEffect, useState } from 'react';
+import { usePagedList } from '../../api/usePagedList';
+import { ListPagination } from '../../api/ListPagination';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -20,6 +21,7 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  TextField,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
@@ -27,30 +29,31 @@ import { moduleKeys } from './accessData';
 import type { ModuleKey } from './accessData';
 import {
   createAccessRole,
-  getAccessRoles,
+  getAccessRolesPage,
   saveAccessRole,
 } from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
 import { signOut } from '../auth/session';
-import type {
-  AccessRoleDraft,
-  AccessRoleResponse,
-  AccessRolesFailure,
-  AccessRolesResponse,
-} from './types';
+import type { AccessRoleDraft, AccessRoleResponse } from './types';
 import { ManagementHeader } from './ManagementScaffold';
 import { RoleForm } from './RoleForm';
 import { RoleDeleteDialog } from './RoleDeleteDialog';
 
-type RolesState =
-  | { status: 'loading' }
-  | { status: 'ready'; roles: AccessRolesResponse }
-  | { status: 'error'; failure: AccessRolesFailure };
-
 export function RoleManagementPage() {
   const { t } = useTranslation('translation');
-  const [state, setState] = useState<RolesState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const list = usePagedList(getAccessRolesPage);
+  const state =
+    list.state.status === 'ready'
+      ? { status: 'ready' as const, roles: list.state.data.items }
+      : list.state.status === 'error'
+        ? {
+            status: 'error' as const,
+            failure:
+              list.state.error instanceof AccessRolesError
+                ? list.state.error.failure
+                : { kind: 'network' as const, action: 'retry' as const },
+          }
+        : list.state;
   const [form, setForm] = useState<{
     initial: AccessRoleDraft;
     editing: boolean;
@@ -62,28 +65,9 @@ export function RoleManagementPage() {
   const [deleted, setDeleted] = useState(false);
   function reloadRoles() {
     setDeletingRole(null);
-    setState({ status: 'loading' });
-    setAttempt((value) => value + 1);
+    list.reload();
   }
-  useEffect(() => {
-    const controller = new AbortController();
-    void getAccessRoles(controller.signal).then(
-      (roles) => {
-        if (!controller.signal.aborted) setState({ status: 'ready', roles });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'error',
-            failure:
-              error instanceof AccessRolesError
-                ? error.failure
-                : { kind: 'network', action: 'retry' },
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
+
   return (
     <>
       <ManagementHeader
@@ -118,8 +102,7 @@ export function RoleManagementPage() {
               <Button
                 color="inherit"
                 onClick={() => {
-                  setState({ status: 'loading' });
-                  setAttempt((value) => value + 1);
+                  list.reload();
                 }}
               >
                 {t('startup.retry')}
@@ -145,6 +128,17 @@ export function RoleManagementPage() {
         <Typography component="h2" variant="h6" sx={{ p: 3 }}>
           {t('access.roles.existing')}
         </Typography>
+        <Box sx={{ p: 3 }}>
+          <TextField
+            placeholder={t('access.roles.searchPlaceholder')}
+            type="search"
+            label={t('access.roles.search')}
+            value={list.input}
+            onChange={(event) => list.setInput(event.target.value)}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            sx={{ width: '100%', maxWidth: 420 }}
+          />
+        </Box>
         <TableContainer>
           <Table
             aria-label={t('access.roles.existing')}
@@ -184,7 +178,7 @@ export function RoleManagementPage() {
                       scope="row"
                       sx={{ minWidth: 170 }}
                     >
-                      {formatRoleName(role.name)}
+                      {role.name}
                     </TableCell>
                     <TableCell>
                       <Stack
@@ -230,7 +224,7 @@ export function RoleManagementPage() {
                               });
                             }}
                             aria-label={t('access.editNamed', {
-                              name: formatRoleName(role.name),
+                              name: role.name,
                             })}
                           >
                             <EditOutlinedIcon />
@@ -247,7 +241,7 @@ export function RoleManagementPage() {
                             }}
                             color="error"
                             aria-label={t('access.deleteNamed', {
-                              name: formatRoleName(role.name),
+                              name: role.name,
                             })}
                           >
                             <DeleteOutlinedIcon />
@@ -260,6 +254,14 @@ export function RoleManagementPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        {list.state.status === 'ready' && list.state.data.items.length > 0 && (
+          <ListPagination
+            query={list.query}
+            total={list.state.data.totalElements}
+            onPage={list.setPage}
+            onSize={list.setSize}
+          />
+        )}
       </Paper>
       {form && (
         <RoleForm
@@ -272,8 +274,7 @@ export function RoleManagementPage() {
           onReload={() => {
             setForm(null);
             setSaved(false);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.reload();
           }}
           onSave={async (draft, signal) => {
             const body = {
@@ -286,8 +287,7 @@ export function RoleManagementPage() {
             if (signal.aborted) return;
             setForm(null);
             setSaved(true);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.reload();
           }}
         />
       )}

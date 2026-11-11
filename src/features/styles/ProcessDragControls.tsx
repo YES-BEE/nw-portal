@@ -105,6 +105,7 @@ export function ProcessPalette({
         {t('styles.dragHint')}
       </Typography>
       <TextField
+        placeholder={t('styles.searchProcessesPlaceholder')}
         label={t('styles.searchProcesses')}
         type="search"
         size="small"
@@ -209,7 +210,9 @@ export function SortableProcessStep({
             <DragIndicatorIcon />
           </IconButton>
         </Tooltip>
-        <Typography sx={{ fontSize: 13, fontWeight: 600, color: 'primary.dark' }}>
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 600, color: 'primary.dark' }}
+        >
           {label}
         </Typography>
       </Stack>

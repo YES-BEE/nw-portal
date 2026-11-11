@@ -38,7 +38,8 @@
     "storage": "Storage Configurations",
     "tags": "Tag Management",
     "openMenu": "Open navigation menu",
-    "closeMenu": "Close navigation menu"
+    "closeMenu": "Close navigation menu",
+    "trolleys": "Trolley Configurations"
   },
   "configuration": {
     "signedInUser": "Signed-in user",
@@ -139,6 +140,16 @@
       "deliveryOrder": "Delivery date cannot be earlier than creation date.",
       "sequenceRequired": "Add at least one process to the production sequence.",
       "processRequired": "Remove this step and drag an available process into the sequence."
+    },
+    "numberPlaceholder": "Enter a style number",
+    "descriptionPlaceholder": "Describe the garment style",
+    "clientPlaceholder": "Enter the fabric client's name",
+    "searchProcessesPlaceholder": "Search by process name or station",
+    "placeholders": {
+      "garments": "Enter number of garments",
+      "lots": "Enter number of lots",
+      "weight": "Enter weight per lot in kg",
+      "avg": "Enter average garment weight in kg"
     }
   },
   "auth": {
@@ -186,6 +197,10 @@
       "network": "Check your connection and try again. If your password was already changed, sign in with your new password.",
       "invalidResponse": "The service returned an unexpected response. Try again or sign in with your new password.",
       "unchanged": "The service did not confirm a password change. Review your details and try again."
+    },
+    "placeholders": {
+      "currentPassword": "Enter your current password",
+      "newPassword": "Enter a new password"
     }
   },
   "access": {
@@ -318,7 +333,10 @@
       "assignmentStation": "Station",
       "processStatus": "Process Status",
       "stationStatus": "Station Status",
-      "noAssignments": "No processes assigned."
+      "noAssignments": "No processes assigned.",
+      "usernamePlaceholder": "Enter a username",
+      "displayNamePlaceholder": "Enter the user's full name",
+      "initialPasswordPlaceholder": "Enter an initial password"
     },
     "roles": {
       "description": "Manage roles, module assignments, and application access.",
@@ -394,7 +412,9 @@
       "existing": "Roles & Module Permissions",
       "add": "Create New Role",
       "edit": "Edit Role",
-      "save": "Save Role"
+      "save": "Save Role",
+      "search": "Search roles",
+      "searchPlaceholder": "Search by role name or code"
     },
     "modules": {
       "dashboard": "Dashboard",
@@ -405,12 +425,14 @@
       "styles": "Style Management",
       "users": "User Management",
       "roles": "Role Management",
-      "newstyle": "New Style"
+      "newstyle": "New Style",
+      "trolleys": "Trolley Configurations"
     },
     "errors": {
       "roleNameRequired": "Enter a role name.",
       "roleDuplicate": "This role already exists."
-    }
+    },
+    "roleNamePlaceholder": "Enter a role name"
   },
   "processes": {
     "detailsTitle": "Process Details",
@@ -423,10 +445,7 @@
     "detailsPageTitle": "NW Track | Process Details",
     "detailsDescription": "View process tracking settings and browse associated devices.",
     "backToList": "Back to Processes",
-    "searchDevices": "Search devices",
-    "searchDevicesPlaceholder": "Search by name, description or NFC tag",
     "noDevices": "No devices are associated with this process.",
-    "noDeviceMatches": "No devices match your search.",
     "viewNamed": "View {{name}}",
     "pageTitle": "NW Track | Process Configurations",
     "pageDescription": "Create processes, assign station numbers and choose the NFC tracking level.",
@@ -558,7 +577,12 @@
       "duplicateTags": "NFC Tag IDs must be unique within this process.",
       "assignedTag": "One or more selected NFC tags are already assigned to another process, device, or storage.",
       "deviceCount": "Device count must be a whole number between 0 and 50."
-    }
+    },
+    "search": "Search processes",
+    "searchPlaceholder": "Search by process name, code or station",
+    "countPlaceholder": "Enter number of devices (0-50)",
+    "deviceNamePlaceholder": "Enter a device name",
+    "deviceDescriptionPlaceholder": "Describe the device (optional)"
   },
   "storages": {
     "detailsTitle": "Storage Details",
@@ -739,5 +763,51 @@
     "passwordPlaceholder": "Enter your password",
     "showPassword": "Show password",
     "hidePassword": "Hide password"
+  },
+  "trolleys": {
+    "title": "Trolley Configurations",
+    "pageTitle": "Trolley Configurations | NW TRACK",
+    "description": "Create and manage trolleys used in production.",
+    "create": "Add Trolley",
+    "edit": "Edit Trolley",
+    "details": "Trolley Details",
+    "code": "Trolley Code",
+    "availability": "Availability",
+    "available": "Available",
+    "inUse": "In Use",
+    "search": "Search trolleys",
+    "searchPlaceholder": "Search trolley code or status",
+    "empty": "No trolleys found.",
+    "viewNamed": "View {{code}}",
+    "editNamed": "Edit {{code}}",
+    "deleteNamed": "Delete {{code}}",
+    "restoreNamed": "Restore {{code}}",
+    "save": "Save Trolley",
+    "saving": "Saving...",
+    "saved": "Trolley changes saved.",
+    "close": "Close",
+    "reload": "Reload trolleys",
+    "deleteTitle": "Delete trolley?",
+    "deleteMessage": "{{code}} will be made inactive.",
+    "restore": "Restore",
+    "restoreTitle": "Restore trolley?",
+    "restoreMessage": "{{code}} will be made active again.",
+    "codeRequired": "Enter a trolley code.",
+    "failureTitle": "Unable to complete trolley request",
+    "failureStatus": "HTTP {{status}}",
+    "failures": {
+      "authentication": "Sign in again to continue.",
+      "roleChanged": "Your role has changed. Sign in again to continue.",
+      "access": "Your account cannot perform this trolley request.",
+      "validation": "Review the trolley code and save again.",
+      "invalidRequest": "Review the trolley details and try again.",
+      "notFound": "This trolley could not be found. Reload the list to view available trolleys.",
+      "conflict": "The trolley code may already be in use. Review the details before saving again.",
+      "service": "The trolley service is temporarily unavailable. Please try again shortly.",
+      "network": "Check your connection and try again.",
+      "invalidResponse": "The service returned an unexpected response. Try again or contact your administrator.",
+      "http": "The trolley request could not be completed. Please try again."
+    },
+    "codePlaceholder": "Enter a trolley code"
   }
 }

@@ -328,7 +328,7 @@ describe('backend user listing', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('lists only active backend users without using or changing local user records', async () => {
+  it('lists returned backend users without using or changing local user records', async () => {
     const local = JSON.stringify({
       users: [
         { id: 'local', username: 'Local only', role: 'NW', status: 'Active' },
@@ -352,7 +352,7 @@ describe('backend user listing', () => {
     expect(
       screen.queryByRole('rowheader', { name: 'operator' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('1–1 of 1')).toBeVisible();
+    expect(screen.getByText(/of 2$/)).toBeVisible();
     expect(screen.queryByText('Local only')).not.toBeInTheDocument();
     expect(localStorage.getItem(ACCESS_STORAGE_KEY)).toBe(local);
     expect(screen.getByRole('button', { name: 'Add User' })).toBeEnabled();
@@ -374,56 +374,17 @@ describe('backend user listing', () => {
     expect(screen.getByRole('progressbar')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('No users found.')).not.toBeInTheDocument();
-    expect(screen.getByRole('searchbox')).toBeDisabled();
+    expect(screen.getByRole('searchbox')).toBeEnabled();
     await act(async () => resolve({ status: 200, data: usersResponse }));
     expect(screen.getAllByRole('rowheader')).toHaveLength(1);
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
-  it('searches username, display name, and role without case sensitivity', async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole('rowheader', { name: 'admin' });
-    const search = screen.getByRole('searchbox', { name: 'Search users' });
-    for (const value of [' ADMIN ', ' bootstrap ', ' nw ']) {
-      await user.clear(search);
-      await user.type(search, value);
-      expect(screen.getAllByRole('rowheader')).toHaveLength(1);
-      expect(screen.getByRole('rowheader', { name: 'admin' })).toBeVisible();
-    }
-    await user.clear(search);
-    await user.type(search, 'operator');
-    expect(screen.getByText('No users match your search.')).toBeVisible();
-    await user.clear(search);
-    expect(screen.getAllByRole('rowheader')).toHaveLength(1);
-  });
-
-  it('paginates fetched users and resets the page when searching', async () => {
-    const records = Array.from({ length: 12 }, (_, i) => ({
-      ...userResponse,
-      id: `id-${i}`,
-      username: `account-${i}`,
-    }));
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: records });
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole('rowheader', { name: 'account-0' });
-    expect(screen.getAllByRole('rowheader')).toHaveLength(10);
-    await user.click(screen.getByRole('button', { name: /next page/i }));
-    expect(screen.getAllByRole('rowheader')).toHaveLength(2);
-    expect(screen.getByRole('rowheader', { name: 'account-11' })).toBeVisible();
-    await user.type(screen.getByRole('searchbox'), 'account-0');
-    expect(screen.getByRole('rowheader', { name: 'account-0' })).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: /previous page/i }),
-    ).toBeDisabled();
-  });
-
-  it.each([
-    { data: [] },
-    { data: usersResponse.map((user) => ({ ...user, enabled: false })) },
-  ])('shows an empty list when no active users exist: %j', async ({ data }) => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
+  it('shows an empty backend page', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: { items: [], page: 0, size: 10, totalElements: 0 },
+    });
     renderPage();
     expect(await screen.findByText('No users found.')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

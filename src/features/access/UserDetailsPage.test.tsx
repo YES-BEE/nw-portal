@@ -63,7 +63,7 @@ describe('backend user details', () => {
       `users/${userResponse.id}`,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(screen.getByText('Process Manager')).toBeVisible();
+    expect(screen.getByText('PROCESS_MANAGER')).toBeVisible();
     expect(screen.getByText('Password Change Required')).toBeVisible();
     expect(screen.getByText('Created At')).toBeVisible();
     expect(screen.queryByText(userResponse.id)).not.toBeInTheDocument();

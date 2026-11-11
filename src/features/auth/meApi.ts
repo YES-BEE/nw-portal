@@ -14,6 +14,10 @@ export function isMeResponse(value: unknown): value is MeResponse {
     typeof profile.display_name === 'string' &&
     typeof profile.enabled === 'boolean' &&
     typeof profile.must_change_password === 'boolean' &&
+    (profile.initial_password_expires_at === undefined ||
+      profile.initial_password_expires_at === null ||
+      (typeof profile.initial_password_expires_at === 'string' &&
+        Number.isFinite(Date.parse(profile.initial_password_expires_at)))) &&
     typeof profile.role === 'string' &&
     (profile.clientType === 'PC' || profile.clientType === 'PAD') &&
     Array.isArray(profile.permissions) &&

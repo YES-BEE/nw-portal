@@ -5,6 +5,7 @@ export const moduleKeys = [
   'reports',
   'process',
   'storage',
+  'trolleys',
   'tags',
   'styles',
   'users',

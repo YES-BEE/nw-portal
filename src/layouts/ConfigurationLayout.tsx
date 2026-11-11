@@ -1,4 +1,3 @@
-import { formatRoleName } from '../features/access/formatRoleName';
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -376,10 +375,10 @@ export function ConfigurationLayout() {
                 }}
               >
                 <Chip
-                  label={formatRoleName(session.user.role)}
+                  label={session.user.role}
                   variant="outlined"
                   size="small"
-                  title={formatRoleName(session.user.role)}
+                  title={session.user.role}
                   sx={{
                     minWidth: 0,
                     height: 22,

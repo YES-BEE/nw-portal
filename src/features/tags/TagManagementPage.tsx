@@ -1,3 +1,4 @@
+import { usePagedList } from '../../api/usePagedList';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,22 +31,34 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
-import { createTag, getTags, TagsError } from './tagsApi';
+import { createTag, getTagsPage, TagsError } from './tagsApi';
 import { TagForm } from './TagForm';
 import { TagDetailsDialog } from './TagDetailsDialog';
 import { TagEditor } from './TagEditor';
 import { TagDeleteDialog } from './TagDeleteDialog';
-import type { TagResponse, TagsFailure } from './tagsApi';
-
-type TagsState =
-  | { status: 'loading' }
-  | { status: 'ready'; tags: TagResponse[] }
-  | { status: 'error'; failure: TagsFailure };
+import type { TagResponse } from './tagsApi';
 
 export function TagManagementPage() {
   const { t } = useTranslation('translation');
-  const [state, setState] = useState<TagsState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const list = usePagedList(getTagsPage);
+  const query = list.input,
+    setQuery = list.setInput;
+  const page = list.query.page,
+    rowsPerPage = list.query.size;
+  const setPage = list.setPage,
+    setRowsPerPage = list.setSize;
+  const state =
+    list.state.status === 'ready'
+      ? { status: 'ready' as const, tags: list.state.data.items }
+      : list.state.status === 'error'
+        ? {
+            status: 'error' as const,
+            failure:
+              list.state.error instanceof TagsError
+                ? list.state.error.failure
+                : { kind: 'network' as const, action: 'retry' as const },
+          }
+        : list.state;
   const [creating, setCreating] = useState(false);
   const [saved, setSaved] = useState(false);
   const [viewingTagId, setViewingTagId] = useState<string | null>(null);
@@ -55,35 +68,8 @@ export function TagManagementPage() {
   function reloadTags() {
     setEditingTagId(null);
     setDeletingTag(null);
-    setState({ status: 'loading' });
-    setAttempt((value) => value + 1);
+    list.reload();
   }
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  useEffect(() => {
-    const controller = new AbortController();
-    void getTags(controller.signal).then(
-      (tags) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'ready',
-            tags,
-          });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'error',
-            failure:
-              error instanceof TagsError
-                ? error.failure
-                : { kind: 'network', action: 'retry' },
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
   useEffect(() => {
     document.title = t('tags.pageTitle');
     document
@@ -92,21 +78,6 @@ export function TagManagementPage() {
   }, [t]);
 
   const tags = state.status === 'ready' ? state.tags : [];
-  const search = query.trim().toLowerCase();
-  const filtered = tags.filter(
-    (tag) =>
-      tag.name.toLowerCase().includes(search) ||
-      tag.uid.toLowerCase().includes(search),
-  );
-  const currentPage = Math.min(
-    page,
-    Math.max(0, Math.ceil(filtered.length / rowsPerPage) - 1),
-  );
-  const visible = filtered.slice(
-    currentPage * rowsPerPage,
-    (currentPage + 1) * rowsPerPage,
-  );
-
   return (
     <>
       <Breadcrumbs
@@ -165,8 +136,7 @@ export function TagManagementPage() {
               <Button
                 color="inherit"
                 onClick={() => {
-                  setState({ status: 'loading' });
-                  setAttempt((value) => value + 1);
+                  list.reload();
                 }}
               >
                 {t('startup.retry')}
@@ -209,10 +179,15 @@ export function TagManagementPage() {
             >
               {t('tags.existing')}
             </Typography>
-            {state.status === 'ready' && (
+            {state.status === 'ready' && tags.length > 0 && (
               <Chip
                 size="small"
-                label={t('tags.count', { count: tags.length })}
+                label={t('tags.count', {
+                  count:
+                    list.state.status === 'ready'
+                      ? list.state.data.totalElements
+                      : 0,
+                })}
               />
             )}
           </Box>
@@ -221,13 +196,12 @@ export function TagManagementPage() {
             label={t('tags.search')}
             placeholder={t('tags.searchPlaceholder')}
             value={query}
-            disabled={state.status !== 'ready'}
             onChange={(event) => {
               setQuery(event.target.value);
-              setPage(0);
             }}
             sx={{ width: { xs: '100%', sm: 320 }, maxWidth: '100%' }}
             slotProps={{
+              htmlInput: { maxLength: 200 },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -265,7 +239,7 @@ export function TagManagementPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {visible.map((tag) => (
+              {tags.map((tag) => (
                 <TableRow key={tag.id}>
                   <TableCell
                     component="th"
@@ -349,21 +323,23 @@ export function TagManagementPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {state.status === 'ready' && !visible.length && (
+              {state.status === 'ready' && !tags.length && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
-                    {t(tags.length ? 'tags.noMatches' : 'tags.empty')}
+                    {t(list.query.search ? 'tags.noMatches' : 'tags.empty')}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-        {state.status === 'ready' && (
+        {state.status === 'ready' && tags.length > 0 && (
           <TablePagination
             component="div"
-            count={filtered.length}
-            page={currentPage}
+            count={
+              list.state.status === 'ready' ? list.state.data.totalElements : 0
+            }
+            page={page}
             rowsPerPage={rowsPerPage}
             rowsPerPageOptions={[10, 25, 50, 100]}
             onPageChange={(_, next) => setPage(next)}
@@ -403,8 +379,7 @@ export function TagManagementPage() {
           onClose={() => setViewingTagId(null)}
           onReload={() => {
             setViewingTagId(null);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.reload();
           }}
         />
       )}
@@ -428,10 +403,8 @@ export function TagManagementPage() {
             if (signal.aborted) return;
             setCreating(false);
             setSaved(true);
-            setQuery('');
-            setPage(0);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.resetSearch();
+            list.reload();
           }}
         />
       )}

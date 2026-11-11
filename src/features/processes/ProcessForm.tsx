@@ -624,6 +624,7 @@ export function ProcessForm({
                       useFlexGap
                     >
                       <TextField
+                        placeholder={t('processes.countPlaceholder')}
                         type="number"
                         id="device-count"
                         error={Boolean(countIssue || backendCountError)}
@@ -715,6 +716,7 @@ export function ProcessForm({
                     </Stack>
                     <Box sx={{ ...gridStyles, p: 2 }}>
                       <TextField
+                        placeholder={t('processes.deviceNamePlaceholder')}
                         id={`${device.id}-name`}
                         label={t('processes.deviceName')}
                         {...fieldProps(`devices.${device.id}.name`)}
@@ -739,6 +741,9 @@ export function ProcessForm({
                         {tagOptions}
                       </TextField>
                       <TextField
+                        placeholder={t(
+                          'processes.deviceDescriptionPlaceholder',
+                        )}
                         id={`${device.id}-description`}
                         label={t('processes.deviceDescription')}
                         value={device.description}

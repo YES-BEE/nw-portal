@@ -1,3 +1,5 @@
+import { usePagedList } from '../../api/usePagedList';
+import { ListPagination } from '../../api/ListPagination';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
@@ -20,6 +22,7 @@ import {
   TableHead,
   TableRow,
   Typography,
+  TextField,
   Tooltip,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -27,27 +30,36 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
-import { createProcess, getProcesses, ProcessesError } from './processesApi';
+import {
+  createProcess,
+  getProcessesPage,
+  ProcessesError,
+} from './processesApi';
 import { ProcessForm } from './ProcessForm';
 import { ProcessEditor } from './ProcessEditor';
 import { ProcessDeleteDialog } from './ProcessDeleteDialog';
 import { emptyProcess } from './processData';
 import type { ProcessConfiguration } from './types';
-import type {
-  ProcessResponse,
-  ProcessesFailure,
-  ProcessesResponse,
-} from './types';
-
-type ProcessesState =
-  | { status: 'loading' }
-  | { status: 'ready'; processes: ProcessesResponse }
-  | { status: 'error'; failure: ProcessesFailure };
+import type { ProcessResponse } from './types';
 
 export function ProcessConfigurationsPage() {
   const { t } = useTranslation('translation');
-  const [state, setState] = useState<ProcessesState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const list = usePagedList(getProcessesPage);
+  const state =
+    list.state.status === 'ready'
+      ? {
+          status: 'ready' as const,
+          processes: list.state.data.items.filter((process) => process.active),
+        }
+      : list.state.status === 'error'
+        ? {
+            status: 'error' as const,
+            failure:
+              list.state.error instanceof ProcessesError
+                ? list.state.error.failure
+                : { kind: 'network' as const, action: 'retry' as const },
+          }
+        : list.state;
   const [creating, setCreating] = useState<ProcessConfiguration | null>(null);
   const [saved, setSaved] = useState(false);
   const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
@@ -57,32 +69,9 @@ export function ProcessConfigurationsPage() {
   function reloadProcesses() {
     setEditingProcessId(null);
     setDeletingProcess(null);
-    setState({ status: 'loading' });
-    setAttempt((value) => value + 1);
+    list.reload();
   }
-  useEffect(() => {
-    const controller = new AbortController();
-    void getProcesses(controller.signal).then(
-      (processes) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'ready',
-            processes: processes.filter((process) => process.active),
-          });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'error',
-            failure:
-              error instanceof ProcessesError
-                ? error.failure
-                : { kind: 'network', action: 'retry' },
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
+
   useEffect(() => {
     document.title = t('processes.pageTitle');
     document.documentElement.lang = 'en';
@@ -155,8 +144,7 @@ export function ProcessConfigurationsPage() {
               <Button
                 color="inherit"
                 onClick={() => {
-                  setState({ status: 'loading' });
-                  setAttempt((value) => value + 1);
+                  list.reload();
                 }}
               >
                 {t('startup.retry')}
@@ -189,6 +177,17 @@ export function ProcessConfigurationsPage() {
         >
           {t('processes.existing')}
         </Typography>
+        <Box sx={{ p: 3 }}>
+          <TextField
+            placeholder={t('processes.searchPlaceholder')}
+            type="search"
+            label={t('processes.search')}
+            value={list.input}
+            onChange={(event) => list.setInput(event.target.value)}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            sx={{ width: '100%', maxWidth: 420 }}
+          />
+        </Box>
         <TableContainer>
           <Table
             aria-labelledby="existing-processes-heading"
@@ -341,6 +340,14 @@ export function ProcessConfigurationsPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        {list.state.status === 'ready' && list.state.data.items.length > 0 && (
+          <ListPagination
+            query={list.query}
+            total={list.state.data.totalElements}
+            onPage={list.setPage}
+            onSize={list.setSize}
+          />
+        )}
       </Paper>
       {deletingProcess && (
         <ProcessDeleteDialog
@@ -382,8 +389,7 @@ export function ProcessConfigurationsPage() {
             if (signal.aborted) return;
             setCreating(null);
             setSaved(true);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.reload();
           }}
         />
       )}

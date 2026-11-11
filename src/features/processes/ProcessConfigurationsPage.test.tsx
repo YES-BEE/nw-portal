@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 describe('backend process listing', () => {
-  it('lists only active backend processes without local records', async () => {
+  it('lists backend processes with active-only filtering without local records', async () => {
     const saved = JSON.stringify([{ id: 'local-process', name: 'Local only' }]);
     localStorage.setItem(PROCESS_STORAGE_KEY, saved);
     renderWithProviders(
@@ -78,7 +78,7 @@ describe('backend process listing', () => {
 
   it.each([
     { data: [] },
-    { data: processesResponse.filter((process) => !process.active) },
+    { data: { items: [], page: 0, size: 10, totalElements: 0 } },
   ])(
     'shows an empty table when no active processes exist: %j',
     async ({ data }) => {

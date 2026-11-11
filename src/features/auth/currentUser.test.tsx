@@ -140,8 +140,8 @@ describe('current-user context and /me permissions', () => {
       await initializeSession();
     });
     expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
-      'auth/refresh-tokens',
       'auth/me',
+      'auth/refresh-tokens',
     ]);
     expect(JSON.parse(screen.getByTestId('current-user').textContent!)).toEqual(
       profile,

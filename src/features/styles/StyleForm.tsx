@@ -80,6 +80,7 @@ export function StyleForm({
         }}
       >
         <TextField
+          placeholder={t('styles.numberPlaceholder')}
           label={t('styles.number')}
           required
           autoFocus
@@ -103,6 +104,7 @@ export function StyleForm({
           }
         />
         <TextField
+          placeholder={t('styles.descriptionPlaceholder')}
           label={t('styles.description')}
           multiline
           minRows={3}
@@ -113,6 +115,7 @@ export function StyleForm({
           sx={{ gridColumn: '1 / -1' }}
         />
         <TextField
+          placeholder={t('styles.clientPlaceholder')}
           label={t('styles.client')}
           required
           value={draft.client}
@@ -125,6 +128,7 @@ export function StyleForm({
         />
         {(['garments', 'lots', 'weight', 'avg'] as const).map((key) => (
           <TextField
+            placeholder={t(`styles.placeholders.${key}`)}
             key={key}
             label={t(`styles.${key}`)}
             type="number"

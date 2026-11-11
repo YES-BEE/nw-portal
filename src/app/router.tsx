@@ -131,6 +131,15 @@ export const router = createBrowserRouter([
             path: '/configurations',
             children: [
               {
+                path: 'trolleys',
+                handle: { requiredModule: 'trolleys' },
+                lazy: async () => {
+                  const { TrolleyConfigurationsPage } =
+                    await import('../features/trolleys/TrolleyConfigurationsPage');
+                  return { Component: TrolleyConfigurationsPage };
+                },
+              },
+              {
                 path: 'tags',
                 handle: { requiredModule: 'tags' },
                 lazy: async () => {

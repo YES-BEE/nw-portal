@@ -69,6 +69,7 @@ export interface MeResponse {
   display_name: string;
   enabled: boolean;
   must_change_password: boolean;
+  initial_password_expires_at?: string | null;
   role: string;
   clientType: LoginClientType;
   permissions: string[];

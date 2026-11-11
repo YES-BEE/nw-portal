@@ -162,6 +162,7 @@ export function UserForm({
           sx={{ alignItems: 'flex-start' }}
         >
           <TextField
+            placeholder={t('access.users.usernamePlaceholder')}
             label={t('access.username')}
             autoFocus
             required
@@ -173,6 +174,7 @@ export function UserForm({
             sx={{ width: { xs: '100%', md: 320 } }}
           />
           <TextField
+            placeholder={t('access.users.displayNamePlaceholder')}
             label={t('access.users.displayName')}
             required
             disabled={saving}
@@ -214,6 +216,7 @@ export function UserForm({
         )}
         {onCreate && (
           <TextField
+            placeholder={t('access.users.initialPasswordPlaceholder')}
             label={t('access.users.initialPassword')}
             type="password"
             autoComplete="new-password"

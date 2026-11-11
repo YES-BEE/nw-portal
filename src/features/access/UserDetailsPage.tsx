@@ -1,4 +1,3 @@
-import { formatRoleName } from './formatRoleName';
 import { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -182,9 +181,7 @@ function UserDetails({ userId }: { userId: string | undefined }) {
               },
               {
                 label: t('access.role'),
-                value: record.role
-                  ? formatRoleName(record.role)
-                  : t('access.users.noRole'),
+                value: record.role ? record.role : t('access.users.noRole'),
               },
               {
                 label: t('access.status'),

@@ -1,3 +1,7 @@
+import { readApiPage } from '../../api/collections';
+import type { ApiPage, ListQuery } from '../../api/collections';
+import type { ApiCollection } from '../../api/collections';
+import { collectApiItems } from '../../api/collections';
 import { apiClient } from '../../api/client';
 import axios from 'axios';
 import type { AxiosResponse } from 'axios';
@@ -69,32 +73,26 @@ async function request<T = unknown>(
 export async function getAccessRoles(
   signal?: AbortSignal,
 ): Promise<AccessRolesResponse> {
-  const data = await request(() =>
-    apiClient.get<unknown>('access-roles', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    }),
+  return collectApiItems(
+    (params) =>
+      request(() =>
+        apiClient.get<unknown>('access-roles', {
+          ...(params ? { params } : {}),
+          signal,
+          timeout: 10000,
+          validateStatus: () => true,
+        }),
+      ),
+    isRole,
+    (item) => item.code,
+    () => {
+      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+    },
   );
-  if (
-    !Array.isArray(data) ||
-    !data.every(isRole) ||
-    new Set(data.map((role) => role.code)).size !== data.length
-  )
-    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
-  return data;
 }
-
 export async function getAccessRoleOptions(
   signal?: AbortSignal,
 ): Promise<AccessRoleOptionsResponse> {
-  const data = await request(() =>
-    apiClient.get<unknown>('access-roles/options', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    }),
-  );
   const isOption = (value: unknown): value is AccessRoleOptionResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -106,25 +104,26 @@ export async function getAccessRoleOptions(
       !!option.name.trim()
     );
   };
-  if (
-    !Array.isArray(data) ||
-    !data.every(isOption) ||
-    new Set(data.map((role) => role.code)).size !== data.length
-  )
-    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
-  return data;
+  return collectApiItems(
+    (params) =>
+      request(() =>
+        apiClient.get<unknown>('access-roles/options', {
+          ...(params ? { params } : {}),
+          signal,
+          timeout: 10000,
+          validateStatus: () => true,
+        }),
+      ),
+    isOption,
+    (item) => item.code,
+    () => {
+      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }
-
 export async function getModules(
   signal?: AbortSignal,
 ): Promise<ModulesResponse> {
-  const data = await request(() =>
-    apiClient.get<unknown>('modules', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    }),
-  );
   const isModule = (value: unknown): value is ModuleResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -138,23 +137,31 @@ export async function getModules(
       typeof module.active === 'boolean'
     );
   };
-  if (
-    !Array.isArray(data) ||
-    !data.every(isModule) ||
-    new Set(data.map((module) => module.key)).size !== data.length
-  )
-    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
-  return data;
+  return collectApiItems(
+    (params) =>
+      request(() =>
+        apiClient.get<unknown>('modules', {
+          ...(params ? { params } : {}),
+          signal,
+          timeout: 10000,
+          validateStatus: () => true,
+        }),
+      ),
+    isModule,
+    (item) => item.key,
+    () => {
+      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }
-
 export async function saveAccessRole(
   roleCode: string,
   body: SaveAccessRoleRequest,
   signal?: AbortSignal,
-): Promise<AccessRolesResponse> {
+): Promise<ApiCollection<AccessRoleResponse>> {
   return request(
     () =>
-      apiClient.put<AccessRolesResponse>(
+      apiClient.put<ApiCollection<AccessRoleResponse>>(
         `access-roles/${encodeURIComponent(roleCode)}`,
         {
           modules: body.modules,
@@ -198,5 +205,28 @@ export async function createAccessRole(
         { signal, timeout: 10000, validateStatus: () => true },
       ),
     'create',
+  );
+}
+
+export async function getAccessRolesPage(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<AccessRoleResponse>> {
+  const data = await request(() =>
+    apiClient.get<unknown>('access-roles', {
+      params: query,
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    }),
+  );
+  return readApiPage(
+    data,
+    query,
+    isRole,
+    (item) => item.code,
+    () => {
+      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+    },
   );
 }

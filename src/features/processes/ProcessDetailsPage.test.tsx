@@ -82,7 +82,7 @@ describe('backend process details', () => {
     expect(screen.getByText('Inactive')).toBeVisible();
   });
 
-  it('keeps device pagination and search working with backend records', async () => {
+  it('shows the complete device array supplied by the detail endpoint', async () => {
     const base = processesResponse[1];
     const record = {
       ...base,
@@ -102,23 +102,10 @@ describe('backend process details', () => {
       })),
     };
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: record });
-    const { user } = setup('/configurations/processes/large');
+    setup('/configurations/processes/large');
     const devices = await screen.findByRole('table', { name: 'Devices' });
-    expect(within(devices).getAllByRole('row')).toHaveLength(11);
-    await user.click(screen.getByRole('button', { name: 'Go to next page' }));
-    expect(
-      within(devices).getByRole('rowheader', { name: 'Device 11' }),
-    ).toBeVisible();
-    await user.type(
-      screen.getByRole('searchbox', { name: 'Search devices' }),
-      'TAG-30',
-    );
-    expect(
-      within(devices).getByRole('rowheader', { name: 'Device 30' }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Go to next page' }),
-    ).toBeDisabled();
+    expect(within(devices).getAllByRole('row')).toHaveLength(31);
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });
 
   it('shows loading without a false missing-process message', async () => {

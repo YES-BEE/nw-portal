@@ -1,5 +1,5 @@
-import { formatRoleName } from './formatRoleName';
-import { useEffect, useState } from 'react';
+import { usePagedList } from '../../api/usePagedList';
+import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,25 +30,37 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { signOut } from '../auth/session';
 import { ManagementHeader } from './ManagementScaffold';
-import { createUser, getUsers } from './usersApi';
+import { createUser, getUsersPage } from './usersApi';
 import { UsersError } from './usersFailure';
 import { UserEditor } from './UserEditor';
 import { UserDeleteDialog } from './UserDeleteDialog';
 import { UserForm } from './UserForm';
-import type { UserResponse, UsersFailure, UsersResponse } from './types';
-
-type UsersState =
-  | { status: 'loading' }
-  | { status: 'ready'; users: UsersResponse }
-  | { status: 'error'; failure: UsersFailure };
+import type { UserResponse } from './types';
 
 export function UserManagementPage() {
   const { t } = useTranslation('translation');
-  const [state, setState] = useState<UsersState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(0);
-  const [rows, setRows] = useState(10);
+  const list = usePagedList(getUsersPage);
+  const query = list.input,
+    setQuery = list.setInput;
+  const page = list.query.page,
+    rows = list.query.size;
+  const setPage = list.setPage,
+    setRows = list.setSize;
+  const state =
+    list.state.status === 'ready'
+      ? {
+          status: 'ready' as const,
+          users: list.state.data.items.filter((user) => user.enabled),
+        }
+      : list.state.status === 'error'
+        ? {
+            status: 'error' as const,
+            failure:
+              list.state.error instanceof UsersError
+                ? list.state.error.failure
+                : { kind: 'network' as const, action: 'retry' as const },
+          }
+        : list.state;
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -58,45 +70,8 @@ export function UserManagementPage() {
     setDeletingUser(null);
     setEditingUserId(null);
     setPage(0);
-    setState({ status: 'loading' });
-    setAttempt((value) => value + 1);
+    list.reload();
   }
-  useEffect(() => {
-    const controller = new AbortController();
-    void getUsers(controller.signal).then(
-      (users) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'ready',
-            users: users.filter((user) => user.enabled),
-          });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'error',
-            failure:
-              error instanceof UsersError
-                ? error.failure
-                : { kind: 'network', action: 'retry' },
-          });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
-  const search = query.trim().toLowerCase();
-  const filtered =
-    state.status === 'ready'
-      ? state.users.filter((user) =>
-          `${user.username} ${user.display_name} ${user.role ?? ''} ${user.role ? formatRoleName(user.role) : ''}`
-            .toLowerCase()
-            .includes(search),
-        )
-      : [];
-  const currentPage = Math.min(
-    page,
-    Math.max(0, Math.ceil(filtered.length / rows) - 1),
-  );
   return (
     <>
       <ManagementHeader
@@ -127,8 +102,7 @@ export function UserManagementPage() {
                 color="inherit"
                 onClick={() => {
                   setPage(0);
-                  setState({ status: 'loading' });
-                  setAttempt((value) => value + 1);
+                  list.reload();
                 }}
               >
                 {t('startup.retry')}
@@ -160,12 +134,11 @@ export function UserManagementPage() {
             label={t('access.users.search')}
             placeholder={t('access.users.searchPlaceholder')}
             value={query}
-            disabled={state.status !== 'ready'}
             onChange={(event) => {
               setQuery(event.target.value);
-              setPage(0);
             }}
             slotProps={{
+              htmlInput: { maxLength: 200 },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -203,91 +176,87 @@ export function UserManagementPage() {
                 </TableRow>
               )}
               {state.status === 'ready' &&
-                filtered
-                  .slice(currentPage * rows, (currentPage + 1) * rows)
-                  .map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell component="th" scope="row">
-                        {user.username}
-                      </TableCell>
-                      <TableCell>
-                        {user.display_name || t('access.users.noDisplayName')}
-                      </TableCell>
-                      <TableCell>
-                        {user.role
-                          ? formatRoleName(user.role)
-                          : t('access.users.noRole')}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          color={user.enabled ? 'success' : 'default'}
-                          variant="outlined"
-                          label={t(
-                            user.enabled ? 'access.active' : 'access.inactive',
-                          )}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                        <Tooltip title={t('common.view')}>
+                state.users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell component="th" scope="row">
+                      {user.username}
+                    </TableCell>
+                    <TableCell>
+                      {user.display_name || t('access.users.noDisplayName')}
+                    </TableCell>
+                    <TableCell>
+                      {user.role ? user.role : t('access.users.noRole')}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={user.enabled ? 'success' : 'default'}
+                        variant="outlined"
+                        label={t(
+                          user.enabled ? 'access.active' : 'access.inactive',
+                        )}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      <Tooltip title={t('common.view')}>
+                        <IconButton
+                          component={RouterLink}
+                          to={`/users/${encodeURIComponent(user.id)}`}
+                          color="primary"
+                          aria-label={t('access.users.viewNamed', {
+                            name: user.username,
+                          })}
+                        >
+                          <VisibilityOutlinedIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={t('access.edit')}>
+                        <Box component="span">
                           <IconButton
-                            component={RouterLink}
-                            to={`/users/${encodeURIComponent(user.id)}`}
-                            color="primary"
-                            aria-label={t('access.users.viewNamed', {
+                            disabled={
+                              editingUserId !== null ||
+                              creatingUser ||
+                              deletingUser !== null
+                            }
+                            onClick={() => setEditingUserId(user.id)}
+                            aria-label={t('access.editNamed', {
                               name: user.username,
                             })}
                           >
-                            <VisibilityOutlinedIcon />
+                            <EditOutlinedIcon />
                           </IconButton>
-                        </Tooltip>
-                        <Tooltip title={t('access.edit')}>
-                          <Box component="span">
-                            <IconButton
-                              disabled={
-                                editingUserId !== null ||
-                                creatingUser ||
-                                deletingUser !== null
-                              }
-                              onClick={() => setEditingUserId(user.id)}
-                              aria-label={t('access.editNamed', {
-                                name: user.username,
-                              })}
-                            >
-                              <EditOutlinedIcon />
-                            </IconButton>
-                          </Box>
-                        </Tooltip>
-                        <Tooltip title={t('access.delete')}>
-                          <Box component="span">
-                            <IconButton
-                              disabled={
-                                editingUserId !== null ||
-                                creatingUser ||
-                                deletingUser !== null ||
-                                !user.enabled
-                              }
-                              onClick={() => {
-                                setDeleted(false);
-                                setDeletingUser(user);
-                              }}
-                              color="error"
-                              aria-label={t('access.deleteNamed', {
-                                name: user.username,
-                              })}
-                            >
-                              <DeleteOutlinedIcon />
-                            </IconButton>
-                          </Box>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              {state.status === 'ready' && !filtered.length && (
+                        </Box>
+                      </Tooltip>
+                      <Tooltip title={t('access.delete')}>
+                        <Box component="span">
+                          <IconButton
+                            disabled={
+                              editingUserId !== null ||
+                              creatingUser ||
+                              deletingUser !== null ||
+                              !user.enabled
+                            }
+                            onClick={() => {
+                              setDeleted(false);
+                              setDeletingUser(user);
+                            }}
+                            color="error"
+                            aria-label={t('access.deleteNamed', {
+                              name: user.username,
+                            })}
+                          >
+                            <DeleteOutlinedIcon />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              {state.status === 'ready' && !state.users.length && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                     {t(
-                      state.users.length
+                      list.query.search
                         ? 'access.users.empty'
                         : 'access.users.noUsers',
                     )}
@@ -297,13 +266,15 @@ export function UserManagementPage() {
             </TableBody>
           </Table>
         </TableContainer>
-        {state.status === 'ready' && (
+        {list.state.status === 'ready' && list.state.data.totalElements > 0 && (
           <TablePagination
             component="div"
-            count={filtered.length}
-            page={currentPage}
+            count={
+              list.state.status === 'ready' ? list.state.data.totalElements : 0
+            }
+            page={page}
             rowsPerPage={rows}
-            rowsPerPageOptions={[10, 25, 50]}
+            rowsPerPageOptions={[10, 25, 50, 100]}
             labelRowsPerPage={t('common.pagination.rowsPerPage')}
             labelDisplayedRows={({ from, to, count }) =>
               t('common.pagination.range', { from, to, count })
@@ -325,10 +296,8 @@ export function UserManagementPage() {
             if (signal.aborted) return;
             setCreatingUser(false);
             setSaved(true);
-            setQuery('');
-            setPage(0);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.resetSearch();
+            list.reload();
           }}
         />
       )}
@@ -344,8 +313,7 @@ export function UserManagementPage() {
           onReload={() => {
             setEditingUserId(null);
             setPage(0);
-            setState({ status: 'loading' });
-            setAttempt((value) => value + 1);
+            list.reload();
           }}
         />
       )}

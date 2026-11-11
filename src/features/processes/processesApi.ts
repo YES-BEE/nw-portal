@@ -1,3 +1,7 @@
+import { readApiPage } from '../../api/collections';
+import type { ApiPage, ListQuery } from '../../api/collections';
+import { collectApiItems } from '../../api/collections';
+import type { PageQuery } from '../../api/collections';
 import axios from 'axios';
 import { apiClient } from '../../api/client';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
@@ -178,33 +182,14 @@ function isProcess(value: unknown): value is ProcessResponse {
 export async function getProcesses(
   signal?: AbortSignal,
 ): Promise<ProcessesResponse> {
-  let response;
-  try {
-    response = await apiClient.get<unknown>('processes', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    });
-  } catch (error: unknown) {
-    if (axios.isCancel(error)) throw error;
-    if (axios.isAxiosError(error) && error.response)
-      throw new ProcessesError(
-        parseProcessesFailure(error.response.data, error.response.status),
-      );
-    throw new ProcessesError({ kind: 'network', action: 'retry' });
-  }
-  if (response.status < 200 || response.status >= 300)
-    throw new ProcessesError(
-      parseProcessesFailure(response.data, response.status),
-    );
-  const data = response.data;
-  if (
-    !Array.isArray(data) ||
-    !data.every(isProcess) ||
-    new Set(data.map((process) => process.id)).size !== data.length
-  )
-    throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
-  return data;
+  return collectApiItems(
+    (params) => fetchProcesses(params, signal),
+    isProcess,
+    (item) => item.id,
+    () => {
+      throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }
 
 export async function getProcess(
@@ -244,25 +229,29 @@ export async function getProcess(
 export async function getProcessTagOptions(
   signal?: AbortSignal,
 ): Promise<ProcessTagOptionResponse[]> {
-  let response;
-  try {
-    response = await apiClient.get<ProcessFormLookupsResponse>('ui/lookups', {
-      signal,
-      timeout: 10000,
-      validateStatus: () => true,
-    });
-  } catch (error: unknown) {
-    if (axios.isCancel(error)) throw error;
-    if (axios.isAxiosError(error) && error.response)
+  const fetchPage = async (params?: PageQuery): Promise<unknown> => {
+    let response;
+    try {
+      response = await apiClient.get<ProcessFormLookupsResponse>('ui/lookups', {
+        ...(params ? { params } : {}),
+        signal,
+        timeout: 10000,
+        validateStatus: () => true,
+      });
+    } catch (error: unknown) {
+      if (axios.isCancel(error)) throw error;
+      if (axios.isAxiosError(error) && error.response)
+        throw new ProcessesError(
+          parseProcessesFailure(error.response.data, error.response.status),
+        );
+      throw new ProcessesError({ kind: 'network', action: 'retry' });
+    }
+    if (response.status < 200 || response.status >= 300)
       throw new ProcessesError(
-        parseProcessesFailure(error.response.data, error.response.status),
+        parseProcessesFailure(response.data, response.status),
       );
-    throw new ProcessesError({ kind: 'network', action: 'retry' });
-  }
-  if (response.status < 200 || response.status >= 300)
-    throw new ProcessesError(
-      parseProcessesFailure(response.data, response.status),
-    );
+    return response.data?.tags;
+  };
   const isOption = (value: unknown): value is ProcessTagOptionResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -275,13 +264,14 @@ export async function getProcessTagOptions(
       typeof tag.assigned === 'boolean'
     );
   };
-  const tags = response.data?.tags;
-  if (
-    !Array.isArray(tags) ||
-    !tags.every(isOption) ||
-    new Set(tags.map((tag) => tag.id)).size !== tags.length
-  )
-    throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+  const tags = await collectApiItems(
+    fetchPage,
+    isOption,
+    (item) => item.id,
+    () => {
+      throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
   return tags.filter((tag) => tag.status === 'ACTIVE' && !tag.assigned);
 }
 
@@ -387,4 +377,46 @@ export async function createProcess(
   if (!isProcess(response.data))
     throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
   return response.data;
+}
+
+async function fetchProcesses(
+  params?: PageQuery,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  let response;
+  try {
+    response = await apiClient.get<unknown>('processes', {
+      ...(params ? { params } : {}),
+      signal,
+      timeout: 10000,
+      validateStatus: () => true,
+    });
+  } catch (error: unknown) {
+    if (axios.isCancel(error)) throw error;
+    if (axios.isAxiosError(error) && error.response)
+      throw new ProcessesError(
+        parseProcessesFailure(error.response.data, error.response.status),
+      );
+    throw new ProcessesError({ kind: 'network', action: 'retry' });
+  }
+  if (response.status < 200 || response.status >= 300)
+    throw new ProcessesError(
+      parseProcessesFailure(response.data, response.status),
+    );
+  return response.data;
+}
+
+export async function getProcessesPage(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<ProcessResponse>> {
+  return readApiPage(
+    await fetchProcesses(query, signal),
+    query,
+    isProcess,
+    (item) => item.id,
+    () => {
+      throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }

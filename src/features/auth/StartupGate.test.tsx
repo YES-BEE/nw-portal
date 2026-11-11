@@ -239,10 +239,10 @@ describe('graceful startup failures', () => {
       adapter.mock.calls.filter(
         ([config]) => config.url === 'auth/refresh-tokens',
       ),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     const config = adapter.mock.calls.filter(
       ([config]) => config.url === 'auth/refresh-tokens',
-    )[1][0];
+    )[0][0];
     await act(async () => {
       resolve(response(config, refreshTokenResponse));
     });

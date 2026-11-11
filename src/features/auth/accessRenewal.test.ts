@@ -149,8 +149,8 @@ describe('expired access-token renewal', () => {
     await initializeSession();
     expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
       'auth/refresh',
-      'auth/refresh-tokens',
       'auth/me',
+      'auth/refresh-tokens',
     ]);
     expect(adapter.mock.calls[1][0].headers.get('Authorization')).toBe(
       'Bearer renewed-access-token',

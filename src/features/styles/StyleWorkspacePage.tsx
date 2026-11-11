@@ -312,23 +312,25 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
               </TableBody>
             </Table>
           </TableContainer>
-          <TablePagination
-            component="div"
-            count={filtered.length}
-            page={currentPage}
-            rowsPerPage={rows}
-            rowsPerPageOptions={[10, 25, 50]}
-            labelRowsPerPage={t('common.pagination.rowsPerPage')}
-            labelDisplayedRows={({ from, to, count }) =>
-              t('common.pagination.range', { from, to, count })
-            }
-            getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
-            onPageChange={(_, next) => setPage(next)}
-            onRowsPerPageChange={(event) => {
-              setRows(Number(event.target.value));
-              setPage(0);
-            }}
-          />
+          {filtered.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filtered.length}
+              page={currentPage}
+              rowsPerPage={rows}
+              rowsPerPageOptions={[10, 25, 50]}
+              labelRowsPerPage={t('common.pagination.rowsPerPage')}
+              labelDisplayedRows={({ from, to, count }) =>
+                t('common.pagination.range', { from, to, count })
+              }
+              getItemAriaLabel={(type) => t(`common.pagination.${type}`)}
+              onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(event) => {
+                setRows(Number(event.target.value));
+                setPage(0);
+              }}
+            />
+          )}
         </Paper>
       )}
       <Dialog

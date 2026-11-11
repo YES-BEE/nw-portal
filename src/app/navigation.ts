@@ -16,6 +16,7 @@ export const configurationNavigationItems = [
     path: '/configurations/processes',
   },
   { key: 'storage', permission: 'storage', path: '/configurations/storages' },
+  { key: 'trolleys', permission: 'trolleys', path: '/configurations/trolleys' },
   { key: 'tags', permission: 'tags', path: '/configurations/tags' },
   { key: 'styles', permission: 'styles', path: '/styles' },
 ] as const;

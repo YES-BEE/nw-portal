@@ -75,11 +75,13 @@ describe('refresh token issuance and storage', () => {
     expect(await signIn('admin', 'password')).toBeNull();
     expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
       'auth/login',
-      'auth/refresh-tokens',
       'auth/me',
+      'auth/refresh-tokens',
     ]);
     expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBeNull();
-    const config = adapter.mock.calls[1][0];
+    const config = adapter.mock.calls.find(
+      ([config]) => config.url === 'auth/refresh-tokens',
+    )![0];
     expect(config.method).toBe('post');
     expect(apiClient.getUri(config)).toBe(
       'http://backend.test/api/v3/auth/refresh-tokens',
@@ -101,7 +103,10 @@ describe('refresh token issuance and storage', () => {
     expect(initializeSession()).toBe(first);
     await first;
     expect(adapter).toHaveBeenCalledTimes(2);
-    expect(adapter.mock.calls[0][0].url).toBe('auth/refresh-tokens');
+    expect(adapter.mock.calls.map(([config]) => config.url)).toEqual([
+      'auth/me',
+      'auth/refresh-tokens',
+    ]);
     expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBe(
       'Bearer test-access-token',
     );
@@ -125,7 +130,14 @@ describe('refresh token issuance and storage', () => {
     { refreshToken: 'token', expiresAt: '2000-01-01T00:00:00Z' },
   ])('does not store an invalid refresh-token response: %j', async (data) => {
     adapter.mockImplementation(async (config) =>
-      response(config, config.url === 'auth/login' ? loginResponse : data),
+      response(
+        config,
+        config.url === 'auth/login'
+          ? loginResponse
+          : config.url === 'auth/me'
+            ? meResponse
+            : data,
+      ),
     );
     expect(await signIn('admin', 'password')).toBe('invalidResponse');
     expect(readSession()).toBeNull();
@@ -166,7 +178,14 @@ describe('refresh token issuance and storage', () => {
     const pending = signIn('admin', 'password');
     await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(3));
     signOut();
-    resolve(response(adapter.mock.calls[1][0], refreshTokenResponse));
+    resolve(
+      response(
+        adapter.mock.calls.find(
+          ([config]) => config.url === 'auth/refresh-tokens',
+        )![0],
+        refreshTokenResponse,
+      ),
+    );
     await pending;
     expect(readSession()).toBeNull();
     expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
@@ -188,7 +207,14 @@ describe('refresh token issuance and storage', () => {
       authentication: { ...loginResponse, accessToken: 'new-access-token' },
       refreshToken: 'new-refresh-token',
     });
-    resolve(response(adapter.mock.calls[0][0], refreshTokenResponse));
+    resolve(
+      response(
+        adapter.mock.calls.find(
+          ([config]) => config.url === 'auth/refresh-tokens',
+        )![0],
+        refreshTokenResponse,
+      ),
+    );
     await pending;
     expect(readSession()?.refreshToken).toBe('new-refresh-token');
   });

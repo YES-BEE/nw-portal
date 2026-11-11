@@ -40,6 +40,71 @@ beforeEach(() => {
 });
 
 describe('application routing', () => {
+  it('shows Trolley Configurations next to Storage only when its backend module is granted', async () => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: [...session.modules, 'trolleys'],
+      profile: {
+        ...session.profile!,
+        modules: [
+          ...session.profile!.modules,
+          { key: 'trolleys', name: 'Trolley Configurations', built_in: true },
+        ],
+      },
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: { items: [], page: 0, size: 10, totalElements: 0 },
+    });
+    await router.navigate('/configurations/trolleys');
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Trolley Configurations',
+      }),
+    ).toBeVisible();
+    expect(await screen.findByText('No trolleys found.')).toBeVisible();
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    const submenu = screen.getByLabelText('Configurations submenu');
+    const links = within(submenu).getAllByRole('link');
+    const storageIndex = links.findIndex(
+      (link) => link.textContent === 'Storage Configurations',
+    );
+    expect(links[storageIndex + 1]).toHaveTextContent('Trolley Configurations');
+    expect(links[storageIndex + 1]).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('hides the trolley navigation entry when trolleys access is absent even if the profile lists it', async () => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['storage'],
+      profile: {
+        ...session.profile!,
+        modules: [
+          ...session.profile!.modules,
+          { key: 'trolleys', name: 'Trolley Configurations', built_in: true },
+        ],
+      },
+    });
+    await router.navigate('/configurations/storages');
+    renderWithProviders(<App />);
+    await screen.findByRole('heading', {
+      level: 1,
+      name: 'Storage Configurations',
+    });
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Open navigation menu' }));
+    expect(
+      screen.queryByRole('link', { name: 'Trolley Configurations' }),
+    ).not.toBeInTheDocument();
+  });
   it('opens user details from the list and retains users navigation access', async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
@@ -100,6 +165,9 @@ describe('application routing', () => {
     '/new-style/sty-1',
     '/configurations',
     '/configurations/',
+    '/configurations/trolleys',
+    '/CONFIGURATIONS/TROLLEYS',
+    '/configurations/%74rolleys',
     '/configurations/processes',
     '/configurations/processes/demo-1',
     '/configurations/storages',
