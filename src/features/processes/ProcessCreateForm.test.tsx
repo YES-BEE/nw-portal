@@ -55,9 +55,7 @@ async function selectTag(
   label: RegExp,
 ) {
   await user.click(screen.getByRole('combobox', { name: label }));
-  await user.click(
-    screen.getByRole('option', { name: 'Washing Line 01 (1234)' }),
-  );
+  await user.click(screen.getByRole('option', { name: 'Washing Line 01' }));
 }
 
 describe('backend process creation', () => {
@@ -70,7 +68,7 @@ describe('backend process creation', () => {
     await user.click(
       screen.getByRole('checkbox', { name: 'Quality control (QC) process' }),
     );
-    await selectTag(user, /Process-level NFC Tag ID/);
+    await selectTag(user, /Process-level NFC Tag/);
     expect(apiClient.get).toHaveBeenCalledWith(
       'ui/lookups',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
@@ -161,7 +159,7 @@ describe('backend process creation', () => {
     });
     const { user } = await openForm();
     await fillBase(user);
-    await selectTag(user, /Process-level NFC Tag ID/);
+    await selectTag(user, /Process-level NFC Tag/);
     await user.click(
       screen.getByRole('checkbox', { name: 'Quality control (QC) process' }),
     );
@@ -194,7 +192,7 @@ describe('backend process creation', () => {
     });
     const { user } = await openForm();
     await fillBase(user);
-    await selectTag(user, /Process-level NFC Tag ID/);
+    await selectTag(user, /Process-level NFC Tag/);
     await user.click(screen.getByRole('button', { name: 'Save Process' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Request validation failed',
@@ -206,7 +204,7 @@ describe('backend process creation', () => {
       screen.getByRole('textbox', { name: /Station Number/ }),
     ).toHaveAccessibleDescription('Invalid station');
     expect(
-      screen.getByRole('combobox', { name: /Process-level NFC Tag ID/ }),
+      screen.getByRole('combobox', { name: /Process-level NFC Tag/ }),
     ).toHaveAccessibleDescription('Invalid tag');
   });
 
@@ -214,7 +212,7 @@ describe('backend process creation', () => {
     vi.mocked(apiClient.post).mockReturnValue(new Promise(() => {}));
     const { user, unmount } = await openForm();
     await fillBase(user);
-    await selectTag(user, /Process-level NFC Tag ID/);
+    await selectTag(user, /Process-level NFC Tag/);
     const submit = screen.getByRole('button', { name: 'Save Process' });
     await user.click(submit);
     fireEvent.submit(submit.closest('form')!);

@@ -1,3 +1,4 @@
+import { useTagName } from './useTagName';
 import { usePagedList } from '../../api/usePagedList';
 import { ListPagination } from '../../api/ListPagination';
 import { useEffect, useState } from 'react';
@@ -60,6 +61,7 @@ export function ProcessConfigurationsPage() {
                 : { kind: 'network' as const, action: 'retry' as const },
           }
         : list.state;
+  const tagName = useTagName(state.status === 'ready');
   const [creating, setCreating] = useState<ProcessConfiguration | null>(null);
   const [saved, setSaved] = useState(false);
   const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
@@ -252,7 +254,7 @@ export function ProcessConfigurationsPage() {
                     </TableCell>
                     <TableCell>
                       {record.nfcMode === 'PROCESS'
-                        ? record.nfcUid || t('processes.noTag')
+                        ? tagName(record.nfcUid)
                         : t('processes.deviceCount', {
                             count: record.deviceCount,
                           })}

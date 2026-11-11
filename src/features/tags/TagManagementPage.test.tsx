@@ -79,7 +79,7 @@ describe('backend tag listing', () => {
     const row = screen
       .getByRole('rowheader', { name: 'Washing Tag' })
       .closest('tr')!;
-    expect(within(row).getByText('04:AA:BB')).toBeVisible();
+    expect(within(row).queryByText('04:AA:BB')).not.toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Status' })).toBeVisible();
     expect(
       screen.getByRole('columnheader', { name: 'Assigned' }),

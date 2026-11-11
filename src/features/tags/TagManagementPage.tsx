@@ -219,19 +219,19 @@ export function TagManagementPage() {
           >
             <TableHead>
               <TableRow>
-                {(
-                  ['name', 'actual', 'status', 'assigned', 'actions'] as const
-                ).map((column) => (
-                  <TableCell key={column} scope="col">
-                    {t(`tags.${column}`)}
-                  </TableCell>
-                ))}
+                {(['name', 'status', 'assigned', 'actions'] as const).map(
+                  (column) => (
+                    <TableCell key={column} scope="col">
+                      {t(`tags.${column}`)}
+                    </TableCell>
+                  ),
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
               {state.status === 'loading' && (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
                     <CircularProgress
                       size={28}
                       aria-label={t('common.loading')}
@@ -247,9 +247,6 @@ export function TagManagementPage() {
                     sx={{ fontWeight: 600 }}
                   >
                     {tag.name}
-                  </TableCell>
-                  <TableCell sx={{ overflowWrap: 'anywhere' }}>
-                    {tag.uid}
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -325,7 +322,7 @@ export function TagManagementPage() {
               ))}
               {state.status === 'ready' && !tags.length && (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
                     {t(list.query.search ? 'tags.noMatches' : 'tags.empty')}
                   </TableCell>
                 </TableRow>

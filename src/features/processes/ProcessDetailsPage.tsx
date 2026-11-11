@@ -1,3 +1,4 @@
+import { useTagName } from './useTagName';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +68,7 @@ function ProcessDetails({ processId }: { processId: string | undefined }) {
   }, [t]);
 
   const record = state.status === 'ready' ? state.process : null;
+  const tagName = useTagName(!!record);
   return (
     <>
       <ConfigurationDetailHeader
@@ -157,7 +159,7 @@ function ProcessDetails({ processId }: { processId: string | undefined }) {
                 ? [
                     {
                       label: t('processes.processTag'),
-                      value: record.nfcUid || t('processes.noTag'),
+                      value: tagName(record.nfcUid),
                     },
                   ]
                 : [
@@ -175,7 +177,7 @@ function ProcessDetails({ processId }: { processId: string | undefined }) {
                 id: device.id,
                 name: device.name,
                 description: device.description ?? '',
-                tag: device.nfcUid || t('processes.noTag'),
+                tag: tagName(device.nfcUid),
               }))}
             />
           )}

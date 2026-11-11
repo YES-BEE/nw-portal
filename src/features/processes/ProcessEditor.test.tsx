@@ -55,8 +55,8 @@ describe('backend process editing', () => {
       screen.getByRole('checkbox', { name: 'Quality control (QC) process' }),
     ).toBeChecked();
     expect(
-      screen.getByRole('combobox', { name: /Process-level NFC Tag ID/ }),
-    ).toHaveTextContent('NFC-WASH');
+      screen.getByRole('combobox', { name: /Process-level NFC Tag/ }),
+    ).toHaveTextContent('Current tag');
     await user.clear(name);
     await user.type(name, ' Updated Washing ');
     const updated = { ...fresh, name: 'Updated Washing', version: 1 };
@@ -120,7 +120,7 @@ describe('backend process editing', () => {
     await user.click(
       screen.getAllByRole('combobox', { name: /Machine NFC Tag/ })[1],
     );
-    await user.click(screen.getByRole('option', { name: 'New tag (NEW-TAG)' }));
+    await user.click(screen.getByRole('option', { name: 'New tag' }));
     await user.click(screen.getByRole('button', { name: 'Save Process' }));
     expect(apiClient.put).toHaveBeenCalledWith(
       'processes/' + deviceProcess.id,

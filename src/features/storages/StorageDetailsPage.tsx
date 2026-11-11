@@ -1,3 +1,4 @@
+import { loadTags } from '../configurations/tagRegistry';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +40,12 @@ export function StorageDetailsPage() {
           fields={[
             { label: t('storages.number'), value: record.number },
             { label: t('storages.description'), value: record.description },
-            { label: t('storages.tag'), value: record.tag },
+            {
+              label: t('storages.tag'),
+              value:
+                loadTags().records.find((tag) => tag.actual === record.tag)
+                  ?.name || t('tags.nameUnavailable'),
+            },
           ]}
         />
       ) : (

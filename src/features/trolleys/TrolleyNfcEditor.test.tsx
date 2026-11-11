@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
-import { TrolleyNfcDialog } from './TrolleyNfcDialog';
+import { TrolleyNfcEditor } from './TrolleyNfcEditor';
 import * as nfc from './trolleyNfcApi';
 import * as tagsApi from '../tags/tagsApi';
 import type { TagDetailsResponse } from '../tags/tagsApi';
@@ -59,21 +59,30 @@ beforeEach(() => {
     );
   });
 });
-function setup() {
+function setup(mode: 'assign' | 'replace' | 'unassign' = 'assign') {
   const user = userEvent.setup();
-  renderWithProviders(<TrolleyNfcDialog trolley={trolley} onClose={vi.fn()} />);
+  const change =
+    mode === 'assign' ? ({ mode } as const) : { mode, tagId: old.id };
+  renderWithProviders(
+    <TrolleyNfcEditor
+      trolley={trolley}
+      change={change}
+      onClose={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
   return user;
 }
-it('shows assigned tag names and UIDs, validates reason and assigns an available tag', async () => {
+it('validates the reason and assigns an available tag inline without a modal', async () => {
   records = [tag];
   const user = setup();
-  expect(await screen.findByText('No NFC tag assigned.')).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Assign NFC tag' }));
+  await screen.findByRole('combobox', { name: 'Available NFC tag' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Save assignment' }));
   expect(screen.getByText('Enter a reason.')).toBeInTheDocument();
   expect(nfc.assignTrolleyNfcTag).not.toHaveBeenCalled();
   await user.click(screen.getByRole('combobox', { name: 'Available NFC tag' }));
-  await user.click(screen.getByRole('option', { name: 'New tag (ABC)' }));
+  await user.click(screen.getByRole('option', { name: 'New tag' }));
   await user.type(
     screen.getByRole('textbox', { name: /Reason/ }),
     'Initial setup',
@@ -95,10 +104,10 @@ it('removes the previous tag first and retries only assigning the replacement', 
       message: 'Please try assigning again',
     }),
   );
-  const user = setup();
-  await user.click(await screen.findByRole('button', { name: 'Replace tag' }));
+  const user = setup('replace');
+  await screen.findByRole('combobox', { name: 'Available NFC tag' });
   await user.click(screen.getByRole('combobox', { name: 'Available NFC tag' }));
-  await user.click(screen.getByRole('option', { name: 'New tag (ABC)' }));
+  await user.click(screen.getByRole('option', { name: 'New tag' }));
   await user.type(
     screen.getByRole('textbox', { name: /Reason/ }),
     'Damaged tag',
@@ -120,9 +129,11 @@ it('removes the previous tag first and retries only assigning the replacement', 
     vi.mocked(nfc.assignTrolleyNfcTag).mock.invocationCallOrder[0],
   );
 });
-it('unassigns the chosen tag with a reason and rejects a stale selected tag', async () => {
-  const user = setup();
-  await user.click(await screen.findByRole('button', { name: 'Unassign tag' }));
+
+it('unassigns the selected tag without fetching tag names for display', async () => {
+  const user = setup('unassign');
+  expect(nfc.getTrolleyNfcTags).not.toHaveBeenCalled();
+  expect(screen.queryByText('Old tag')).not.toBeInTheDocument();
   await user.type(screen.getByRole('textbox', { name: /Reason/ }), 'Retired');
   await user.click(screen.getByRole('button', { name: 'Save assignment' }));
   await waitFor(() =>
@@ -132,11 +143,26 @@ it('unassigns the chosen tag with a reason and rejects a stale selected tag', as
       expect.any(AbortSignal),
     ),
   );
+});
+it('shows an appropriate message and prevents saving when no tags are available', async () => {
+  records = [];
+  setup();
+  expect(
+    await screen.findByText(
+      'No available tags. Add a tag in Tag Management first.',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Save assignment' }),
+  ).toBeDisabled();
+});
+it('rejects a tag that was assigned to another asset after selection', async () => {
+  records = [tag];
+  const user = setup();
   await user.click(
-    await screen.findByRole('button', { name: 'Assign NFC tag' }),
+    await screen.findByRole('combobox', { name: 'Available NFC tag' }),
   );
-  await user.click(screen.getByRole('combobox', { name: 'Available NFC tag' }));
-  await user.click(screen.getByRole('option', { name: 'New tag (ABC)' }));
+  await user.click(screen.getByRole('option', { name: 'New tag' }));
   await user.type(screen.getByRole('textbox', { name: /Reason/ }), 'Setup');
   vi.mocked(tagsApi.getTag).mockResolvedValueOnce({ ...tag, assigned: true });
   await user.click(screen.getByRole('button', { name: 'Save assignment' }));
@@ -146,33 +172,4 @@ it('unassigns the chosen tag with a reason and rejects a stale selected tag', as
     ),
   ).toBeInTheDocument();
   expect(nfc.assignTrolleyNfcTag).not.toHaveBeenCalled();
-});
-
-it('offers replacement instead of another assignment when a tag is assigned', async () => {
-  setup();
-  expect(await screen.findByText('Old tag (OLD)')).toBeInTheDocument();
-  expect(
-    screen.queryByRole('button', { name: 'Assign NFC tag' }),
-  ).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Replace tag' })).toBeEnabled();
-});
-it('shows an informational empty state and disables assignment when no tags are available', async () => {
-  records = [];
-  setup();
-  expect(
-    await screen.findByText(
-      'No available tags. Add a tag in Tag Management first.',
-    ),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Assign NFC tag' })).toBeDisabled();
-});
-it('keeps the assigned tag visible and disables replacement when no spare tag is available', async () => {
-  records = [old];
-  setup();
-  expect(await screen.findByText('Old tag (OLD)')).toBeInTheDocument();
-  expect(
-    screen.getByText('No available tags. Add a tag in Tag Management first.'),
-  ).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Replace tag' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Unassign tag' })).toBeEnabled();
 });

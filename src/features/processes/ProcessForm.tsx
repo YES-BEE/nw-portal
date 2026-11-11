@@ -33,7 +33,7 @@ import type {
   ProcessResponse,
   UpdateProcessRequest,
 } from './types';
-import { getProcessTagOptions, ProcessesError } from './processesApi';
+import { getProcessTags, ProcessesError } from './processesApi';
 import { signOut } from '../auth/session';
 import { normalizeProcess, getProcessFieldErrors } from './processData';
 import { loadTags } from '../configurations/tagRegistry';
@@ -114,7 +114,7 @@ export function ProcessForm({
   useEffect(() => {
     if (!backendMode) return;
     const controller = new AbortController();
-    void getProcessTagOptions(controller.signal).then(
+    void getProcessTags(controller.signal).then(
       (tags) => {
         if (!controller.signal.aborted) setTagState({ status: 'ready', tags });
       },
@@ -139,7 +139,13 @@ export function ProcessForm({
   const availableTags: ProcessTagOptionResponse[] =
     tagState.status === 'ready'
       ? [
-          ...tagState.tags,
+          ...tagState.tags
+            .filter((tag) => !tag.assigned || retainedUids.includes(tag.uid))
+            .map((tag) =>
+              retainedUids.includes(tag.uid)
+                ? { ...tag, assigned: false }
+                : tag,
+            ),
           ...retainedUids
             .filter((uid) => !tagState.tags.some((tag) => tag.uid === uid))
             .map((uid) => ({

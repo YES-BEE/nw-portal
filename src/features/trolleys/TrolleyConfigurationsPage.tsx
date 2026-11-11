@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -26,8 +26,12 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import RestoreIcon from '@mui/icons-material/Restore';
-import NfcIcon from '@mui/icons-material/Nfc';
-import { TrolleyNfcDialog } from './TrolleyNfcDialog';
+import LinkIcon from '@mui/icons-material/Link';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import SyncIcon from '@mui/icons-material/Sync';
+import { TrolleyNfcEditor, type TrolleyNfcChange } from './TrolleyNfcEditor';
+import { getTrolleyNfcTags } from './trolleyNfcApi';
+import { TagsError } from '../tags/tagsApi';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { getTrolleys, TrolleysError } from './trolleysApi';
 import type {
@@ -54,7 +58,15 @@ export function TrolleyConfigurationsPage() {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<TrolleySelection | null>(null);
   const [saved, setSaved] = useState(false);
-  const [nfcTrolley, setNfcTrolley] = useState<TrolleyResponse | null>(null);
+  const [nfcSelection, setNfcSelection] = useState<{
+    trolley: TrolleyResponse;
+    change: TrolleyNfcChange;
+  } | null>(null);
+  const [assignments, setAssignments] = useState<{
+    source: TrolleysResponse;
+    byTrolley: Map<string, string[]>;
+    failure?: TrolleysFailure;
+  } | null>(null);
   usePageMetadata(t('trolleys.pageTitle'), t('trolleys.description'));
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,6 +92,44 @@ export function TrolleyConfigurationsPage() {
             return;
           }
           setState({ status: 'ready', data });
+          if (!data.items.length) return;
+          void getTrolleyNfcTags(controller.signal, true).then(
+            (tags) => {
+              if (controller.signal.aborted) return;
+              const byTrolley = new Map<string, string[]>();
+              for (const tag of tags) {
+                if (
+                  tag.assigned &&
+                  tag.asset_type === 'TROLLEY' &&
+                  tag.trolley_id
+                ) {
+                  byTrolley.set(tag.trolley_id, [
+                    ...(byTrolley.get(tag.trolley_id) || []),
+                    tag.id,
+                  ]);
+                }
+              }
+              setAssignments({ source: data, byTrolley });
+            },
+            (error: unknown) => {
+              if (controller.signal.aborted) return;
+              const value =
+                error instanceof TagsError
+                  ? error.failure
+                  : { kind: 'network' as const, action: 'retry' as const };
+              setAssignments({
+                source: data,
+                byTrolley: new Map(),
+                failure: {
+                  ...value,
+                  kind:
+                    value.kind === 'representation'
+                      ? 'invalidResponse'
+                      : value.kind,
+                },
+              });
+            },
+          );
         }
       },
       (error: unknown) => {
@@ -97,6 +147,7 @@ export function TrolleyConfigurationsPage() {
   }, [page, size, search, attempt]);
   function reload() {
     setSelection(null);
+    setNfcSelection(null);
     setState({ status: 'loading' });
     setAttempt((value) => value + 1);
   }
@@ -105,6 +156,10 @@ export function TrolleyConfigurationsPage() {
     setSelection(value);
   }
   const items = state.status === 'ready' ? state.data.items : [];
+  const currentAssignments =
+    state.status === 'ready' && assignments?.source === state.data
+      ? assignments
+      : null;
   return (
     <>
       <Breadcrumbs
@@ -138,7 +193,7 @@ export function TrolleyConfigurationsPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          disabled={!!selection}
+          disabled={!!selection || !!nfcSelection}
           onClick={() => open({ mode: 'create' })}
         >
           {t('trolleys.create')}
@@ -147,6 +202,13 @@ export function TrolleyConfigurationsPage() {
       {state.status === 'error' && (
         <TrolleyFailureAlert
           failure={state.failure}
+          onReload={reload}
+          onRetry={reload}
+        />
+      )}
+      {currentAssignments?.failure && (
+        <TrolleyFailureAlert
+          failure={currentAssignments.failure}
           onReload={reload}
           onRetry={reload}
         />
@@ -191,95 +253,162 @@ export function TrolleyConfigurationsPage() {
                 </TableRow>
               )}
               {items.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell component="th" scope="row">
-                    {record.code}
-                  </TableCell>
-                  <TableCell>
-                    {record.status === 'AVAILABLE'
-                      ? t('trolleys.available')
-                      : record.status === 'IN_USE'
-                        ? t('trolleys.inUse')
-                        : record.status}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      color={record.active ? 'success' : 'default'}
-                      label={t(
-                        record.active ? 'access.active' : 'access.inactive',
-                      )}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Tooltip title={t('trolleys.nfc.manage')}>
-                      <IconButton
-                        color="primary"
-                        disabled={!!selection || !!nfcTrolley}
-                        aria-label={t('trolleys.nfc.title', {
-                          code: record.code,
-                        })}
-                        onClick={() => setNfcTrolley(record)}
+                <Fragment key={record.id}>
+                  <TableRow>
+                    <TableCell component="th" scope="row">
+                      {record.code}
+                    </TableCell>
+                    <TableCell>
+                      {record.status === 'AVAILABLE'
+                        ? t('trolleys.available')
+                        : record.status === 'IN_USE'
+                          ? t('trolleys.inUse')
+                          : record.status}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        color={record.active ? 'success' : 'default'}
+                        label={t(
+                          record.active ? 'access.active' : 'access.inactive',
+                        )}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {currentAssignments &&
+                        !currentAssignments.failure &&
+                        (() => {
+                          const ids =
+                            currentAssignments.byTrolley.get(record.id) || [];
+                          const actions: TrolleyNfcChange[] = ids.length
+                            ? [
+                                ...(record.active && ids.length === 1
+                                  ? [
+                                      {
+                                        mode: 'replace' as const,
+                                        tagId: ids[0],
+                                      },
+                                    ]
+                                  : []),
+                                ...ids.map((tagId) => ({
+                                  mode: 'unassign' as const,
+                                  tagId,
+                                })),
+                              ]
+                            : record.active
+                              ? [{ mode: 'assign' }]
+                              : [];
+                          return actions.map((action) => (
+                            <Tooltip
+                              key={
+                                action.mode +
+                                ('tagId' in action ? action.tagId : '')
+                              }
+                              title={t(`trolleys.nfc.${action.mode}`)}
+                            >
+                              <Box component="span">
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  disabled={!!selection || !!nfcSelection}
+                                  aria-label={t(
+                                    `trolleys.nfc.${action.mode}Trolley`,
+                                    { code: record.code },
+                                  )}
+                                  onClick={() =>
+                                    setNfcSelection({
+                                      trolley: record,
+                                      change: action,
+                                    })
+                                  }
+                                >
+                                  {action.mode === 'assign' ? (
+                                    <LinkIcon fontSize="small" />
+                                  ) : action.mode === 'replace' ? (
+                                    <SyncIcon fontSize="small" />
+                                  ) : (
+                                    <LinkOffIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Box>
+                            </Tooltip>
+                          ));
+                        })()}
+                      <Tooltip title={t('common.view')}>
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            disabled={!!selection || !!nfcSelection}
+                            aria-label={t('trolleys.viewNamed', {
+                              code: record.code,
+                            })}
+                            onClick={() => open({ mode: 'view', record })}
+                          >
+                            <VisibilityOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                      <Tooltip title={t('access.edit')}>
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            disabled={!!selection || !!nfcSelection}
+                            aria-label={t('trolleys.editNamed', {
+                              code: record.code,
+                            })}
+                            onClick={() => open({ mode: 'edit', record })}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                      <Tooltip
+                        title={t(
+                          record.active ? 'access.delete' : 'trolleys.restore',
+                        )}
                       >
-                        <NfcIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={t('common.view')}>
-                      <Box component="span">
-                        <IconButton
-                          color="primary"
-                          disabled={!!selection}
-                          aria-label={t('trolleys.viewNamed', {
-                            code: record.code,
-                          })}
-                          onClick={() => open({ mode: 'view', record })}
-                        >
-                          <VisibilityOutlinedIcon />
-                        </IconButton>
-                      </Box>
-                    </Tooltip>
-                    <Tooltip title={t('access.edit')}>
-                      <Box component="span">
-                        <IconButton
-                          color="primary"
-                          disabled={!!selection}
-                          aria-label={t('trolleys.editNamed', {
-                            code: record.code,
-                          })}
-                          onClick={() => open({ mode: 'edit', record })}
-                        >
-                          <EditOutlinedIcon />
-                        </IconButton>
-                      </Box>
-                    </Tooltip>
-                    <Tooltip
-                      title={t(
-                        record.active ? 'access.delete' : 'trolleys.restore',
-                      )}
-                    >
-                      <Box component="span">
-                        <IconButton
-                          color={record.active ? 'error' : 'primary'}
-                          disabled={!!selection}
-                          aria-label={t(
-                            record.active
-                              ? 'trolleys.deleteNamed'
-                              : 'trolleys.restoreNamed',
-                            { code: record.code },
-                          )}
-                          onClick={() => open({ mode: 'status', record })}
-                        >
-                          {record.active ? (
-                            <DeleteOutlinedIcon />
-                          ) : (
-                            <RestoreIcon />
-                          )}
-                        </IconButton>
-                      </Box>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
+                        <Box component="span">
+                          <IconButton
+                            size="small"
+                            color={record.active ? 'error' : 'primary'}
+                            disabled={!!selection || !!nfcSelection}
+                            aria-label={t(
+                              record.active
+                                ? 'trolleys.deleteNamed'
+                                : 'trolleys.restoreNamed',
+                              { code: record.code },
+                            )}
+                            onClick={() => open({ mode: 'status', record })}
+                          >
+                            {record.active ? (
+                              <DeleteOutlinedIcon fontSize="small" />
+                            ) : (
+                              <RestoreIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                  {nfcSelection?.trolley.id === record.id && (
+                    <TableRow>
+                      <TableCell colSpan={4}>
+                        <TrolleyNfcEditor
+                          trolley={record}
+                          change={nfcSelection.change}
+                          onClose={reload}
+                          onSaved={() => {
+                            setSaved(true);
+                            reload();
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))}
               {state.status === 'ready' && !items.length && (
                 <TableRow>
@@ -324,12 +453,6 @@ export function TrolleyConfigurationsPage() {
             setSaved(true);
             reload();
           }}
-        />
-      )}
-      {nfcTrolley && (
-        <TrolleyNfcDialog
-          trolley={nfcTrolley}
-          onClose={() => setNfcTrolley(null)}
         />
       )}
       <Snackbar

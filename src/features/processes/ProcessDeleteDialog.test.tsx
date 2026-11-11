@@ -66,7 +66,10 @@ describe('backend process deletion', () => {
     );
     expect(screen.getByRole('button', { name: 'Deleting...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === 'processes')
+        .length,
+    ).toBe(1);
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
       data: [deleted],
@@ -78,7 +81,10 @@ describe('backend process deletion', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByText('Process deleted.')).toBeVisible();
-    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === 'processes')
+        .length,
+    ).toBe(2);
     expect(apiClient.delete).toHaveBeenCalledTimes(1);
   });
 
@@ -107,7 +113,11 @@ describe('backend process deletion', () => {
         .getByRole('rowheader', { name: /Washing/, hidden: true })
         .closest('tr')!;
       expect(within(row).getByText('Active')).toBeInTheDocument();
-      expect(apiClient.get).toHaveBeenCalledTimes(1);
+      expect(
+        vi
+          .mocked(apiClient.get)
+          .mock.calls.filter(([url]) => url === 'processes').length,
+      ).toBe(1);
       expect(apiClient.delete).toHaveBeenCalledTimes(1);
       if (action) {
         expect(screen.getByRole('button', { name: action })).toBeEnabled();

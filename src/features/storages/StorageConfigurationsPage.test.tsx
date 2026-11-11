@@ -41,9 +41,7 @@ describe('storage configurations', () => {
       'New holding area',
     );
     await user.click(screen.getByRole('combobox', { name: /NFC Tag ID/ }));
-    await user.click(
-      screen.getByRole('option', { name: 'Storage Bay C Tag (NFC-STORE-003)' }),
-    );
+    await user.click(screen.getByRole('option', { name: 'Storage Bay C Tag' }));
     await user.click(screen.getByRole('button', { name: 'Save Storage' }));
     expect(screen.getByRole('rowheader', { name: 'ST-003' })).toBeVisible();
     expect(
@@ -107,9 +105,7 @@ describe('storage configurations', () => {
       'st-002',
     );
     await user.click(screen.getByRole('combobox', { name: /NFC Tag ID/ }));
-    await user.click(
-      screen.getByRole('option', { name: 'Storage Bay C Tag (NFC-STORE-003)' }),
-    );
+    await user.click(screen.getByRole('option', { name: 'Storage Bay C Tag' }));
     await user.click(screen.getByRole('button', { name: 'Save Storage' }));
     expect(
       screen.getByRole('textbox', { name: /Storage Number/ }),
@@ -120,9 +116,9 @@ describe('storage configurations', () => {
     await user.click(screen.getByRole('button', { name: 'Add New Storage' }));
     await user.click(screen.getByRole('combobox', { name: /NFC Tag ID/ }));
     for (const label of [
-      'Storage Bay A Tag (NFC-STORE-001)',
-      'Lot Preparation Tag (NFC-PROC-001)',
-      'Washer 01 Tag (NFC-DEV-001)',
+      'Storage Bay A Tag',
+      'Lot Preparation Tag',
+      'Washer 01 Tag',
     ]) {
       expect(screen.getByRole('option', { name: label })).toHaveAttribute(
         'aria-disabled',
@@ -130,7 +126,7 @@ describe('storage configurations', () => {
       );
     }
     expect(
-      screen.getByRole('option', { name: 'Storage Bay C Tag (NFC-STORE-003)' }),
+      screen.getByRole('option', { name: 'Storage Bay C Tag' }),
     ).not.toHaveAttribute('aria-disabled', 'true');
   });
   it('deletes only after confirmation and keeps deletion on reload', async () => {

@@ -1,3 +1,4 @@
+import { loadTags } from '../configurations/tagRegistry';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -169,7 +170,11 @@ export function StorageConfigurationsPage() {
                   <TableCell>
                     <Chip
                       size="small"
-                      label={record.tag}
+                      label={
+                        loadTags().records.find(
+                          (tag) => tag.actual === record.tag,
+                        )?.name || t('tags.nameUnavailable')
+                      }
                       sx={{
                         bgcolor: '#edf4ff',
                         color: '#1556c4',

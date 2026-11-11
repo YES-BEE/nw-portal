@@ -45,7 +45,7 @@ describe('storage details', () => {
       screen.getByRole('heading', { level: 1, name: 'ST-001' }),
     ).toBeVisible();
     expect(screen.getByText('Intermediate storage bay A')).toBeVisible();
-    expect(screen.getByText('NFC-STORE-001')).toBeVisible();
+    expect(screen.getByText('Storage Bay A Tag')).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Back to Storages' }));
@@ -72,7 +72,7 @@ describe('storage details', () => {
       screen.getByRole('heading', { level: 1, name: 'ST-009' }),
     ).toBeVisible();
     expect(screen.getByText('New bay')).toBeVisible();
-    expect(screen.getByText('NFC-STORE-003')).toBeVisible();
+    expect(screen.getByText('Storage Bay C Tag')).toBeVisible();
   });
 
   it('handles a missing or deleted storage', () => {

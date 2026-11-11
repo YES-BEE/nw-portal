@@ -51,6 +51,7 @@ const options = (signal?: AbortSignal) => ({
 
 export async function getTrolleyNfcTags(
   signal?: AbortSignal,
+  assigned?: boolean,
 ): Promise<TagDetailsResponse[]> {
   // The backend has no asset-id filter. Its list projection includes all asset references.
   return collectApiItems(
@@ -58,7 +59,11 @@ export async function getTrolleyNfcTags(
       request(() =>
         apiClient.get<unknown>('nfc-tags', {
           ...options(signal),
-          params: { status: 'ACTIVE', ...page },
+          params: {
+            status: 'ACTIVE',
+            ...(assigned === undefined ? {} : { assigned }),
+            ...page,
+          },
         }),
       ),
     isTagDetails,

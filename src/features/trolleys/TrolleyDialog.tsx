@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -188,30 +189,47 @@ export function TrolleyDialog({
             />
           )}
           {loaded && mode === 'view' && record && (
-            <Stack spacing={2}>
-              <Typography>
-                <Typography component="span" sx={{ fontWeight: 700 }}>
-                  {t('trolleys.code')}:{' '}
-                </Typography>
-                {record.code}
-              </Typography>
-              <Typography>
-                <Typography component="span" sx={{ fontWeight: 700 }}>
-                  {t('trolleys.availability')}:{' '}
-                </Typography>
-                {record.status === 'AVAILABLE'
-                  ? t('trolleys.available')
-                  : record.status === 'IN_USE'
-                    ? t('trolleys.inUse')
-                    : record.status}
-              </Typography>
-              <Typography>
-                <Typography component="span" sx={{ fontWeight: 700 }}>
-                  {t('access.status')}:{' '}
-                </Typography>
-                {t(record.active ? 'access.active' : 'access.inactive')}
-              </Typography>
-            </Stack>
+            <Box
+              component="dl"
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '170px minmax(0, 1fr)' },
+                gap: 1.5,
+                m: 0,
+              }}
+            >
+              {[
+                [t('trolleys.code'), record.code],
+                [
+                  t('trolleys.availability'),
+                  record.status === 'AVAILABLE'
+                    ? t('trolleys.available')
+                    : record.status === 'IN_USE'
+                      ? t('trolleys.inUse')
+                      : record.status,
+                ],
+                [
+                  t('access.status'),
+                  t(record.active ? 'access.active' : 'access.inactive'),
+                ],
+              ].map(([label, value]) => (
+                <Box key={label} sx={{ display: 'contents' }}>
+                  <Typography
+                    component="dt"
+                    color="text.secondary"
+                    sx={{ fontSize: 13, fontWeight: 700 }}
+                  >
+                    {label}
+                  </Typography>
+                  <Typography
+                    component="dd"
+                    sx={{ m: 0, overflowWrap: 'anywhere', fontSize: 13 }}
+                  >
+                    {value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
           )}
           {mode === 'status' && record && (
             <DialogContentText>

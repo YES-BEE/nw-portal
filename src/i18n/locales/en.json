@@ -545,9 +545,9 @@
     "processModeHint": "Track the entire process using one NFC tag.",
     "deviceMode": "Machine-level tracking",
     "deviceModeHint": "Track each machine separately using its own NFC tag.",
-    "processTag": "Process-level NFC Tag ID",
+    "processTag": "Process-level NFC Tag",
     "selectTag": "Select a registered tag",
-    "tagOption": "{{name}} ({{id}})",
+    "tagOption": "{{name}}",
     "processTagHint": "This NFC tag is used to track the entire process.",
     "devices": "Machines",
     "devicesHint": "Add machines and assign a unique NFC tag to track each one separately.",
@@ -604,7 +604,7 @@
     "descriptionPlaceholder": "Describe the storage location",
     "formDescription": "Enter the storage location details and select an available NFC tag.",
     "selectTag": "Select a registered tag",
-    "tagOption": "{{name}} ({{id}})",
+    "tagOption": "{{name}}",
     "noDescription": "—",
     "empty": "No storages configured. Click Add New Storage.",
     "editAction": "Edit",
@@ -679,7 +679,7 @@
     "saved": "Tag saved successfully.",
     "deleted": "Tag deleted.",
     "deleteTitle": "Delete tag?",
-    "deleteMessage": "Delete “{{name}}” ({{actual}})?",
+    "deleteMessage": "Delete \"{{name}}\"?",
     "empty": "No NFC tags registered.",
     "assigned": "Assigned",
     "saving": "Saving...",
@@ -744,7 +744,8 @@
     "errors": {
       "nameRequired": "Enter a tag name.",
       "actualRequired": "Enter the actual NFC tag ID."
-    }
+    },
+    "nameUnavailable": "Tag name unavailable"
   },
   "login": {
     "errors": {
@@ -810,16 +811,11 @@
     },
     "codePlaceholder": "Enter a trolley code",
     "nfc": {
-      "manage": "Manage NFC tags",
-      "title": "NFC tags - {{code}}",
-      "assigned": "Assigned tag",
-      "empty": "No NFC tag assigned.",
       "assign": "Assign NFC tag",
       "replace": "Replace tag",
       "unassign": "Unassign tag",
-      "replaceNamed": "Replace {{name}} ({{uid}})",
-      "unassignNamed": "Unassign {{name}} ({{uid}})?",
       "tag": "Available NFC tag",
+      "tagPlaceholder": "Select an NFC tag",
       "reason": "Reason",
       "reasonPlaceholder": "Enter the reason for this assignment change",
       "reasonRequired": "Enter a reason.",
@@ -829,7 +825,10 @@
       "partialReplacement": "The previous tag was unassigned, but the new tag could not be assigned. Finish the replacement to assign it, or reload to review the current assignment.",
       "finishReplacement": "Finish replacement",
       "save": "Save assignment",
-      "review": "Reload tags"
+      "review": "Reload tags",
+      "assignTrolley": "Assign NFC tag to {{code}}",
+      "unassignTrolley": "Unassign NFC tag from {{code}}",
+      "replaceTrolley": "Replace NFC tag on {{code}}"
     }
   }
 }

@@ -55,3 +55,20 @@ export const processesResponse: ProcessesResponse = [
     ],
   },
 ];
+
+export const processTags = [
+  {
+    id: 'wash-tag',
+    name: 'Washing tag',
+    uid: 'NFC-WASH',
+    status: 'ACTIVE',
+    assigned: true,
+  },
+  {
+    id: 'dryer-tag',
+    name: 'Dryer tag',
+    uid: 'NFC-DRYER',
+    status: 'ACTIVE',
+    assigned: true,
+  },
+];

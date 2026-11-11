@@ -4,7 +4,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { processResponse, processesResponse } from '../../test/processes';
+import {
+  processResponse,
+  processesResponse,
+  processTags,
+} from '../../test/processes';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import { ProcessDetailsPage } from './ProcessDetailsPage';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
@@ -33,11 +37,13 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
     data:
-      url === 'processes'
-        ? processesResponse
-        : (processesResponse.find(
-            (process) => 'processes/' + process.id === url,
-          ) ?? processResponse),
+      url === 'ui/lookups'
+        ? { tags: processTags }
+        : url === 'processes'
+          ? processesResponse
+          : (processesResponse.find(
+              (process) => 'processes/' + process.id === url,
+            ) ?? processResponse),
   }));
 });
 
@@ -46,7 +52,12 @@ describe('backend process details', () => {
     const detail = { ...processResponse, name: 'Fresh Washing', quality: true };
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'processes' ? processesResponse : detail,
+      data:
+        url === 'ui/lookups'
+          ? { tags: processTags }
+          : url === 'processes'
+            ? processesResponse
+            : detail,
     }));
     const { user } = setup('/configurations/processes');
     await user.click(await screen.findByRole('link', { name: 'View Washing' }));
@@ -57,7 +68,8 @@ describe('backend process details', () => {
       'processes/' + detail.id,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
-    expect(screen.getByText('NFC-WASH')).toBeVisible();
+    expect(await screen.findByText('Washing tag')).toBeVisible();
+    expect(screen.queryByText('NFC-WASH')).not.toBeInTheDocument();
     expect(screen.getByText('03')).toBeVisible();
     expect(screen.getByText('Yes')).toBeVisible();
     expect(screen.getByText('Active')).toBeVisible();
@@ -77,7 +89,8 @@ describe('backend process details', () => {
     setup('/configurations/processes/' + processesResponse[1].id);
     const devices = await screen.findByRole('table', { name: 'Machines' });
     expect(within(devices).getByText('Dryer 1')).toBeVisible();
-    expect(within(devices).getByText('NFC-DRYER')).toBeVisible();
+    expect(await within(devices).findByText('Dryer tag')).toBeVisible();
+    expect(within(devices).queryByText('NFC-DRYER')).not.toBeInTheDocument();
     expect(screen.getByText('Machine-level tracking')).toBeVisible();
     expect(screen.getByText('Inactive')).toBeVisible();
   });
@@ -161,7 +174,11 @@ describe('backend process details', () => {
     expect(
       await screen.findByRole('heading', { name: 'Washing' }),
     ).toBeVisible();
-    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(
+      vi
+        .mocked(apiClient.get)
+        .mock.calls.filter(([url]) => url.startsWith('processes/')).length,
+    ).toBe(2);
   });
 
   it('shows access denial without a futile retry', async () => {

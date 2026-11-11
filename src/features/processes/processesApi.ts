@@ -226,7 +226,7 @@ export async function getProcess(
   return response.data;
 }
 
-export async function getProcessTagOptions(
+export async function getProcessTags(
   signal?: AbortSignal,
 ): Promise<ProcessTagOptionResponse[]> {
   const fetchPage = async (params?: PageQuery): Promise<unknown> => {
@@ -272,6 +272,13 @@ export async function getProcessTagOptions(
       throw new ProcessesError({ kind: 'invalidResponse', action: 'retry' });
     },
   );
+  return tags;
+}
+
+export async function getProcessTagOptions(
+  signal?: AbortSignal,
+): Promise<ProcessTagOptionResponse[]> {
+  const tags = await getProcessTags(signal);
   return tags.filter((tag) => tag.status === 'ACTIVE' && !tag.assigned);
 }
 

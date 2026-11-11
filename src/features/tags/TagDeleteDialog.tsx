@@ -66,7 +66,7 @@ export function TagDeleteDialog({
       <DialogTitle id="delete-tag-title">{t('tags.deleteTitle')}</DialogTitle>
       <DialogContent aria-busy={pending}>
         <DialogContentText id="delete-tag-description">
-          {t('tags.deleteMessage', { name: tag.name, actual: tag.uid })}
+          {t('tags.deleteMessage', { name: tag.name })}
         </DialogContentText>
         {failure && (
           <Alert severity="error" sx={{ mt: 2 }}>

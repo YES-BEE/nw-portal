@@ -68,7 +68,6 @@ export function TagDetailsDialog({
   const fields: [string, string | number][] = tag
     ? [
         [t('tags.name'), tag.name],
-        [t('tags.actual'), tag.uid],
         [t('tags.status'), t(`tags.statusValues.${tag.status}`)],
         [t('tags.assigned'), t(tag.assigned ? 'tags.yes' : 'tags.no')],
         [

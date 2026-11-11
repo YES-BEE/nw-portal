@@ -1,6 +1,8 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTagResponse } from '../../test/tags';
+import type { TagDetailsResponse } from '../tags/tagsApi';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
 import { TrolleyConfigurationsPage } from './TrolleyConfigurationsPage';
@@ -14,7 +16,9 @@ const trolley: TrolleyResponse = {
   version: 0,
 };
 let records: TrolleyResponse[];
+let tagRecords: TagDetailsResponse[];
 beforeEach(() => {
+  tagRecords = [];
   records = [
     trolley,
     {
@@ -26,6 +30,20 @@ beforeEach(() => {
     },
   ];
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
+    const assigned = (config?.params as { assigned?: boolean } | undefined)
+      ?.assigned;
+    if (url === 'nfc-tags')
+      return {
+        status: 200,
+        data: tagRecords.filter(
+          (tag) => assigned === undefined || tag.assigned === assigned,
+        ),
+      };
+    if (url.startsWith('nfc-tags/'))
+      return {
+        status: 200,
+        data: tagRecords.find((tag) => url === 'nfc-tags/' + tag.id),
+      };
     if (url !== 'trolleys')
       return {
         status: 200,
@@ -208,7 +226,7 @@ describe('trolley configuration', () => {
     expect(
       await screen.findByRole('rowheader', { name: 'TR-03' }),
     ).toBeVisible();
-    expect(apiClient.get).toHaveBeenLastCalledWith(
+    expect(apiClient.get).toHaveBeenCalledWith(
       'trolleys',
       expect.objectContaining({
         params: { page: 0, size: 10, search: 'TR-03' },
@@ -299,4 +317,79 @@ describe('trolley configuration', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     );
   });
+});
+
+it('shows separate assignment actions inline and hides NFC actions on inactive unassigned trolleys', async () => {
+  records.push({ ...trolley, id: 'trolley-3', code: 'TR-03', active: false });
+  tagRecords = [
+    {
+      ...createTagResponse,
+      id: 'active-tag',
+      name: 'Hidden active tag name',
+      assigned: true,
+      asset_type: 'TROLLEY',
+      trolley_id: trolley.id,
+    },
+    {
+      ...createTagResponse,
+      id: 'inactive-tag',
+      name: 'Hidden inactive tag name',
+      assigned: true,
+      asset_type: 'TROLLEY',
+      trolley_id: 'trolley-2',
+    },
+  ];
+  const remove = vi
+    .spyOn(apiClient, 'delete')
+    .mockResolvedValue({ status: 200, data: '' });
+  const { user } = setup();
+  expect(
+    await screen.findByRole('button', { name: 'Replace NFC tag on TR-01' }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole('button', { name: 'Unassign NFC tag from TR-01' }),
+  ).toBeEnabled();
+  expect(
+    screen.queryByRole('button', { name: 'Assign NFC tag to TR-01' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Replace NFC tag on TR-02' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: /NFC tag.*TR-03/ }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('Hidden inactive tag name'),
+  ).not.toBeInTheDocument();
+  await user.click(
+    screen.getByRole('button', { name: 'Unassign NFC tag from TR-02' }),
+  );
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await user.type(screen.getByRole('textbox', { name: /Reason/ }), 'Retired');
+  await user.click(screen.getByRole('button', { name: 'Save assignment' }));
+  await waitFor(() =>
+    expect(remove).toHaveBeenCalledWith(
+      'nfc-assignments/inactive-tag',
+      expect.objectContaining({ data: { reason: 'Retired' } }),
+    ),
+  );
+});
+it('opens the available-tag selector inline from the Assign action', async () => {
+  tagRecords = [createTagResponse];
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Assign NFC tag to TR-01' }),
+  );
+  const select = await screen.findByRole('combobox', {
+    name: 'Available NFC tag',
+  });
+  expect(select).toHaveTextContent('Select an NFC tag');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Assign NFC tag to TR-02' }),
+  ).not.toBeInTheDocument();
+  expect(apiClient.get).toHaveBeenCalledWith(
+    'nfc-tags',
+    expect.objectContaining({ params: { status: 'ACTIVE', assigned: false } }),
+  );
 });

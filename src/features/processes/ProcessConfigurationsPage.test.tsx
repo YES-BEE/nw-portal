@@ -4,17 +4,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { MemoryRouter } from 'react-router-dom';
 import { renderWithProviders } from '../../test/render';
-import { processResponse, processesResponse } from '../../test/processes';
+import {
+  processResponse,
+  processesResponse,
+  processTags,
+} from '../../test/processes';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import { PROCESS_STORAGE_KEY } from './processData';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
 
 beforeEach(() => {
   localStorage.clear();
-  vi.spyOn(apiClient, 'get').mockResolvedValue({
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: processesResponse,
-  });
+    data: url === 'ui/lookups' ? { tags: processTags } : processesResponse,
+  }));
 });
 
 describe('backend process listing', () => {
@@ -35,7 +39,8 @@ describe('backend process listing', () => {
     );
     expect(within(row).getByText('03')).toBeVisible();
     expect(within(row).getByText('Process-level')).toBeVisible();
-    expect(within(row).getByText('NFC-WASH')).toBeVisible();
+    expect(await within(row).findByText('Washing tag')).toBeVisible();
+    expect(within(row).queryByText('NFC-WASH')).not.toBeInTheDocument();
     expect(within(row).getByText('Active')).toBeVisible();
     expect(
       screen.queryByRole('rowheader', { name: /Drying/ }),
@@ -108,10 +113,16 @@ describe('backend process listing', () => {
       'Process service unavailable',
     );
     expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 503');
-    expect(apiClient.get).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === 'processes')
+        .length,
+    ).toBe(1);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await screen.findByRole('rowheader', { name: /Washing/ });
-    expect(apiClient.get).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === 'processes')
+        .length,
+    ).toBe(2);
   });
 
   it.each([403, 406])(

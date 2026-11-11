@@ -45,12 +45,12 @@ describe('tag details', () => {
     expect(dialog.queryByText(detail.id)).not.toBeInTheDocument();
     expect(dialog.queryByText('machine-uuid')).not.toBeInTheDocument();
     expect(dialog.queryByText('process-uuid')).not.toBeInTheDocument();
-    expect(dialog.getByText(detail.uid)).toBeVisible();
+    expect(dialog.queryByText(detail.uid)).not.toBeInTheDocument();
     expect(dialog.getByText('Yes')).toBeVisible();
     expect(dialog.getByText('Active')).toBeVisible();
     expect(dialog.queryByText('Version')).not.toBeInTheDocument();
     expect(dialog.queryByText('3')).not.toBeInTheDocument();
-    expect(dialog.getAllByRole('definition')).toHaveLength(5);
+    expect(dialog.getAllByRole('definition')).toHaveLength(4);
     await user.click(dialog.getByRole('button', { name: 'Close' }));
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
