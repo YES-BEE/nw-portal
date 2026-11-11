@@ -131,7 +131,7 @@ export function RoleManagementPage() {
           </AlertTitle>
           {state.failure.message ||
             t(`access.roles.failures.${state.failure.kind}.description`)}
-          {state.failure.status !== undefined && (
+          {!state.failure.message && state.failure.status !== undefined && (
             <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
               {t('access.roles.failureStatus', {
                 status: state.failure.status,

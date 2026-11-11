@@ -155,7 +155,7 @@ export function TagForm({
               <AlertTitle>{t('tags.createFailure')}</AlertTitle>
               {failure.message ||
                 t(`tags.failures.${failure.kind}.description`)}
-              {failure.status !== undefined && (
+              {!failure.message && failure.status !== undefined && (
                 <Typography
                   variant="caption"
                   sx={{ display: 'block', mt: 0.5 }}

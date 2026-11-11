@@ -206,7 +206,7 @@ export function UserForm({ initial, onClose, onCreate }: UserFormProps) {
                 {failure.fieldErrors.processAssignments}
               </Typography>
             )}
-            {failure.status !== undefined && (
+            {!failure.message && failure.status !== undefined && (
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
                 {t('access.users.failureStatus', { status: failure.status })}
               </Typography>

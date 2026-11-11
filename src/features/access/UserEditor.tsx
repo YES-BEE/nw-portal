@@ -110,7 +110,7 @@ export function UserEditor({
           <AlertTitle>{t('access.users.detailFailure')}</AlertTitle>
           {state.failure.message ||
             t(`access.users.failures.${state.failure.kind}.description`)}
-          {state.failure.status !== undefined && (
+          {!state.failure.message && state.failure.status !== undefined && (
             <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
               {t('access.users.failureStatus', {
                 status: state.failure.status,

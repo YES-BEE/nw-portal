@@ -82,7 +82,7 @@ export function RoleDeleteDialog({
                     ? 'access.roles.builtInDelete'
                     : `access.roles.failures.${failure.kind}.description`,
               )}
-            {failure.status !== undefined && (
+            {!failure.message && failure.status !== undefined && (
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
                 {t('access.roles.failureStatus', { status: failure.status })}
               </Typography>

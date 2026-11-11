@@ -151,7 +151,12 @@ describe('user creation failures', () => {
       const { user } = await fillForm();
       await user.click(screen.getByRole('button', { name: 'Save User' }));
       expect(await screen.findByRole('alert')).toHaveTextContent(reason);
-      expect(screen.getByRole('alert')).toHaveTextContent(`HTTP ${status}`);
+      if (status < 500)
+        expect(screen.getByRole('alert')).not.toHaveTextContent(
+          `HTTP ${status}`,
+        );
+      else
+        expect(screen.getByRole('alert')).toHaveTextContent(`HTTP ${status}`);
       expect(screen.getByRole('textbox', { name: /Username/ })).toHaveValue(
         'new.manager',
       );

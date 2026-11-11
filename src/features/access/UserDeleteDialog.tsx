@@ -78,7 +78,7 @@ export function UserDeleteDialog({
             <AlertTitle>{t('access.users.deleteFailure')}</AlertTitle>
             {failure.message ||
               t(`access.users.failures.${failure.kind}.description`)}
-            {failure.status !== undefined && (
+            {!failure.message && failure.status !== undefined && (
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
                 {t('access.users.failureStatus', { status: failure.status })}
               </Typography>

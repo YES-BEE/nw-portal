@@ -167,7 +167,7 @@ describe('backend tag listing', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Maintenance in progress',
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 503');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 503');
     expect(apiClient.get).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await screen.findByRole('rowheader', { name: 'Washing Tag' });

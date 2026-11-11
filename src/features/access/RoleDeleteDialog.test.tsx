@@ -71,7 +71,7 @@ describe('role deletion', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Built-in roles cannot be deleted',
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('HTTP 409');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 409');
     expect(apiClient.get).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('rowheader', { name: 'NW' })).toBeVisible();
@@ -135,7 +135,7 @@ describe('role deletion', () => {
         }),
       );
       expect(await screen.findByRole('alert')).toHaveTextContent(detail);
-      expect(screen.getByRole('alert')).toHaveTextContent('HTTP ' + status);
+      expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP ' + status);
       expect(
         screen.getByRole('rowheader', { name: customRole.name, hidden: true }),
       ).toBeInTheDocument();

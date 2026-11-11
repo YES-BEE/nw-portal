@@ -286,13 +286,17 @@ export function RoleForm({
             <AlertTitle>{t('access.roles.modulesFailure')}</AlertTitle>
             {modulesState.failure.message ||
               t('access.roles.modulesFailureDescription')}
-            {modulesState.failure.status !== undefined && (
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
-                {t('access.roles.failureStatus', {
-                  status: modulesState.failure.status,
-                })}
-              </Typography>
-            )}
+            {!modulesState.failure.message &&
+              modulesState.failure.status !== undefined && (
+                <Typography
+                  variant="caption"
+                  sx={{ mt: 0.5, display: 'block' }}
+                >
+                  {t('access.roles.failureStatus', {
+                    status: modulesState.failure.status,
+                  })}
+                </Typography>
+              )}
           </Alert>
         )}
         <FormControl
@@ -349,7 +353,7 @@ export function RoleForm({
             </AlertTitle>
             {failure.message ||
               t(`access.roles.failures.${failure.kind}.description`)}
-            {failure.status !== undefined && (
+            {!failure.message && failure.status !== undefined && (
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
                 {t('access.roles.failureStatus', { status: failure.status })}
               </Typography>

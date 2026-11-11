@@ -259,7 +259,7 @@ export function ChangePasswordPage() {
                 )}
               </AlertTitle>
               {failure.message || t(`passwordChange.failures.${failure.kind}`)}
-              {failure.status !== undefined && (
+              {!failure.message && failure.status !== undefined && (
                 <Typography
                   variant="caption"
                   sx={{ mt: 0.5, display: 'block' }}

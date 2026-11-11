@@ -108,7 +108,7 @@ describe('backend user listing', () => {
         }),
       );
       expect(await screen.findByRole('alert')).toHaveTextContent(detail);
-      expect(screen.getByRole('alert')).toHaveTextContent(`HTTP ${status}`);
+      expect(screen.getByRole('alert')).not.toHaveTextContent(`HTTP ${status}`);
       expect(
         within(
           screen

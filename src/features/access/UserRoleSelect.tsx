@@ -124,7 +124,7 @@ export function UserRoleSelect({
           <AlertTitle>{t('access.users.rolesFailure')}</AlertTitle>
           {state.failure.message ||
             t(`access.roles.failures.${state.failure.kind}.description`)}
-          {state.failure.status !== undefined && (
+          {!state.failure.message && state.failure.status !== undefined && (
             <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
               {t('access.users.failureStatus', {
                 status: state.failure.status,

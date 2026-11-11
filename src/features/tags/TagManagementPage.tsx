@@ -160,7 +160,7 @@ export function TagManagementPage() {
           </AlertTitle>
           {state.failure.message ||
             t(`tags.failures.${state.failure.kind}.description`)}
-          {state.failure.status !== undefined && (
+          {!state.failure.message && state.failure.status !== undefined && (
             <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
               {t('tags.failureStatus', { status: state.failure.status })}
             </Typography>
