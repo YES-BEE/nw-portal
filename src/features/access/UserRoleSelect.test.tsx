@@ -89,11 +89,11 @@ describe('backend user role dropdown', () => {
       ).not.toHaveAttribute('aria-disabled', 'true'),
     );
     expect(screen.getByRole('combobox', { name: /Role/ })).toHaveTextContent(
-      'REMOVED_ROLE (unavailable)',
+      'Removed Role (unavailable)',
     );
     await user.click(screen.getByRole('combobox', { name: /Role/ }));
     expect(
-      screen.getByRole('option', { name: 'REMOVED_ROLE (unavailable)' }),
+      screen.getByRole('option', { name: 'Removed Role (unavailable)' }),
     ).toHaveAttribute('aria-disabled', 'true');
     expect(change).not.toHaveBeenCalled();
   });

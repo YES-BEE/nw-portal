@@ -1,3 +1,4 @@
+import { formatRoleName } from './formatRoleName';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -89,13 +90,15 @@ export function UserRoleSelect({
         {missingCurrent && (
           <MenuItem value={value!} disabled>
             {state.status === 'ready'
-              ? t('access.users.unavailableRole', { code: value })
-              : value}
+              ? t('access.users.unavailableRole', {
+                  code: formatRoleName(value!),
+                })
+              : formatRoleName(value!)}
           </MenuItem>
         )}
         {roles.map((role) => (
           <MenuItem key={role.code} value={role.code}>
-            {role.name}
+            {formatRoleName(role.name)}
           </MenuItem>
         ))}
       </TextField>

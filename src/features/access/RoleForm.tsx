@@ -1,3 +1,4 @@
+import { formatRoleName } from './formatRoleName';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -176,7 +177,7 @@ export function RoleForm({
           label={t('access.roleName')}
           autoFocus
           required
-          value={draft.name}
+          value={editing ? formatRoleName(draft.name) : draft.name}
           disabled={saving}
           onChange={(event) =>
             updateDraft({ name: event.target.value }, ['name'])

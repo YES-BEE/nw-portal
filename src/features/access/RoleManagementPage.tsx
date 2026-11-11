@@ -1,3 +1,4 @@
+import { formatRoleName } from './formatRoleName';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -183,7 +184,7 @@ export function RoleManagementPage() {
                       scope="row"
                       sx={{ minWidth: 170 }}
                     >
-                      {role.name}
+                      {formatRoleName(role.name)}
                     </TableCell>
                     <TableCell>
                       <Stack
@@ -229,7 +230,7 @@ export function RoleManagementPage() {
                               });
                             }}
                             aria-label={t('access.editNamed', {
-                              name: role.name,
+                              name: formatRoleName(role.name),
                             })}
                           >
                             <EditOutlinedIcon />
@@ -246,7 +247,7 @@ export function RoleManagementPage() {
                             }}
                             color="error"
                             aria-label={t('access.deleteNamed', {
-                              name: role.name,
+                              name: formatRoleName(role.name),
                             })}
                           >
                             <DeleteOutlinedIcon />

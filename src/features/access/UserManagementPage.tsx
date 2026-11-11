@@ -1,3 +1,4 @@
+import { formatRoleName } from './formatRoleName';
 import { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +88,7 @@ export function UserManagementPage() {
   const filtered =
     state.status === 'ready'
       ? state.users.filter((user) =>
-          `${user.username} ${user.display_name} ${user.role ?? ''}`
+          `${user.username} ${user.display_name} ${user.role ?? ''} ${user.role ? formatRoleName(user.role) : ''}`
             .toLowerCase()
             .includes(search),
         )
@@ -213,7 +214,9 @@ export function UserManagementPage() {
                         {user.display_name || t('access.users.noDisplayName')}
                       </TableCell>
                       <TableCell>
-                        {user.role || t('access.users.noRole')}
+                        {user.role
+                          ? formatRoleName(user.role)
+                          : t('access.users.noRole')}
                       </TableCell>
                       <TableCell>
                         <Chip

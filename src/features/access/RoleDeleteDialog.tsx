@@ -1,3 +1,4 @@
+import { formatRoleName } from './formatRoleName';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -69,7 +70,7 @@ export function RoleDeleteDialog({
       </DialogTitle>
       <DialogContent aria-busy={pending}>
         <DialogContentText id="delete-role-description">
-          {t('access.roles.deleteMessage', { name: role.name })}
+          {t('access.roles.deleteMessage', { name: formatRoleName(role.name) })}
         </DialogContentText>
         {failure && (
           <Alert severity="error" sx={{ mt: 2 }}>
