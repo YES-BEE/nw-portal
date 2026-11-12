@@ -1,18 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
   Button,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import { createLot, lotsFailure } from './lotsApi';
+import { createLots, lotsFailure } from './lotsApi';
 import { LotFailureAlert } from './LotFailureAlert';
-import { generateLotNumber } from './lotNumber';
-import type { LotStyleOption, LotResponse, LotsFailure } from './types';
+import type { LotStyleOption, CreateLotsResponse, LotsFailure } from './types';
 export function LotForm({
   styles,
   initialStyleId,
@@ -23,14 +23,14 @@ export function LotForm({
   styles: LotStyleOption[];
   initialStyleId?: string;
   onClose: () => void;
-  onCreated: (lot: LotResponse) => void;
+  onCreated: (batch: CreateLotsResponse) => void;
   onReload: () => void;
 }) {
   const { t } = useTranslation('translation');
   const [styleId, setStyleId] = useState(
     styles.some((style) => style.id === initialStyleId) ? initialStyleId! : '',
   );
-  const [number] = useState(generateLotNumber);
+  const [lotCount, setLotCount] = useState('1');
   const [quantity, setQuantity] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -43,22 +43,31 @@ export function LotForm({
   }, []);
   const quantityValue = Number(quantity);
   const validQuantity =
-    !!quantity.trim() &&
-    Number.isSafeInteger(quantityValue) &&
-    quantityValue > 0 &&
-    quantityValue <= 2147483647;
+    !quantity.trim() ||
+    (Number.isSafeInteger(quantityValue) &&
+      quantityValue > 0 &&
+      quantityValue <= 2147483647);
+  const countValue = Number(lotCount);
+  const validCount =
+    !!lotCount.trim() &&
+    Number.isInteger(countValue) &&
+    countValue >= 1 &&
+    countValue <= 1000;
   async function save() {
     if (pending.current) return;
     setSubmitted(true);
-    if (!number || !styleId || !validQuantity) return;
+    if (!validCount || !styleId || !validQuantity) return;
     const controller = new AbortController();
     pending.current = controller;
     setSaving(true);
     setFailure(null);
     try {
-      const lot = await createLot(
+      const lot = await createLots(
         styleId,
-        { lotNumber: number, quantity: quantityValue },
+        {
+          lotCount: countValue,
+          ...(quantity.trim() ? { quantity: quantityValue } : {}),
+        },
         controller.signal,
       );
       if (!controller.signal.aborted) onCreated(lot);
@@ -112,7 +121,11 @@ export function LotForm({
           disabled={saving || !styles.length}
           error={submitted && !styleId}
           helperText={
-            submitted && !styleId ? t('lots.styleRequired') : undefined
+            !styles.length
+              ? t('lots.noStyles')
+              : submitted && !styleId
+                ? t('lots.styleRequired')
+                : undefined
           }
           onChange={(event) => {
             setStyleId(event.target.value);
@@ -127,21 +140,27 @@ export function LotForm({
           ))}
         </TextField>
         <TextField
-          label={t('lots.number')}
-          placeholder={t('lots.numberGenerated')}
-          value={number}
+          required
+          type="number"
+          label={t('lots.count')}
+          placeholder={t('lots.countPlaceholder')}
+          value={lotCount}
           disabled={saving}
-          error={!!failure?.fieldErrors?.lotNumber}
+          error={!!failure?.fieldErrors?.lotCount || (submitted && !validCount)}
           helperText={
-            failure?.fieldErrors?.lotNumber || t('lots.numberGenerated')
+            failure?.fieldErrors?.lotCount ||
+            (submitted && !validCount ? t('lots.countInvalid') : undefined)
           }
-          slotProps={{ htmlInput: { readOnly: true } }}
+          slotProps={{ htmlInput: { min: 1, max: 1000, step: 1 } }}
+          onChange={(event) => {
+            setLotCount(event.target.value);
+            setFailure(null);
+          }}
         />
         <TextField
-          required
           autoFocus
           type="number"
-          label={t('lots.quantity')}
+          label={t('lots.quantityPerLot')}
           placeholder={t('lots.quantityPlaceholder')}
           value={quantity}
           disabled={saving}
@@ -152,9 +171,14 @@ export function LotForm({
             failure?.fieldErrors?.quantity ||
             (submitted && !validQuantity
               ? t('lots.quantityRequired')
-              : undefined)
+              : t('lots.quantityOptional'))
           }
-          slotProps={{ htmlInput: { min: 1, max: 2147483647, step: 1 } }}
+          slotProps={{
+            input: {
+              endAdornment: <InputAdornment position="end">Kg</InputAdornment>,
+            },
+            htmlInput: { min: 1, max: 2147483647, step: 1 },
+          }}
           onChange={(event) => {
             setQuantity(event.target.value);
             setFailure(null);
@@ -179,7 +203,6 @@ export function LotForm({
           variant="contained"
           disabled={
             saving ||
-            !number ||
             !styles.length ||
             failure?.action === 'signIn' ||
             failure?.action === 'reload' ||

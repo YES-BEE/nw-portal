@@ -138,7 +138,7 @@ export function DashboardLotsTable({
                   {lot.lot_number}
                 </TableCell>
                 <TableCell>{lot.style_number}</TableCell>
-                <TableCell>{lot.quantity}</TableCell>
+                <TableCell>{lot.quantity ?? t('lots.quantityUnset')}</TableCell>
                 <TableCell>
                   <Chip
                     size="small"

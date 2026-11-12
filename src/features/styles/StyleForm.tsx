@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -49,6 +50,7 @@ export function StyleForm({
   const [description, setDescription] = useState('');
   const [reason, setReason] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [lotCount, setLotCount] = useState('0');
   const [scope, setScope] = useState<RevisionScope>('unstarted');
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [options, setOptions] = useState<StyleProcessOption[]>([]);
@@ -105,6 +107,10 @@ export function StyleForm({
     (Number.isSafeInteger(quantityValue) &&
       quantityValue > 0 &&
       quantityValue <= 2147483647);
+  const countValue = Number(lotCount);
+  const validPlanCount =
+    !lotCount.trim() ||
+    (Number.isInteger(countValue) && countValue >= 0 && countValue <= 1000);
   async function save() {
     if (pending.current || !loaded) return;
     setSubmitted(true);
@@ -113,7 +119,8 @@ export function StyleForm({
       !steps.length ||
       invalidSteps.some(Boolean) ||
       duplicates ||
-      (revisionEdit && (!reason.trim() || !validQuantity))
+      (revisionEdit && (!reason.trim() || !validQuantity)) ||
+      (!styleId && (!validPlanCount || !validQuantity))
     )
       return;
     const controller = new AbortController();
@@ -143,6 +150,8 @@ export function StyleForm({
             styleNumber: number.trim(),
             description: description.trim(),
             processIds: selected,
+            lotCount: countValue,
+            ...(quantity.trim() ? { quantity: quantityValue } : {}),
           },
           controller.signal,
         );
@@ -251,6 +260,61 @@ export function StyleForm({
               sx={{ gridColumn: '1 / -1' }}
             />
           </Box>
+
+          {!styleId && (
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                gap: 2.5,
+                mb: 3,
+              }}
+            >
+              <TextField
+                type="number"
+                label={t('styles.plannedLots')}
+                placeholder={t('styles.plannedLotsPlaceholder')}
+                value={lotCount}
+                error={
+                  !!failure?.fieldErrors?.lotCount ||
+                  (submitted && !validPlanCount)
+                }
+                helperText={
+                  failure?.fieldErrors?.lotCount ||
+                  (submitted && !validPlanCount
+                    ? t('styles.plannedLotsInvalid')
+                    : t('styles.plannedLotsHint'))
+                }
+                slotProps={{ htmlInput: { min: 0, max: 1000, step: 1 } }}
+                onChange={(event) => setLotCount(event.target.value)}
+              />
+              <TextField
+                type="number"
+                label={t('lots.quantityPerLot')}
+                placeholder={t('lots.quantityPlaceholder')}
+                value={quantity}
+                error={
+                  !!failure?.fieldErrors?.quantity ||
+                  (submitted && !validQuantity)
+                }
+                helperText={
+                  failure?.fieldErrors?.quantity ||
+                  (submitted && !validQuantity
+                    ? t('lots.quantityRequired')
+                    : t('lots.quantityOptional'))
+                }
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">Kg</InputAdornment>
+                    ),
+                  },
+                  htmlInput: { min: 1, max: 2147483647, step: 1 },
+                }}
+                onChange={(event) => setQuantity(event.target.value)}
+              />
+            </Box>
+          )}
           {failure?.fieldErrors?.processIds && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {failure.fieldErrors.processIds}
@@ -308,7 +372,14 @@ export function StyleForm({
                     ? t('styles.lotQuantityInvalid')
                     : t('styles.lotQuantityHint'))
                 }
-                slotProps={{ htmlInput: { min: 1, max: 2147483647, step: 1 } }}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">Kg</InputAdornment>
+                    ),
+                  },
+                  htmlInput: { min: 1, max: 2147483647, step: 1 },
+                }}
                 onChange={(event) => {
                   setQuantity(event.target.value);
                   setFailure(null);

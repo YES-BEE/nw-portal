@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+﻿import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -9,6 +9,7 @@ import {
   lotStyleOption,
   lotEvent,
   lotQcResponse,
+  lotBatchResponse,
 } from '../../test/lots';
 import { LotManagementPage } from './LotManagementPage';
 import { LotDetailsPage } from './LotDetailsPage';
@@ -31,10 +32,9 @@ beforeEach(() => {
   }));
   vi.spyOn(apiClient, 'post').mockImplementation(async (url) => ({
     status: 200,
-    data: {
-      ...lotResponse,
-      status: url.endsWith('/cancel') ? 'CANCELLED' : 'READY',
-    },
+    data: url.endsWith('/cancel')
+      ? { ...lotResponse, status: 'CANCELLED' }
+      : lotBatchResponse,
   }));
 });
 function renderList() {
@@ -47,35 +47,64 @@ function renderList() {
     </MemoryRouter>,
   );
 }
+it('shows the newest lot first within the loaded page and style number in the first column', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { styles: [lotStyleOption] }
+        : {
+            items: [
+              lotResponse,
+              {
+                ...lotResponse,
+                id: 'new-lot',
+                lot_number: 'LOT-002',
+                created_at: '2026-11-13T09:00:00Z',
+              },
+            ],
+            page: 0,
+            size: 10,
+            totalElements: 2,
+          },
+  }));
+  renderList();
+  await screen.findByRole('rowheader', { name: 'LOT-002' });
+  expect(
+    screen.getAllByRole('rowheader').map((cell) => cell.textContent),
+  ).toEqual(['LOT-002', 'LOT-001']);
+  const row = screen.getByRole('rowheader', { name: 'LOT-002' }).closest('tr')!;
+  expect(row.firstElementChild).toHaveTextContent('STY-001');
+  expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent('Style');
+});
 it('creates a lot from a released style, then fetches its details and timeline', async () => {
   const user = userEvent.setup();
   renderList();
   await screen.findByRole('link', { name: 'View lot LOT-001' });
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Add New Lot' })).toBeEnabled(),
+    expect(screen.getByRole('button', { name: 'Add Lots' })).toBeEnabled(),
   );
-  await user.click(screen.getByRole('button', { name: 'Add New Lot' }));
-  const form = screen.getByRole('form', { name: 'Create Lot' });
+  await user.click(screen.getByRole('button', { name: 'Add Lots' }));
+  const form = screen.getByRole('form', { name: 'Create Production Lots' });
   expect(form).toHaveAccessibleDescription(
-    'Create a production lot for a released style. The lot receives an automatically generated number.',
+    'Choose a style and the number of lots to create. Lot numbers are assigned automatically. Garment quantity per lot is optional.',
   );
   await user.click(within(form).getByRole('combobox', { name: /Style/ }));
   await user.click(screen.getByRole('option', { name: 'STY-001' }));
-  const numberField = within(form).getByRole('textbox', { name: /Lot Number/ });
-  const generatedNumber = (numberField as HTMLInputElement).value;
-  expect(generatedNumber).toMatch(/^LOT-\d{17}-001$/);
-  expect(numberField).toHaveAttribute('readonly');
+  expect(
+    within(form).queryByRole('textbox', { name: /Lot Number/ }),
+  ).not.toBeInTheDocument();
   await user.type(
     within(form).getByRole('spinbutton', { name: /Quantity/ }),
     '200',
   );
-  await user.click(within(form).getByRole('button', { name: 'Create Lot' }));
+  await user.click(within(form).getByRole('button', { name: 'Create Lots' }));
   expect(
     await screen.findByRole('heading', { level: 1, name: 'LOT-001' }),
   ).toBeVisible();
   expect(apiClient.post).toHaveBeenCalledWith(
     'styles/style-id/lots',
-    { lotNumber: generatedNumber, quantity: 200 },
+    { lotCount: 1, quantity: 200 },
     expect.anything(),
   );
   expect(await screen.findByText('PASS')).toBeVisible();
@@ -129,7 +158,7 @@ it('handles an empty list and unavailable released styles without pagination', a
   renderList();
   expect(await screen.findByText('No lots found.')).toBeVisible();
   expect(screen.getByText(/No released styles are available/)).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Add New Lot' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add Lots' })).toBeDisabled();
   expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toHaveTextContent(
     /unexpected response/,
@@ -154,38 +183,27 @@ it('validates quantity locally and retains the form and backend conflict explana
       onReload={vi.fn()}
     />,
   );
-  await waitFor(() =>
-    expect(
-      (screen.getByRole('textbox', { name: /Lot Number/ }) as HTMLInputElement)
-        .value,
-    ).toMatch(/^LOT-\d{17}-001$/),
-  );
-  const generatedNumber = (
-    screen.getByRole('textbox', { name: /Lot Number/ }) as HTMLInputElement
-  ).value;
   await user.type(screen.getByRole('spinbutton', { name: /Quantity/ }), '0');
-  await user.click(screen.getByRole('button', { name: 'Create Lot' }));
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
   expect(apiClient.post).not.toHaveBeenCalled();
   await user.clear(screen.getByRole('spinbutton', { name: /Quantity/ }));
   await user.type(screen.getByRole('spinbutton', { name: /Quantity/ }), '200');
-  await user.click(screen.getByRole('button', { name: 'Create Lot' }));
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'This lot number is already in use.',
   );
   expect(screen.getByRole('alert')).not.toHaveTextContent('409');
-  expect(screen.getByRole('textbox', { name: /Lot Number/ })).toHaveValue(
-    generatedNumber,
-  );
+  expect(screen.getByRole('spinbutton', { name: /Quantity/ })).toHaveValue(200);
   expect(onCreated).not.toHaveBeenCalled();
   vi.mocked(apiClient.post).mockResolvedValue({
     status: 200,
-    data: { ...lotResponse, lot_number: generatedNumber },
+    data: lotBatchResponse,
   });
-  await user.click(screen.getByRole('button', { name: 'Create Lot' }));
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
   await waitFor(() => expect(onCreated).toHaveBeenCalled());
   expect(apiClient.post).toHaveBeenLastCalledWith(
     'styles/style-id/lots',
-    { lotNumber: generatedNumber, quantity: 200 },
+    { lotCount: 1, quantity: 200 },
     expect.anything(),
   );
 });
@@ -207,13 +225,13 @@ it('requires a cancellation reason and keeps the backend completed-lot error vis
       onCancelled={onCancelled}
     />,
   );
-  await user.click(screen.getByRole('button', { name: 'Cancel lot' }));
+  await user.click(screen.getByRole('button', { name: 'Delete lot' }));
   expect(apiClient.post).not.toHaveBeenCalled();
   await user.type(
     screen.getByRole('textbox', { name: /Reason/ }),
     ' Order withdrawn ',
   );
-  await user.click(screen.getByRole('button', { name: 'Cancel lot' }));
+  await user.click(screen.getByRole('button', { name: 'Delete lot' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'A completed Lot cannot be cancelled',
   );
@@ -225,11 +243,11 @@ it('requires a cancellation reason and keeps the backend completed-lot error vis
   );
   expect(onCancelled).not.toHaveBeenCalled();
 });
-it('refreshes the list after cancellation and removes the cancellation action', async () => {
+it('refreshes the list after deletion and hides the cancelled lot', async () => {
   const user = userEvent.setup();
   renderList();
   await user.click(
-    await screen.findByRole('button', { name: 'Cancel lot LOT-001' }),
+    await screen.findByRole('button', { name: 'Delete lot LOT-001' }),
   );
   await user.type(
     screen.getByRole('textbox', { name: /Reason/ }),
@@ -242,11 +260,57 @@ it('refreshes the list after cancellation and removes the cancellation action', 
         ? { styles: [lotStyleOption] }
         : [{ ...lotResponse, status: 'CANCELLED' }],
   }));
-  await user.click(screen.getByRole('button', { name: 'Cancel lot' }));
-  expect(await screen.findByText('Cancelled')).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Delete lot' }));
+  expect(await screen.findByText('No lots found.')).toBeVisible();
   expect(
-    screen.queryByRole('button', { name: 'Cancel lot LOT-001' }),
+    screen.queryByRole('rowheader', { name: 'LOT-001' }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Delete lot LOT-001' }),
+  ).not.toBeInTheDocument();
+});
+it('hides cancelled lots on later pages and preserves navigation through empty pages', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url, config) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { styles: [lotStyleOption] }
+        : {
+            items:
+              (config?.params as { page?: number } | undefined)?.page === 1
+                ? [
+                    {
+                      ...lotResponse,
+                      id: 'hidden-last',
+                      lot_number: 'HIDDEN-LAST',
+                      status: 'CANCELLED',
+                    },
+                  ]
+                : [
+                    lotResponse,
+                    ...Array.from({ length: 9 }, (_, i) => ({
+                      ...lotResponse,
+                      id: `hidden-${i}`,
+                      lot_number: `HIDDEN-${i}`,
+                      status: 'CANCELLED',
+                    })),
+                  ],
+            page: (config?.params as { page?: number } | undefined)?.page ?? 0,
+            size: 10,
+            totalElements: 11,
+          },
+  }));
+  const user = userEvent.setup();
+  renderList();
+  await screen.findByRole('rowheader', { name: 'LOT-001' });
+  expect(screen.getAllByRole('rowheader')).toHaveLength(1);
+  await user.click(screen.getByRole('button', { name: 'Go to next page' }));
+  expect(await screen.findByText('No lots found.')).toBeVisible();
+  expect(screen.queryByText('HIDDEN-LAST')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Go to previous page' }));
+  expect(
+    await screen.findByRole('rowheader', { name: 'LOT-001' }),
+  ).toBeVisible();
 });
 it('does not fetch a timeline when the lot detail request is forbidden', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({
@@ -267,4 +331,93 @@ it('does not fetch a timeline when the lot detail request is forbidden', async (
     'This lot is outside your assigned processes.',
   );
   expect(apiClient.get).toHaveBeenCalledTimes(1);
+});
+it('creates multiple lots with optional quantities and validates the batch size', async () => {
+  const user = userEvent.setup();
+  const onCreated = vi.fn();
+  const batch = {
+    createdCount: 2,
+    items: [
+      { ...lotResponse, quantity: null },
+      { ...lotResponse, id: 'lot-2', lot_number: 'LOT-2', quantity: null },
+    ],
+  };
+  vi.mocked(apiClient.post).mockResolvedValue({ status: 200, data: batch });
+  renderWithProviders(
+    <LotForm
+      styles={[{ ...lotStyleOption, status: 'COMPLETED' }]}
+      initialStyleId="style-id"
+      onCreated={onCreated}
+      onClose={vi.fn()}
+      onReload={vi.fn()}
+    />,
+  );
+  const count = screen.getByRole('spinbutton', { name: /Number of Lots/ });
+  await user.clear(count);
+  await user.type(count, '1001');
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
+  expect(apiClient.post).not.toHaveBeenCalled();
+  expect(
+    screen.getByText('Enter a whole number between 1 and 1000.'),
+  ).toBeVisible();
+  await user.clear(count);
+  await user.type(count, '2');
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
+  expect(apiClient.post).toHaveBeenCalledWith(
+    'styles/style-id/lots',
+    { lotCount: 2 },
+    expect.anything(),
+  );
+  expect(onCreated).toHaveBeenCalledWith(batch);
+  expect(
+    screen.queryByRole('textbox', { name: /Lot Number/ }),
+  ).not.toBeInTheDocument();
+});
+it('returns to the list after creating a batch and displays unset quantities', async () => {
+  const user = userEvent.setup();
+  const items = [
+    { ...lotResponse, quantity: null },
+    { ...lotResponse, id: 'lot-2', lot_number: 'LOT-2', quantity: null },
+  ];
+  vi.mocked(apiClient.post).mockImplementation(async () => {
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'ui/lookups' ? { styles: [lotStyleOption] } : items,
+    }));
+    return { status: 200, data: { createdCount: 2, items } };
+  });
+  renderList();
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Add Lots' })).toBeEnabled(),
+  );
+  await user.click(screen.getByRole('button', { name: 'Add Lots' }));
+  await user.click(screen.getByRole('combobox', { name: /^Style/ }));
+  await user.click(screen.getByRole('option', { name: 'STY-001' }));
+  await user.clear(screen.getByRole('spinbutton', { name: /Number of Lots/ }));
+  await user.type(
+    screen.getByRole('spinbutton', { name: /Number of Lots/ }),
+    '2',
+  );
+  await user.click(screen.getByRole('button', { name: 'Create Lots' }));
+  expect(await screen.findByText('2 lots created successfully.')).toBeVisible();
+  expect(await screen.findByText('LOT-2')).toBeVisible();
+  expect(screen.getAllByText('Not specified')).toHaveLength(2);
+  expect(screen.queryByRole('form')).not.toBeInTheDocument();
+});
+it('does not offer trolley mapping for processing or terminal lots', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { styles: [lotStyleOption] }
+        : [{ ...lotResponse, status: 'IN_PROCESS' }],
+  }));
+  renderList();
+  await screen.findByText('LOT-001');
+  expect(
+    screen.queryByRole('button', { name: 'Assign trolley LOT-001' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Unassign trolley LOT-001' }),
+  ).not.toBeInTheDocument();
 });

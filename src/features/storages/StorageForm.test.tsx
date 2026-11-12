@@ -130,6 +130,7 @@ it('shows the empty-tag message and disables save without available tags', async
     ),
   ).toBeVisible();
   expect(screen.getByRole('button', { name: 'Save Storage' })).toBeDisabled();
+  expect(screen.getByRole('combobox')).toHaveAttribute('aria-disabled', 'true');
 });
 it('blocks saving on a failed edit GET and offers reload for missing records', async () => {
   vi.mocked(apiClient.get).mockImplementation(async (url) => ({

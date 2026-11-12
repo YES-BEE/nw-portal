@@ -90,13 +90,19 @@ export function UserProcessSelect({
         fullWidth
         label={t('access.users.processes')}
         value={selected}
-        disabled={disabled || state.status !== 'ready'}
+        disabled={
+          disabled ||
+          state.status !== 'ready' ||
+          (!options.length && !selected.length)
+        }
         error={!!errorMessage || state.status === 'error'}
         helperText={
           errorMessage ||
           (state.status === 'loading'
             ? t('access.users.loadingProcesses')
-            : t('access.users.processesHint'))
+            : state.status === 'ready' && !options.length
+              ? t('access.users.noProcesses')
+              : t('access.users.processesHint'))
         }
         slotProps={{
           select: {
@@ -156,9 +162,6 @@ export function UserProcessSelect({
             {label(id)} — {t('access.users.unavailableProcess')}
           </MenuItem>
         ))}
-        {!options.length && (
-          <MenuItem disabled>{t('access.users.noProcesses')}</MenuItem>
-        )}
       </TextField>
       {state.status === 'ready' && unavailable.length > 0 && (
         <Alert severity="warning" sx={{ mt: 1 }}>

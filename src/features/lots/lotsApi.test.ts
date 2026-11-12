@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CanceledError, type InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
 import { loginResponse } from '../../test/auth';
@@ -7,17 +7,21 @@ import {
   lotStyleOption,
   lotEvent,
   lotQcResponse,
+  lotBatchResponse,
 } from '../../test/lots';
 import { setAuthenticatedSession } from '../auth/session';
 import {
   getLots,
   getLot,
-  createLot,
+  createLots,
   cancelLot,
   getLotTimeline,
   getLotStyleOptions,
   parseLotsFailure,
   getLotQc,
+  getAvailableLotTrolleys,
+  assignLotTrolley,
+  unassignLotTrolley,
 } from './lotsApi';
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -29,6 +33,142 @@ const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({
   data: lotResponse as unknown,
 }));
 const query = { page: 0, size: 10, search: '' };
+it('uses the backend default batch count for null and accepts null quantities', async () => {
+  const batch = {
+    createdCount: 1,
+    items: [{ ...lotResponse, quantity: null }],
+  };
+  respond(batch);
+  await expect(
+    createLots('style-id', { lotCount: null, quantity: null }),
+  ).resolves.toEqual(batch);
+  expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({
+    lotCount: null,
+    quantity: null,
+  });
+  respond({
+    createdCount: 1,
+    items: [{ ...lotResponse, trolley_id: undefined, trolley_code: undefined }],
+  });
+  await expect(createLots('style-id', {})).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  respond({ createdCount: 1, items: [lotResponse] });
+  await expect(
+    createLots('style-id', { quantity: null }),
+  ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+  expect(
+    parseLotsFailure(
+      {
+        code: 'VALIDATION_FAILED',
+        fieldErrors: { trolleyId: 'Select a trolley' },
+      },
+      400,
+    ),
+  ).toMatchObject({ fieldErrors: { trolleyId: 'Select a trolley' } });
+});
+it('rejects lot responses missing the required trolley fields', async () => {
+  respond({ ...lotResponse, trolley_id: undefined, trolley_code: undefined });
+  await expect(getLot(lotResponse.id)).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
+it('creates a backend-numbered batch and permits an unspecified quantity', async () => {
+  const items = [
+    { ...lotResponse, quantity: null },
+    { ...lotResponse, id: 'second-lot', lot_number: 'LOT-2', quantity: null },
+  ];
+  respond({ createdCount: 2, items });
+  await expect(createLots('style-id', { lotCount: 2 })).resolves.toEqual({
+    createdCount: 2,
+    items,
+  });
+  expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({ lotCount: 2 });
+  await expect(createLots('style-id', { lotCount: 3 })).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  respond({ createdCount: 2, items: [lotResponse, lotResponse] });
+  await expect(createLots('style-id', { lotCount: 2 })).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  respond({
+    createdCount: 1,
+    items: [{ ...lotResponse, style_id: 'other-style' }],
+  });
+  await expect(createLots('style-id', {})).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
+it('accepts null lot quantities and completed styles in the owned-style lookup', async () => {
+  respond({ ...lotResponse, quantity: null });
+  await expect(getLot('lot-id')).resolves.toMatchObject({ quantity: null });
+  respond({ styles: [{ ...lotStyleOption, status: 'COMPLETED' }] });
+  await expect(getLotStyleOptions()).resolves.toEqual([
+    { ...lotStyleOption, status: 'COMPLETED' },
+  ]);
+  expect(
+    parseLotsFailure(
+      { code: 'VALIDATION_FAILED', fieldErrors: { lotCount: 'At most 1000' } },
+      400,
+    ),
+  ).toMatchObject({ fieldErrors: { lotCount: 'At most 1000' } });
+});
+it('loads available trolleys through the lots-authorized endpoint and maps/unmaps a trolley', async () => {
+  const trolley = {
+    id: 'trolley-id',
+    code: 'TR-01',
+    active: true,
+    status: 'AVAILABLE',
+    version: 0,
+  };
+  respond([trolley]);
+  await expect(getAvailableLotTrolleys()).resolves.toEqual([trolley]);
+  expect(adapter.mock.calls[0][0]).toMatchObject({
+    url: 'trolleys/available',
+    params: { page: 0, size: 100 },
+  });
+  respond({
+    ...lotResponse,
+    trolley_id: trolley.id,
+    trolley_code: trolley.code,
+  });
+  await expect(
+    assignLotTrolley('lot-id', { trolleyId: trolley.id }),
+  ).resolves.toMatchObject({ trolley_id: trolley.id });
+  expect(adapter.mock.calls[1][0]).toMatchObject({
+    url: 'lots/lot-id/trolley',
+    method: 'put',
+  });
+  expect(JSON.parse(adapter.mock.calls[1][0].data)).toEqual({
+    trolleyId: trolley.id,
+  });
+  respond(lotResponse);
+  await expect(unassignLotTrolley('lot-id')).resolves.toEqual(lotResponse);
+  expect(adapter.mock.calls[2][0]).toMatchObject({
+    url: 'lots/lot-id/trolley',
+    method: 'delete',
+  });
+  respond({
+    ...lotResponse,
+    trolley_id: 'different-trolley',
+    trolley_code: 'TR-02',
+  });
+  await expect(
+    assignLotTrolley('lot-id', { trolleyId: trolley.id }),
+  ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+  await expect(unassignLotTrolley('lot-id')).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  respond(
+    { code: 'TROLLEY_OCCUPIED', detail: 'Trolley is already assigned' },
+    409,
+  );
+  await expect(
+    assignLotTrolley('lot-id', { trolleyId: trolley.id }),
+  ).rejects.toMatchObject({
+    failure: { kind: 'conflict', message: 'Trolley is already assigned' },
+  });
+});
 it('fetches a typed QC inspection using the encoded lot ID and abort signal', async () => {
   respond({ ...lotQcResponse, lot_id: 'lot/id' });
   const controller = new AbortController();
@@ -130,13 +270,14 @@ it('pages and searches lots and style-specific lots on the server', async () => 
   });
 });
 it('sends backend create and cancellation commands and authenticated encoded detail URLs', async () => {
-  await createLot('style-id', { lotNumber: 'LOT-001', quantity: 200 });
+  respond(lotBatchResponse);
+  await createLots('style-id', { lotCount: 1, quantity: 200 });
   expect(adapter.mock.calls[0][0]).toMatchObject({
     url: 'styles/style-id/lots',
     method: 'post',
   });
   expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({
-    lotNumber: 'LOT-001',
+    lotCount: 1,
     quantity: 200,
   });
   expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBe(
@@ -168,7 +309,7 @@ it('rejects malformed or mismatched successful responses', async () => {
     { failure: { kind: 'invalidResponse' } },
   );
   await expect(
-    createLot('other-style', { lotNumber: 'L', quantity: 1 }),
+    createLots('other-style', { lotCount: 1, quantity: 1 }),
   ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
 });
 it('loads released style options from lookups without requiring style management access', async () => {

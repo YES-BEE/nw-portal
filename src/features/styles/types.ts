@@ -10,11 +10,15 @@ export interface StyleResponse {
   created_at: string;
   created_by: string | null;
   version: number;
+  lot_count: number;
+  lot_quantity: number | null;
 }
 export interface CreateStyleRequest {
   styleNumber: string;
   description?: string | null;
   processIds?: string[] | null;
+  lotCount?: number | null;
+  quantity?: number | null;
 }
 export interface StyleRouteProcess {
   processId: string;
@@ -82,7 +86,12 @@ export interface StylesFailure {
   code?: string;
   fieldErrors?: Partial<
     Record<
-      'styleNumber' | 'description' | 'processIds' | 'quantity' | 'reason',
+      | 'styleNumber'
+      | 'description'
+      | 'processIds'
+      | 'quantity'
+      | 'lotCount'
+      | 'reason',
       string
     >
   >;

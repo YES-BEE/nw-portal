@@ -22,7 +22,10 @@ export interface DashboardSummary extends Omit<DashboardResponse, 'stations'> {
   stations: StationWip[];
 }
 // DashboardController.LOT_VIEW adds the active station and process, without version.
-export interface DashboardLot extends Omit<LotResponse, 'version'> {
+export interface DashboardLot extends Omit<
+  LotResponse,
+  'version' | 'trolley_id' | 'trolley_code'
+> {
   current_station: string | null;
   current_process: string | null;
 }

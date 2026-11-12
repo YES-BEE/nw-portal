@@ -1,4 +1,4 @@
-import { formatDateTime } from '../../utils/formatDateTime';
+﻿import { formatDateTime } from '../../utils/formatDateTime';
 import { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -126,6 +126,19 @@ function StyleDetails({
           <ConfigurationDetails
             fields={[
               { label: t('styles.number'), value: state.style.style_number },
+
+              {
+                label: t('styles.plannedLots'),
+                value: String(state.style.lot_count),
+              },
+              {
+                label: t('lots.quantityPerLot'),
+                value:
+                  state.style.lot_quantity == null
+                    ? t('lots.quantityUnset')
+                    : String(state.style.lot_quantity),
+              },
+
               {
                 label: t('styles.description'),
                 value: state.style.description || '',

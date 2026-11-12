@@ -5,7 +5,7 @@ export interface LotResponse {
   style_id: string;
   style_number: string;
   lot_number: string;
-  quantity: number;
+  quantity: number | null;
   status: string;
   current_route_sequence: number | null;
   current_location_type: string | null;
@@ -13,10 +13,19 @@ export interface LotResponse {
   created_at: string;
   completed_at: string | null;
   version: number;
+  trolley_id: string | null;
+  trolley_code: string | null;
 }
-export interface CreateLotRequest {
-  lotNumber: string;
-  quantity: number;
+export interface CreateLotsRequest {
+  lotCount?: number | null;
+  quantity?: number | null;
+}
+export interface CreateLotsResponse {
+  createdCount: number;
+  items: LotResponse[];
+}
+export interface LotTrolleyRequest {
+  trolleyId: string;
 }
 export interface CancelLotRequest {
   reason: string;
@@ -50,7 +59,7 @@ export interface LotStyleOption {
   id: string;
   style_number: string;
   description: string | null;
-  status: 'RELEASED' | 'IN_PRODUCTION';
+  status: 'RELEASED' | 'IN_PRODUCTION' | 'COMPLETED';
 }
 export interface LotLookupsResponse {
   styles: ApiCollection<LotStyleOption>;
@@ -73,7 +82,12 @@ export interface LotsFailure {
   status?: number;
   code?: string;
   fieldErrors?: Partial<
-    Record<keyof CreateLotRequest | keyof CancelLotRequest, string>
+    Record<
+      | keyof CreateLotsRequest
+      | keyof CancelLotRequest
+      | keyof LotTrolleyRequest,
+      string
+    >
   >;
 }
 export type LotsQuery = ListQuery;

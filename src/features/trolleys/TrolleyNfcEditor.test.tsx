@@ -144,18 +144,26 @@ it('unassigns the selected tag without fetching tag names for display', async ()
     ),
   );
 });
-it('shows an appropriate message and prevents saving when no tags are available', async () => {
-  records = [];
-  setup();
-  expect(
-    await screen.findByText(
-      'No available tags. Add a tag in Tag Management first.',
-    ),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole('button', { name: 'Save assignment' }),
-  ).toBeDisabled();
-});
+it.each(['assign', 'replace'] as const)(
+  'disables the dropdown and shows a message when no tags are available to %s',
+  async (mode) => {
+    records = [old];
+    setup(mode);
+    expect(
+      await screen.findByText(
+        'No available tags. Add a tag in Tag Management first.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: 'Available NFC tag' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Save assignment' }),
+    ).toBeDisabled();
+    expect(nfc.assignTrolleyNfcTag).not.toHaveBeenCalled();
+    expect(nfc.unassignTrolleyNfcTag).not.toHaveBeenCalled();
+  },
+);
 it('rejects a tag that was assigned to another asset after selection', async () => {
   records = [tag];
   const user = setup();

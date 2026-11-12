@@ -21,6 +21,15 @@ import {
 } from '../../test/styles';
 import { CanceledError } from 'axios';
 beforeEach(() => vi.restoreAllMocks());
+it('rejects style responses missing the required lot planning fields', async () => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: { ...style, lot_count: undefined, lot_quantity: undefined },
+  });
+  await expect(getStyle(style.id)).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
 it('updates draft processes as an ordered JSON array and validates the returned route', async () => {
   const put = vi
     .spyOn(apiClient, 'put')

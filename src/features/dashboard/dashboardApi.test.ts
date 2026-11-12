@@ -150,3 +150,12 @@ it('handles role changes, network failures, and cancellation', async () => {
   get.mockRejectedValue(cancelled);
   await expect(getDashboard()).rejects.toBe(cancelled);
 });
+it('accepts lots whose garment quantities are not yet specified', async () => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: [{ ...dashboardLot, quantity: null }],
+  });
+  await expect(
+    getDashboardLots({ page: 0, size: 10, search: '' }),
+  ).resolves.toMatchObject({ items: [{ quantity: null }] });
+});

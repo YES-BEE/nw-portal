@@ -68,6 +68,7 @@ export function parseStylesFailure(
       'description',
       'processIds',
       'quantity',
+      'lotCount',
       'reason',
     ] as const) {
       const value = safeApiText((fields as Record<string, unknown>)[field]);
@@ -143,7 +144,11 @@ function isStyle(value: unknown): value is StyleResponse {
     (row.released_at === null || date(row.released_at)) &&
     date(row.created_at) &&
     (row.created_by === null || text(row.created_by)) &&
-    nonnegative(row.version)
+    nonnegative(row.version) &&
+    nonnegative(row.lot_count) &&
+    row.lot_count <= 1000 &&
+    (row.lot_quantity === null ||
+      (nonnegative(row.lot_quantity) && row.lot_quantity > 0))
   );
 }
 function single(data: unknown, id?: string): StyleResponse {
@@ -265,7 +270,7 @@ export async function releaseStyle(
       apiClient.post<unknown>(
         `styles/${encodeURIComponent(id)}/release`,
         undefined,
-        options(signal),
+        { ...options(signal), timeout: 120000 },
       ),
     ),
     id,

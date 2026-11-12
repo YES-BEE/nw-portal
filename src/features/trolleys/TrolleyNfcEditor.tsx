@@ -220,8 +220,8 @@ export function TrolleyNfcEditor({
                       ),
                   },
                 }}
-                disabled={saving || previousRemoved}
-                error={submitted && !selected}
+                disabled={saving || previousRemoved || !available.length}
+                error={submitted && !selected && available.length > 0}
                 helperText={
                   !available.length ? t('trolleys.nfc.noAvailable') : undefined
                 }

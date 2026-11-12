@@ -1,4 +1,9 @@
-import { act, screen, within } from '@testing-library/react';
+import {
+  act,
+  screen,
+  waitForElementToBeRemoved,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
@@ -40,7 +45,7 @@ it('shows a neutral message when the backend has no inspection', async () => {
   expect(screen.getByRole('alert')).not.toHaveTextContent('Unable to complete');
   expect(screen.getByRole('alert')).not.toHaveTextContent('404');
 });
-it('shows permission errors instead of claiming an inspection is absent', async () => {
+it('hides the entire QC section when access is denied', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({
     status: 403,
     data: {
@@ -49,10 +54,10 @@ it('shows permission errors instead of claiming an inspection is absent', async 
     },
   });
   renderWithProviders(<LotQcResults lotId="lot-id" />);
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'This endpoint is outside the granted desktop modules',
+  await waitForElementToBeRemoved(
+    screen.getByRole('region', { name: 'QC Results' }),
   );
-  expect(screen.getByRole('alert')).not.toHaveTextContent('403');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(
     screen.queryByText('No QC results recorded for this lot.'),
   ).not.toBeInTheDocument();

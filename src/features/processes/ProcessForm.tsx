@@ -352,11 +352,6 @@ export function ProcessForm({
                 {t('processes.loadingTags')}
               </Typography>
             )}
-            {tagState.status === 'ready' && !availableTags.length && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                {t('processes.noTags')}
-              </Alert>
-            )}
             {tagState.status === 'error' && (
               <Alert
                 severity="error"
@@ -547,13 +542,16 @@ export function ProcessForm({
                 sx={dropdownStyles}
                 label={t('processes.processTag')}
                 value={draft.processTag}
+                disabled={tagState.status !== 'ready' || !availableTags.length}
                 onChange={(event) =>
                   setDraft({ ...draft, processTag: event.target.value })
                 }
                 required
                 error={fieldProps('processTag').error}
                 helperText={
-                  fieldProps('processTag').helperText ||
+                  (!availableTags.length && tagState.status === 'ready'
+                    ? t('processes.noTags')
+                    : fieldProps('processTag').helperText) ||
                   t('processes.processTagHint')
                 }
               >
@@ -696,6 +694,14 @@ export function ProcessForm({
                         sx={dropdownStyles}
                         label={t('processes.deviceTag')}
                         {...fieldProps(`devices.${device.id}.tag`)}
+                        disabled={
+                          tagState.status !== 'ready' || !availableTags.length
+                        }
+                        helperText={
+                          !availableTags.length && tagState.status === 'ready'
+                            ? t('processes.noTags')
+                            : fieldProps(`devices.${device.id}.tag`).helperText
+                        }
                         value={device.tag}
                         onChange={(event) =>
                           updateDevice(device.id, { tag: event.target.value })

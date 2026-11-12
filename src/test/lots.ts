@@ -18,6 +18,8 @@ export const lotResponse: LotResponse = {
   created_at: '2026-11-12T09:00:00Z',
   completed_at: null,
   version: 0,
+  trolley_id: null,
+  trolley_code: null,
 };
 export const lotStyleOption: LotStyleOption = {
   id: lotResponse.style_id,
@@ -25,6 +27,7 @@ export const lotStyleOption: LotStyleOption = {
   description: null,
   status: 'RELEASED',
 };
+export const lotBatchResponse = { createdCount: 1, items: [lotResponse] };
 export const lotEvent: LotTimelineEvent = {
   location_type: 'PROCESS_AREA',
   location_id: 'hidden-location-id',

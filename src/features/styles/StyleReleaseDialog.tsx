@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -56,7 +56,12 @@ export function StyleReleaseDialog({
       </DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          {t('styles.releaseMessage', { number: style.style_number })}
+          {t(
+            style.lot_count > 0
+              ? 'styles.releasePlannedMessage'
+              : 'styles.releaseMessage',
+            { number: style.style_number, count: style.lot_count },
+          )}
         </DialogContentText>
         {failure && <StyleFailureAlert failure={failure} onReload={onReload} />}
       </DialogContent>

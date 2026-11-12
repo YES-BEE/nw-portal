@@ -1,4 +1,4 @@
-import axios, { type AxiosResponse } from 'axios';
+﻿import axios, { type AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
 import {
   collectApiItems,
@@ -8,7 +8,7 @@ import {
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
 import type {
   LotResponse,
-  CreateLotRequest,
+  CreateLotsRequest,
   CancelLotRequest,
   CancelLotResponse,
   LotTimelineEvent,
@@ -18,7 +18,10 @@ import type {
   LotsQuery,
   JsonValue,
   LotQcResponse,
+  CreateLotsResponse,
+  LotTrolleyRequest,
 } from './types';
+import type { TrolleyResponse } from '../trolleys/types';
 export class LotsError extends Error {
   readonly failure: LotsFailure;
   constructor(failure: LotsFailure) {
@@ -57,7 +60,12 @@ export function parseLotsFailure(data: unknown, status: number): LotsFailure {
   const fieldErrors: LotsFailure['fieldErrors'] = {};
   const fields = problem?.fieldErrors;
   if (fields && typeof fields === 'object' && !Array.isArray(fields))
-    for (const field of ['lotNumber', 'quantity', 'reason'] as const) {
+    for (const field of [
+      'lotCount',
+      'quantity',
+      'reason',
+      'trolleyId',
+    ] as const) {
       const text = safeApiText((fields as Record<string, unknown>)[field]);
       if (text) fieldErrors[field] = text;
     }
@@ -117,8 +125,10 @@ function isLot(value: unknown): value is LotResponse {
     ['id', 'style_id', 'style_number', 'lot_number', 'status'].every((key) =>
       text(row[key]),
     ) &&
-    integer(row.quantity) &&
-    row.quantity > 0 &&
+    (row.quantity === null || (integer(row.quantity) && row.quantity > 0)) &&
+    nullableText(row.trolley_id) &&
+    nullableText(row.trolley_code) &&
+    (row.trolley_id === null) === (row.trolley_code === null) &&
     (row.current_route_sequence === null ||
       integer(row.current_route_sequence)) &&
     nullableText(row.current_location_type) &&
@@ -168,22 +178,41 @@ export async function getLot(
     id,
   );
 }
-export async function createLot(
+export async function createLots(
   styleId: string,
-  body: CreateLotRequest,
+  body: CreateLotsRequest,
   signal?: AbortSignal,
-): Promise<LotResponse> {
-  const value = single(
-    await request(() =>
-      apiClient.post<unknown>(
-        `styles/${encodeURIComponent(styleId)}/lots`,
-        body,
-        options(signal),
-      ),
+): Promise<CreateLotsResponse> {
+  const data = await request(() =>
+    apiClient.post<unknown>(
+      `styles/${encodeURIComponent(styleId)}/lots`,
+      {
+        ...(body.lotCount !== undefined ? { lotCount: body.lotCount } : {}),
+        ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+      },
+      { ...options(signal), timeout: 120000 },
     ),
   );
-  if (value.style_id.toLowerCase() !== styleId.toLowerCase()) return invalid();
-  return value;
+  if (!data || typeof data !== 'object' || Array.isArray(data))
+    return invalid();
+  const batch = data as Record<string, unknown>;
+  if (
+    !integer(batch.createdCount) ||
+    batch.createdCount !== (body.lotCount ?? 1) ||
+    !Array.isArray(batch.items) ||
+    batch.items.length !== batch.createdCount ||
+    !batch.items.every(isLot) ||
+    new Set(batch.items.map((row) => row.id)).size !== batch.items.length ||
+    new Set(batch.items.map((row) => row.lot_number)).size !==
+      batch.items.length ||
+    batch.items.some(
+      (row) =>
+        row.style_id.toLowerCase() !== styleId.toLowerCase() ||
+        row.quantity !== (body.quantity ?? null),
+    )
+  )
+    return invalid();
+  return { createdCount: batch.createdCount, items: batch.items };
 }
 export async function getLotQc(
   id: string,
@@ -341,10 +370,73 @@ export async function getLotStyleOptions(
         text(row.id) &&
         text(row.style_number) &&
         (row.description === null || typeof row.description === 'string') &&
-        (row.status === 'RELEASED' || row.status === 'IN_PRODUCTION')
+        (row.status === 'RELEASED' ||
+          row.status === 'IN_PRODUCTION' ||
+          row.status === 'COMPLETED')
       );
     },
     (row) => row.id,
     invalid,
   );
+}
+export async function getAvailableLotTrolleys(
+  signal?: AbortSignal,
+): Promise<TrolleyResponse[]> {
+  return collectApiItems(
+    async (query) =>
+      request(() =>
+        apiClient.get<unknown>('trolleys/available', {
+          ...options(signal),
+          params: query || { page: 0, size: 100 },
+        }),
+      ),
+    (value): value is TrolleyResponse => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+      const row = value as Record<string, unknown>;
+      return (
+        text(row.id) &&
+        text(row.code) &&
+        text(row.status) &&
+        row.active === true &&
+        integer(row.version)
+      );
+    },
+    (row) => row.id,
+    invalid,
+  );
+}
+export async function assignLotTrolley(
+  id: string,
+  body: LotTrolleyRequest,
+  signal?: AbortSignal,
+): Promise<LotResponse> {
+  const lot = single(
+    await request(() =>
+      apiClient.put<unknown>(
+        `lots/${encodeURIComponent(id)}/trolley`,
+        body,
+        options(signal),
+      ),
+    ),
+    id,
+  );
+  if (!isLot(lot) || lot.trolley_id !== body.trolleyId) return invalid();
+  return lot;
+}
+export async function unassignLotTrolley(
+  id: string,
+  signal?: AbortSignal,
+): Promise<LotResponse> {
+  const lot = single(
+    await request(() =>
+      apiClient.delete<unknown>(
+        `lots/${encodeURIComponent(id)}/trolley`,
+        options(signal),
+      ),
+    ),
+    id,
+  );
+  if (!isLot(lot) || lot.trolley_id !== null) return invalid();
+  return lot;
 }

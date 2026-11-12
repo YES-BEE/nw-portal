@@ -176,8 +176,7 @@ function isLot(value: unknown): value is DashboardLot {
     ['id', 'lot_number', 'status', 'style_id', 'style_number'].every((key) =>
       text(row[key]),
     ) &&
-    count(row.quantity) &&
-    row.quantity > 0 &&
+    (row.quantity === null || (count(row.quantity) && row.quantity > 0)) &&
     (row.current_route_sequence === null ||
       count(row.current_route_sequence)) &&
     [

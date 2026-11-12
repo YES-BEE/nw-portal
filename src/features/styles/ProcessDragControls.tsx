@@ -242,6 +242,9 @@ export function SequenceDropTarget({ nextStep }: { nextStep: number }) {
       aria-label={t('styles.dropTarget')}
       sx={{
         minHeight: 64,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         p: 1.5,
         border: 2,
         borderStyle: 'dashed',

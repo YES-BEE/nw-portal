@@ -1,10 +1,15 @@
-import {
+﻿import {
   styleResponse,
   styleRouteResponse,
   styleProcessOptions,
 } from '../test/styles';
 import { storageAreaResponse, storageTags } from '../test/storages';
-import { lotResponse, lotEvent, lotStyleOption } from '../test/lots';
+import {
+  lotResponse,
+  lotEvent,
+  lotStyleOption,
+  lotBatchResponse,
+} from '../test/lots';
 import {
   emptyDashboard,
   dashboardResponse,
@@ -166,17 +171,17 @@ describe('application routing', () => {
     }));
     vi.mocked(apiClient.post).mockResolvedValue({
       status: 200,
-      data: lotResponse,
+      data: lotBatchResponse,
     });
     await router.navigate('/lots');
     renderWithProviders(<App />);
     await screen.findByText('No lots found.');
     const user = userEvent.setup();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Add New Lot' })).toBeEnabled(),
+      expect(screen.getByRole('button', { name: 'Add Lots' })).toBeEnabled(),
     );
-    await user.click(screen.getByRole('button', { name: 'Add New Lot' }));
-    const form = screen.getByRole('form', { name: 'Create Lot' });
+    await user.click(screen.getByRole('button', { name: 'Add Lots' }));
+    const form = screen.getByRole('form', { name: 'Create Production Lots' });
     await user.click(within(form).getByRole('combobox', { name: /Style/ }));
     await user.click(
       screen.getByRole('option', { name: lotStyleOption.style_number }),
@@ -185,13 +190,13 @@ describe('application routing', () => {
       within(form).getByRole('spinbutton', { name: /Quantity/ }),
       '200',
     );
-    await user.click(within(form).getByRole('button', { name: 'Create Lot' }));
+    await user.click(within(form).getByRole('button', { name: 'Create Lots' }));
     expect(
       await screen.findByRole('heading', { name: 'LOT-001', level: 1 }),
     ).toBeVisible();
     expect(apiClient.post).toHaveBeenCalledWith(
       `styles/${lotStyleOption.id}/lots`,
-      { lotNumber: expect.stringMatching(/^LOT-/), quantity: 200 },
+      { lotCount: 1, quantity: 200 },
       expect.anything(),
     );
   });

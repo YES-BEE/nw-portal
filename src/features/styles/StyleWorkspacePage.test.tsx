@@ -1,4 +1,4 @@
-import { screen, within, waitFor } from '@testing-library/react';
+﻿import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -222,4 +222,35 @@ it('retries a failed list fetch without discarding the backend message', async (
   await waitFor(() =>
     expect(screen.getByRole('rowheader', { name: 'STY-1001' })).toBeVisible(),
   );
+});
+it('confirms planned lots on release and uses only the backend release operation', async () => {
+  records = [{ ...styleResponse, lot_count: 5, lot_quantity: null }];
+  const post = vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+    records = [
+      {
+        ...records[0],
+        status: 'IN_PRODUCTION',
+        released_at: '2026-11-12T00:00:00Z',
+      },
+    ];
+    return { status: 200, data: records[0] };
+  });
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Release style STY-1001' }),
+  );
+  expect(screen.getByText(/This will create 5 planned lots/)).toBeVisible();
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+  );
+  expect(await screen.findByText('In Production')).toBeVisible();
+  expect(post).toHaveBeenCalledTimes(1);
+  expect(post).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/release`,
+    undefined,
+    expect.anything(),
+  );
+  expect(
+    screen.queryByRole('button', { name: 'Release style STY-1001' }),
+  ).not.toBeInTheDocument();
 });

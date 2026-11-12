@@ -13,6 +13,8 @@ export const styleResponse: StyleResponse = {
   created_at: '2026-11-01T10:00:00Z',
   created_by: 'actor-1',
   version: 0,
+  lot_count: 0,
+  lot_quantity: null,
 };
 export const styleProcessOptions: StyleProcessOption[] = [
   {

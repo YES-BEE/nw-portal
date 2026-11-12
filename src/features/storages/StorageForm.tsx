@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -252,9 +251,15 @@ export function StorageForm({
                 select
                 label={t('storages.tag')}
                 value={selected}
-                disabled={saving}
+                disabled={
+                  saving || (!available.length && selected !== 'current')
+                }
                 error={!!tagError}
-                helperText={tagError}
+                helperText={
+                  !available.length && selected !== 'current'
+                    ? t('storages.noTags')
+                    : tagError
+                }
                 slotProps={{
                   inputLabel: { shrink: true },
                   select: { displayEmpty: true },
@@ -276,9 +281,6 @@ export function StorageForm({
                   </MenuItem>
                 ))}
               </TextField>
-              {!available.length && selected !== 'current' && (
-                <Alert severity="info">{t('storages.noTags')}</Alert>
-              )}
               <TextField
                 label={t('storages.description')}
                 placeholder={t('storages.descriptionPlaceholder')}

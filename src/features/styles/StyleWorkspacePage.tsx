@@ -1,4 +1,4 @@
-import { formatDateTime } from '../../utils/formatDateTime';
+﻿import { formatDateTime } from '../../utils/formatDateTime';
 import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +24,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PublishOutlinedIcon from '@mui/icons-material/PublishOutlined';
 import { usePagedList } from '../../api/usePagedList';
 import { ListPagination } from '../../api/ListPagination';
 import { usePageMetadata } from '../../app/usePageMetadata';
@@ -165,7 +164,11 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                     </TableCell>
                     <TableCell>{formatDateTime(record.created_at)}</TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={0.5}>
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        sx={{ alignItems: 'center' }}
+                      >
                         <Tooltip title={t('common.view')}>
                           <IconButton
                             size="small"
@@ -203,17 +206,19 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                             {record.status === 'DRAFT' && (
                               <Tooltip title={t('styles.release')}>
                                 <Box component="span">
-                                  <IconButton
+                                  <Chip
+                                    component="button"
+                                    type="button"
                                     size="small"
                                     color="primary"
+                                    variant="filled"
+                                    label={t('styles.release')}
                                     disabled={busy}
                                     aria-label={t('styles.releaseNamed', {
                                       number: record.style_number,
                                     })}
                                     onClick={() => setRelease(record)}
-                                  >
-                                    <PublishOutlinedIcon fontSize="small" />
-                                  </IconButton>
+                                  />
                                 </Box>
                               </Tooltip>
                             )}

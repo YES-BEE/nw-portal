@@ -33,6 +33,7 @@ export function LotQcResults({ lotId }: { lotId: string }) {
     setAttempt((value) => value + 1);
   }
   const result = state.status === 'ready' ? state.result : null;
+  if (state.status === 'error' && state.failure.kind === 'access') return null;
   return (
     <Box component="section" aria-labelledby="lot-qc-title" sx={{ mb: 3 }}>
       <Typography

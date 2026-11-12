@@ -57,6 +57,7 @@ it('creates a style using backend fields and the dragged process order', async (
       styleNumber: 'STY-1001',
       description: 'Denim',
       processIds: [styleProcessOptions[1].id, styleProcessOptions[0].id],
+      lotCount: 0,
     },
     expect.anything(),
   );
@@ -298,4 +299,40 @@ it('retains the draft process sequence when the backend reports a concurrent rel
     within(screen.getByRole('region', { name: 'Step 1' })).getByText('Washing'),
   ).toBeVisible();
   expect(onSaved).not.toHaveBeenCalled();
+});
+it('saves a planned lot count and optional per-lot quantity on a new style', async () => {
+  vi.mocked(apiClient.post).mockResolvedValue({
+    status: 200,
+    data: { ...styleResponse, lot_count: 5, lot_quantity: 100 },
+  });
+  const { user, onSaved } = setup();
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    'PLANNED-01',
+  );
+  await dragProcessToEnd(user, 'Washing');
+  const count = screen.getByRole('spinbutton', { name: 'Planned Lots' });
+  await user.clear(count);
+  await user.type(count, '1001');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).not.toHaveBeenCalled();
+  await user.clear(count);
+  await user.type(count, '5');
+  await user.type(
+    screen.getByRole('spinbutton', { name: 'Garment Quantity per Lot' }),
+    '100',
+  );
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).toHaveBeenCalledWith(
+    'styles',
+    {
+      styleNumber: 'PLANNED-01',
+      description: '',
+      processIds: [styleProcessOptions[0].id],
+      lotCount: 5,
+      quantity: 100,
+    },
+    expect.anything(),
+  );
+  expect(onSaved).toHaveBeenCalledWith(styleResponse.id);
 });

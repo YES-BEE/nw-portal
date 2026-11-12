@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, CircularProgress, Stack } from '@mui/material';
@@ -13,6 +13,8 @@ import { LotFailureAlert } from './LotFailureAlert';
 import { LotCancelDialog } from './LotCancelDialog';
 import { LotTimeline } from './LotTimeline';
 import { LotQcResults } from './LotQcResults';
+import { LotTrolleyDialog } from './LotTrolleyDialog';
+import { canMapLotTrolley } from './lotDisplay';
 import { useLotLabels } from './lotDisplay';
 import type { LotResponse, LotsFailure } from './types';
 type State =
@@ -37,6 +39,7 @@ function LotDetails({ lotId }: { lotId?: string }) {
   );
   const [attempt, setAttempt] = useState(0);
   const [cancelling, setCancelling] = useState(false);
+  const [mapping, setMapping] = useState(false);
   const lot = state.status === 'ready' ? state.lot : null;
   const createdId = (location.state as { createdLotId?: unknown } | null)
     ?.createdLotId;
@@ -58,6 +61,7 @@ function LotDetails({ lotId }: { lotId?: string }) {
   }, [lotId, attempt]);
   function reload() {
     setCancelling(false);
+    setMapping(false);
     setState({ status: 'loading' });
     setAttempt((value) => value + 1);
   }
@@ -92,7 +96,17 @@ function LotDetails({ lotId }: { lotId?: string }) {
             fields={[
               { label: t('lots.number'), value: lot.lot_number },
               { label: t('lots.style'), value: lot.style_number },
-              { label: t('lots.quantity'), value: String(lot.quantity) },
+              {
+                label: t('lots.quantity'),
+                value:
+                  lot.quantity === null
+                    ? t('lots.quantityUnset')
+                    : String(lot.quantity),
+              },
+              {
+                label: t('trolleys.code'),
+                value: lot.trolley_code || t('lots.trolley.notAssigned'),
+              },
               {
                 label: t('lots.status'),
                 value: labels.statusLabel(lot.status),
@@ -121,7 +135,20 @@ function LotDetails({ lotId }: { lotId?: string }) {
             ]}
           />
           {!['COMPLETED', 'CANCELLED'].includes(lot.status) && (
-            <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 3 }}>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              sx={{ justifyContent: 'flex-end', flexWrap: 'wrap', mb: 3 }}
+            >
+              {canMapLotTrolley(lot.status) && (
+                <Button variant="outlined" onClick={() => setMapping(true)}>
+                  {t(
+                    lot.trolley_id
+                      ? 'lots.trolley.unassign'
+                      : 'lots.trolley.assign',
+                  )}
+                </Button>
+              )}
               <Button variant="contained" onClick={() => setCancelling(true)}>
                 {t('lots.cancel')}
               </Button>
@@ -129,6 +156,14 @@ function LotDetails({ lotId }: { lotId?: string }) {
           )}
           <LotQcResults key={`qc-${attempt}`} lotId={lot.id} />
           <LotTimeline key={attempt} lotId={lot.id} />
+          {mapping && (
+            <LotTrolleyDialog
+              lot={lot}
+              onClose={() => setMapping(false)}
+              onReload={reload}
+              onSaved={reload}
+            />
+          )}
           {cancelling && (
             <LotCancelDialog
               lot={lot}

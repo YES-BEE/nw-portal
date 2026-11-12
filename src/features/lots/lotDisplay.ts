@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import type { JsonValue } from './types';
+export function canMapLotTrolley(status: string) {
+  return ['READY', 'AT_STATION', 'READY_FOR_DISPATCH'].includes(status);
+}
 const statuses = [
   'READY',
   'AT_STATION',
