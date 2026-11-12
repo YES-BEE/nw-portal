@@ -1,3 +1,4 @@
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
@@ -56,6 +57,7 @@ const navigationIcons = {
   users: PeopleOutlineIcon,
   newstyle: AddCircleOutlinedIcon,
   roles: AdminPanelSettingsOutlinedIcon,
+  lots: Inventory2OutlinedIcon,
 };
 
 export function ConfigurationLayout() {
@@ -68,16 +70,35 @@ export function ConfigurationLayout() {
     profile?.display_name.trim() || session?.user.username || '';
   const modules = profile?.modules ?? [];
   const permissions = session?.modules ?? [];
+  const configurator = session?.user.role === 'STYLE_CONFIGURATOR';
   const visibleMainItems = mapNavigationModules(
     mainNavigationItems,
     modules,
     permissions,
-  );
+  ).filter((item) => !configurator || item.permission !== 'newstyle');
   const visibleConfigurationItems = mapNavigationModules(
     configurationItems,
     modules,
     permissions,
   );
+  if (
+    configurator &&
+    !visibleConfigurationItems.some((item) => item.permission === 'styles') &&
+    permissions.includes('newstyle') &&
+    modules.some((module) => module.key === 'newstyle')
+  ) {
+    const styleItem = configurationItems.find(
+      (item) => item.permission === 'styles',
+    )!;
+    const lotIndex = visibleConfigurationItems.findIndex(
+      (item) => item.permission === 'lots',
+    );
+    visibleConfigurationItems.splice(
+      lotIndex < 0 ? visibleConfigurationItems.length : lotIndex,
+      0,
+      { ...styleItem, name: t('navigation.styles') },
+    );
+  }
   const hasConfigurations = visibleConfigurationItems.length > 0;
   const isActive = (path: string) =>
     pathname === path || pathname.startsWith(path + '/');

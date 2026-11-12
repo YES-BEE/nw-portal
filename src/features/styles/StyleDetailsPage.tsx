@@ -15,6 +15,8 @@ import {
   stylesFailure,
 } from './stylesApi';
 import { StyleFailureAlert } from './StyleFailureAlert';
+import { StyleRevisionHistory } from './StyleRevisionHistory';
+import { useSession } from '../auth/useSession';
 import { LotRouteStepper } from './LotRouteStepper';
 import { styleProcesses, orderedStyleProcesses } from './styleData';
 import type {
@@ -46,6 +48,9 @@ function StyleDetails({
 }) {
   const { t } = useTranslation('translation');
   const location = useLocation();
+  const session = useSession();
+  const showHistory =
+    mode === 'management' && session?.user.role !== 'STYLE_CONFIGURATOR';
   const [state, setState] = useState<State>(
     styleId
       ? { status: 'loading' }
@@ -167,6 +172,12 @@ function StyleDetails({
             />
           ) : (
             <Alert severity="info">{t('styles.noRoute')}</Alert>
+          )}
+          {showHistory && (
+            <StyleRevisionHistory
+              key={state.style.id}
+              styleId={state.style.id}
+            />
           )}
         </>
       )}

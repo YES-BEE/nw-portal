@@ -169,14 +169,17 @@ it('shows a blocked release error and keeps the dialog open', async () => {
   expect(screen.getByRole('dialog')).toBeVisible();
   expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
 });
-it('opens an existing style as a backend revision and fetches a fresh route', async () => {
+it('opens a draft for process editing and fetches a fresh route', async () => {
   const { user } = setup();
   await user.click(
     await screen.findByRole('button', { name: 'Edit STY-1001' }),
   );
   expect(
-    await screen.findByRole('textbox', { name: /Reason for change/ }),
+    await screen.findByRole('textbox', { name: /Style Number/ }),
   ).toBeVisible();
+  expect(
+    screen.queryByRole('textbox', { name: /Reason for change/ }),
+  ).not.toBeInTheDocument();
   expect(apiClient.get).toHaveBeenCalledWith(
     `styles/${styleResponse.id}/derived-route`,
     expect.anything(),

@@ -9,15 +9,79 @@ import {
   releaseStyle,
   reviseStyle,
   parseStylesFailure,
+  updateStyleProcesses,
+  getStyleRevisions,
 } from './stylesApi';
 import {
   styleResponse as style,
   styleRouteResponse as route,
   styleProcessOptions,
   styleRevisionResponse,
+  styleHistoryItem,
 } from '../../test/styles';
 import { CanceledError } from 'axios';
 beforeEach(() => vi.restoreAllMocks());
+it('updates draft processes as an ordered JSON array and validates the returned route', async () => {
+  const put = vi
+    .spyOn(apiClient, 'put')
+    .mockResolvedValue({ status: 200, data: route });
+  const controller = new AbortController();
+  expect(
+    await updateStyleProcesses(
+      'id/with space',
+      [styleProcessOptions[0].id],
+      controller.signal,
+    ),
+  ).toEqual(route);
+  expect(put).toHaveBeenCalledWith(
+    'styles/id%2Fwith%20space/processes',
+    [styleProcessOptions[0].id],
+    expect.objectContaining({ signal: controller.signal }),
+  );
+  put.mockResolvedValue({ status: 200, data: { processes: route } });
+  await expect(updateStyleProcesses(style.id, ['p'])).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  put.mockResolvedValue({
+    status: 409,
+    data: {
+      code: 'STYLE_IMMUTABLE',
+      detail: 'Processes cannot change after Style release',
+    },
+  });
+  await expect(updateStyleProcesses(style.id, ['p'])).rejects.toMatchObject({
+    failure: {
+      kind: 'conflict',
+      message: 'Processes cannot change after Style release',
+    },
+  });
+});
+it('loads typed revision pages using backend paging/search and accepts empty arrays', async () => {
+  const query = { page: 1, size: 10, search: 'process' };
+  const page = { items: [styleHistoryItem], ...query, totalElements: 11 };
+  const get = vi
+    .spyOn(apiClient, 'get')
+    .mockResolvedValue({ status: 200, data: page });
+  expect(await getStyleRevisions('id/with space', query)).toEqual({
+    items: page.items,
+    page: 1,
+    size: 10,
+    totalElements: 11,
+  });
+  expect(get).toHaveBeenCalledWith(
+    'styles/id%2Fwith%20space/revisions',
+    expect.objectContaining({ params: query }),
+  );
+  get.mockResolvedValue({ status: 200, data: [] });
+  expect((await getStyleRevisions(style.id, query)).items).toEqual([]);
+  get.mockResolvedValue({
+    status: 200,
+    data: [{ ...styleHistoryItem, affected_lot_count: '2' }],
+  });
+  await expect(getStyleRevisions(style.id, query)).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
 it('uses backend paging and search and accepts empty pages and empty arrays', async () => {
   const query = { page: 1, size: 10, search: 'Denim' };
   const get = vi.spyOn(apiClient, 'get').mockResolvedValue({

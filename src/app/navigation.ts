@@ -19,6 +19,7 @@ export const configurationNavigationItems = [
   { key: 'trolleys', permission: 'trolleys', path: '/configurations/trolleys' },
   { key: 'tags', permission: 'tags', path: '/configurations/tags' },
   { key: 'styles', permission: 'styles', path: '/styles' },
+  { key: 'lots', permission: 'lots', path: '/lots' },
 ] as const;
 
 export const orderedNavigationItems = [

@@ -491,11 +491,15 @@ export async function completePasswordChange(
 
 export function getLandingPath(session: AuthSession) {
   if (requiresPasswordChange(session)) return '/change-password';
-  return (
-    orderedNavigationItems.find((item) =>
-      session.modules.includes(item.permission),
-    )?.path ?? '/workspace'
-  );
+  const destination = orderedNavigationItems.find((item) =>
+    session.user.role === 'STYLE_CONFIGURATOR'
+      ? item.permission !== 'newstyle' &&
+        (session.modules.includes(item.permission) ||
+          (item.permission === 'styles' &&
+            session.modules.includes('newstyle')))
+      : session.modules.includes(item.permission),
+  )?.path;
+  return destination ?? '/workspace';
 }
 
 export function getSessionSnapshot() {

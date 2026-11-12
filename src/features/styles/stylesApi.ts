@@ -19,6 +19,8 @@ import type {
   RevisionScope,
   StylesFailure,
   StyleLookupsResponse,
+  UpdateStyleProcessesRequest,
+  StyleRevisionHistoryItem,
 } from './types';
 export class StylesError extends Error {
   readonly failure: StylesFailure;
@@ -270,6 +272,52 @@ export async function releaseStyle(
   );
   if (value.status === 'DRAFT') return invalid();
   return value;
+}
+export async function updateStyleProcesses(
+  id: string,
+  body: UpdateStyleProcessesRequest,
+  signal?: AbortSignal,
+): Promise<StyleRouteResponse> {
+  return route(
+    await request(() =>
+      apiClient.put<unknown>(
+        `styles/${encodeURIComponent(id)}/processes`,
+        body,
+        options(signal),
+      ),
+    ),
+  );
+}
+export async function getStyleRevisions(
+  id: string,
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<StyleRevisionHistoryItem>> {
+  return readApiPage(
+    await request(() =>
+      apiClient.get<unknown>(`styles/${encodeURIComponent(id)}/revisions`, {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
+    (value): value is StyleRevisionHistoryItem => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+      const row = value as Record<string, unknown>;
+      return (
+        ['id', 'actor_id', 'actor_role', 'reason'].every((key) =>
+          text(row[key]),
+        ) &&
+        nonnegative(row.revision_no) &&
+        row.revision_no > 0 &&
+        nonnegative(row.affected_lot_count) &&
+        date(row.created_at)
+      );
+    },
+    (row) => row.id,
+    invalid,
+  );
 }
 export async function reviseStyle(
   id: string,

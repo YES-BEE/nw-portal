@@ -328,5 +328,13 @@ describe('permission-aware destinations', () => {
       getLandingPath({ ...identity, modules: ['styles', 'process'] }),
     ).toBe('/configurations/processes');
     expect(getLandingPath({ ...identity, modules: [] })).toBe('/workspace');
+    expect(getLandingPath({ ...identity, modules: ['lots'] })).toBe('/lots');
+    expect(
+      getLandingPath({
+        ...identity,
+        user: { ...identity.user, role: 'STYLE_CONFIGURATOR' },
+        modules: ['newstyle', 'lots'],
+      }),
+    ).toBe('/styles');
   });
 });

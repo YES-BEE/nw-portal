@@ -30,6 +30,17 @@ export interface StyleRouteEntry {
   processes: StyleRouteProcess[];
 }
 export type StyleRouteResponse = StyleRouteEntry[];
+// ProductionController accepts an ordered JSON array of process UUIDs.
+export type UpdateStyleProcessesRequest = string[];
+export interface StyleRevisionHistoryItem {
+  id: string;
+  revision_no: number;
+  actor_id: string;
+  actor_role: string;
+  reason: string;
+  affected_lot_count: number;
+  created_at: string;
+}
 export type RevisionScope = 'unstarted' | 'in-progress';
 export interface StyleRevisionRequest {
   description?: string | null;

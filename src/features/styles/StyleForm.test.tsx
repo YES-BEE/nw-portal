@@ -97,6 +97,15 @@ it('requires a selected process and refuses duplicate process selections', async
   expect(apiClient.post).not.toHaveBeenCalled();
 });
 it('loads fresh edit data, requires a revision reason and saves using the chosen revision scope', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: styleProcessOptions }
+        : url.endsWith('/derived-route')
+          ? styleRouteResponse
+          : { ...styleResponse, status: 'RELEASED' },
+  }));
   const { user, onSaved } = setup(styleResponse.id);
   const number = await screen.findByRole('textbox', { name: /Style Number/ });
   expect(number).toHaveValue(styleResponse.style_number);
@@ -194,4 +203,99 @@ it('retries failed process lookups instead of showing an empty drag/drop area', 
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Save Style' })).toBeEnabled(),
   );
+});
+it('updates a draft using only process IDs without requiring a revision reason', async () => {
+  const put = vi
+    .spyOn(apiClient, 'put')
+    .mockResolvedValue({ status: 200, data: styleRouteResponse });
+  const { user, onSaved } = setup(styleResponse.id);
+  await screen.findByRole('textbox', { name: /Style Number/ });
+  expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
+    'readonly',
+  );
+  expect(
+    screen.queryByRole('textbox', { name: /Reason for change/ }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(put).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/processes`,
+    [styleProcessOptions[0].id],
+    expect.anything(),
+  );
+  expect(apiClient.post).not.toHaveBeenCalled();
+  expect(onSaved).toHaveBeenCalledWith(styleResponse.id);
+});
+it('validates optional per-lot quantity and sends it in the selected revision scope', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: styleProcessOptions }
+        : url.endsWith('/derived-route')
+          ? styleRouteResponse
+          : { ...styleResponse, status: 'IN_PRODUCTION' },
+  }));
+  const { user, onSaved } = setup(styleResponse.id);
+  await user.type(
+    await screen.findByRole('textbox', { name: /Reason for change/ }),
+    'Adjust garment count',
+  );
+  const quantity = screen.getByRole('spinbutton', {
+    name: 'Quantity per affected lot',
+  });
+  await user.type(quantity, '0');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).not.toHaveBeenCalled();
+  expect(
+    screen.getByText(
+      /Enter a whole number between 1 and 2147483647, or leave blank/,
+    ),
+  ).toBeVisible();
+  await user.clear(quantity);
+  await user.type(quantity, '150');
+  vi.mocked(apiClient.post).mockResolvedValueOnce({
+    status: 400,
+    data: {
+      code: 'VALIDATION_FAILED',
+      detail: 'Invalid quantity',
+      fieldErrors: { quantity: 'Review lot quantity' },
+    },
+  });
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(await screen.findByText('Review lot quantity')).toBeVisible();
+  expect(quantity).toHaveValue(150);
+  expect(onSaved).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).toHaveBeenLastCalledWith(
+    `styles/${styleResponse.id}/revisions/unstarted`,
+    {
+      description: styleResponse.description,
+      processIds: [styleProcessOptions[0].id],
+      reason: 'Adjust garment count',
+      quantity: 150,
+    },
+    expect.anything(),
+  );
+  expect(onSaved).toHaveBeenCalledWith(styleResponse.id);
+});
+it('retains the draft process sequence when the backend reports a concurrent release', async () => {
+  vi.spyOn(apiClient, 'put').mockResolvedValue({
+    status: 409,
+    data: {
+      code: 'STYLE_IMMUTABLE',
+      detail: 'Processes cannot change after Style release',
+    },
+  });
+  const { user, onSaved } = setup(styleResponse.id);
+  await screen.findByRole('textbox', { name: /Style Number/ });
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Processes cannot change after Style release',
+  );
+  expect(screen.getByRole('alert')).not.toHaveTextContent('409');
+  expect(
+    within(screen.getByRole('region', { name: 'Step 1' })).getByText('Washing'),
+  ).toBeVisible();
+  expect(onSaved).not.toHaveBeenCalled();
 });

@@ -21,6 +21,7 @@ import {
   getStyleRoute,
   getStyleProcessOptions,
   reviseStyle,
+  updateStyleProcesses,
   stylesFailure,
 } from './stylesApi';
 import { styleProcesses, orderedStyleProcesses } from './styleData';
@@ -47,6 +48,7 @@ export function StyleForm({
   const [number, setNumber] = useState('');
   const [description, setDescription] = useState('');
   const [reason, setReason] = useState('');
+  const [quantity, setQuantity] = useState('');
   const [scope, setScope] = useState<RevisionScope>('unstarted');
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [options, setOptions] = useState<StyleProcessOption[]>([]);
@@ -95,6 +97,14 @@ export function StyleForm({
   const available = new Set(options.map((process) => process.id));
   const invalidSteps = selected.map((id) => !available.has(id));
   const duplicates = new Set(selected).size !== selected.length;
+  const draftEdit = !!styleId && source?.status === 'DRAFT';
+  const revisionEdit = !!styleId && !!source && !draftEdit;
+  const quantityValue = Number(quantity);
+  const validQuantity =
+    !quantity.trim() ||
+    (Number.isSafeInteger(quantityValue) &&
+      quantityValue > 0 &&
+      quantityValue <= 2147483647);
   async function save() {
     if (pending.current || !loaded) return;
     setSubmitted(true);
@@ -103,7 +113,7 @@ export function StyleForm({
       !steps.length ||
       invalidSteps.some(Boolean) ||
       duplicates ||
-      (styleId && !reason.trim())
+      (revisionEdit && (!reason.trim() || !validQuantity))
     )
       return;
     const controller = new AbortController();
@@ -111,7 +121,10 @@ export function StyleForm({
     setSaving(true);
     setFailure(null);
     try {
-      if (styleId) {
+      if (styleId && draftEdit) {
+        await updateStyleProcesses(styleId, selected, controller.signal);
+        if (!controller.signal.aborted) onSaved(styleId);
+      } else if (styleId) {
         await reviseStyle(
           styleId,
           scope,
@@ -119,6 +132,7 @@ export function StyleForm({
             description: description.trim(),
             processIds: selected,
             reason: reason.trim(),
+            ...(quantity.trim() ? { quantity: quantityValue } : {}),
           },
           controller.signal,
         );
@@ -163,7 +177,9 @@ export function StyleForm({
         {t(styleId ? 'styles.edit' : 'styles.create')}
       </Typography>
       <Typography color="text.secondary" sx={{ fontSize: 13, mb: 3 }}>
-        {t('styles.formDescription')}
+        {t(
+          draftEdit ? 'styles.draftFormDescription' : 'styles.formDescription',
+        )}
       </Typography>
       {failure && (
         <StyleFailureAlert
@@ -219,22 +235,18 @@ export function StyleForm({
               }
               onChange={(event) => setNumber(event.target.value)}
             />
-            {source && (
-              <TextField
-                label={t('styles.status')}
-                value={t(`styles.statusValues.${source.status}`)}
-                slotProps={{ input: { readOnly: true } }}
-              />
-            )}
             <TextField
               label={t('styles.description')}
               placeholder={t('styles.descriptionPlaceholder')}
               multiline
               minRows={3}
               value={description}
-              slotProps={{ htmlInput: { maxLength: 500 } }}
+              slotProps={{ htmlInput: { maxLength: 500, readOnly: draftEdit } }}
               error={!!failure?.fieldErrors?.description}
-              helperText={failure?.fieldErrors?.description}
+              helperText={
+                failure?.fieldErrors?.description ||
+                (draftEdit ? t('styles.draftDescriptionHint') : undefined)
+              }
               onChange={(event) => setDescription(event.target.value)}
               sx={{ gridColumn: '1 / -1' }}
             />
@@ -258,7 +270,7 @@ export function StyleForm({
               if (!saving) setSteps(value);
             }}
           />
-          {styleId && (
+          {revisionEdit && (
             <Box
               sx={{
                 display: 'grid',
@@ -281,6 +293,27 @@ export function StyleForm({
                   {t('styles.inProgress')}
                 </MenuItem>
               </TextField>
+              <TextField
+                type="number"
+                label={t('styles.lotQuantity')}
+                placeholder={t('styles.lotQuantityPlaceholder')}
+                value={quantity}
+                error={
+                  !!failure?.fieldErrors?.quantity ||
+                  (submitted && !validQuantity)
+                }
+                helperText={
+                  failure?.fieldErrors?.quantity ||
+                  (submitted && !validQuantity
+                    ? t('styles.lotQuantityInvalid')
+                    : t('styles.lotQuantityHint'))
+                }
+                slotProps={{ htmlInput: { min: 1, max: 2147483647, step: 1 } }}
+                onChange={(event) => {
+                  setQuantity(event.target.value);
+                  setFailure(null);
+                }}
+              />
               <TextField
                 required
                 label={t('styles.revisionReason')}

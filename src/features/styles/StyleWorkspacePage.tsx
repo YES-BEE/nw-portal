@@ -33,21 +33,24 @@ import { StyleFailureAlert } from './StyleFailureAlert';
 import { StyleForm } from './StyleForm';
 import { StyleReleaseDialog } from './StyleReleaseDialog';
 import type { StyleResponse, StyleMode } from './types';
+import { useSession } from '../auth/useSession';
 export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
   const { t } = useTranslation('translation');
   const navigate = useNavigate();
+  const session = useSession();
+  const configurator = session?.user.role === 'STYLE_CONFIGURATOR';
   const list = usePagedList(getStyles);
   const [form, setForm] = useState<{ id?: string } | null>(null);
   const [release, setRelease] = useState<StyleResponse | null>(null);
   const [saved, setSaved] = useState(false);
-  const own = mode === 'own';
+  const own = mode === 'own' && !configurator;
   const basePath = own ? '/new-style' : '/styles';
   const title = t(own ? 'navigation.newstyle' : 'navigation.styles');
   const busy = !!form || !!release;
   const items = list.state.status === 'ready' ? list.state.data.items : [];
   usePageMetadata(
     t('access.pageTitle', { title }),
-    t(own ? 'styles.ownDescription' : 'styles.pageDescription'),
+    t(own || configurator ? 'styles.ownDescription' : 'styles.pageDescription'),
   );
   function reload() {
     setForm(null);
@@ -70,7 +73,11 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
             {title}
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
-            {t(own ? 'styles.ownDescription' : 'styles.pageDescription')}
+            {t(
+              own || configurator
+                ? 'styles.ownDescription'
+                : 'styles.pageDescription',
+            )}
           </Typography>
         </Box>
         <Button
@@ -173,7 +180,7 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                             <VisibilityOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {!own && (
+                        {!own && !configurator && (
                           <>
                             <Tooltip title={t('access.edit')}>
                               <Box component="span">

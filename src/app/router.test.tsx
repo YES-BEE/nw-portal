@@ -4,6 +4,7 @@ import {
   styleProcessOptions,
 } from '../test/styles';
 import { storageAreaResponse, storageTags } from '../test/storages';
+import { lotResponse, lotEvent, lotStyleOption } from '../test/lots';
 import { apiClient } from '../api/client';
 import { processResponse } from '../test/processes';
 import { userResponse, usersResponse } from '../test/users';
@@ -55,6 +56,194 @@ beforeEach(() => {
 });
 
 describe('application routing', () => {
+  it('shows shared style/lot menus and only backend-supported style actions for configurators', async () => {
+    signIn('style.configurator', 'Style@2026demo');
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['newstyle', 'lots'],
+      profile: {
+        ...session.profile!,
+        modules: [
+          { key: 'newstyle', name: 'New Style', built_in: true },
+          { key: 'lots', name: 'Lot Management', built_in: true },
+        ],
+      },
+    });
+    await router.navigate('/styles');
+    renderWithProviders(<App />);
+    await screen.findByRole('rowheader', { name: 'STY-1001' });
+    expect(
+      screen.queryByRole('button', { name: 'Edit STY-1001' }),
+    ).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    expect(
+      screen.queryByRole('button', { name: 'Release style STY-1001' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Style' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'View STY-1001' })).toBeVisible();
+    expect(apiClient.post).not.toHaveBeenCalled();
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    expect(
+      screen.queryByRole('link', { name: 'New Style' }),
+    ).not.toBeInTheDocument();
+    const menu = screen.getByLabelText('Configurations submenu');
+    expect(
+      within(menu).getByRole('link', { name: 'Style Management' }),
+    ).toHaveAttribute('href', '/styles');
+    expect(
+      within(menu).getByRole('link', { name: 'Lot Management' }),
+    ).toHaveAttribute('href', '/lots');
+  });
+
+  it('lets a configurator create a lot associated with a released style through Lot Management', async () => {
+    signIn('style.configurator', 'Style@2026demo');
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['newstyle', 'lots'],
+      profile: {
+        ...session.profile!,
+        modules: [
+          ...session.profile!.modules,
+          { key: 'lots', name: 'Lot Management', built_in: true },
+        ],
+      },
+    });
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: url.endsWith('/qc') ? 404 : 200,
+      data:
+        url === 'ui/lookups'
+          ? { styles: [lotStyleOption] }
+          : url === 'lots' || url.endsWith('/timeline')
+            ? []
+            : url.endsWith('/qc')
+              ? { code: 'NOT_FOUND' }
+              : lotResponse,
+    }));
+    vi.mocked(apiClient.post).mockResolvedValue({
+      status: 200,
+      data: lotResponse,
+    });
+    await router.navigate('/lots');
+    renderWithProviders(<App />);
+    await screen.findByText('No lots found.');
+    const user = userEvent.setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add New Lot' })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Add New Lot' }));
+    const form = screen.getByRole('form', { name: 'Create Lot' });
+    await user.click(within(form).getByRole('combobox', { name: /Style/ }));
+    await user.click(
+      screen.getByRole('option', { name: lotStyleOption.style_number }),
+    );
+    await user.type(
+      within(form).getByRole('spinbutton', { name: /Quantity/ }),
+      '200',
+    );
+    await user.click(within(form).getByRole('button', { name: 'Create Lot' }));
+    expect(
+      await screen.findByRole('heading', { name: 'LOT-001', level: 1 }),
+    ).toBeVisible();
+    expect(apiClient.post).toHaveBeenCalledWith(
+      `styles/${lotStyleOption.id}/lots`,
+      { lotNumber: expect.stringMatching(/^LOT-/), quantity: 200 },
+      expect.anything(),
+    );
+  });
+
+  it('does not grant shared Style Management to other roles with only newstyle access', async () => {
+    setAuthenticatedSession({ ...readSession()!, modules: ['newstyle'] });
+    await router.navigate('/styles');
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Access denied' }),
+    ).toBeVisible();
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+
+  it('keeps lot details and history available when QC access is denied', async () => {
+    setAuthenticatedSession({ ...readSession()!, modules: ['lots'] });
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: url.endsWith('/qc') ? 403 : 200,
+      data: url.endsWith('/qc')
+        ? {
+            code: 'ACCESS_DENIED',
+            detail: 'QC results are outside the granted desktop modules',
+          }
+        : url.endsWith('/timeline')
+          ? [lotEvent]
+          : lotResponse,
+    }));
+    await router.navigate('/lots/lot-id');
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'LOT-001' }),
+    ).toBeVisible();
+    expect(await screen.findByText('PASS')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'QC results are outside the granted desktop modules',
+    );
+  });
+
+  it('allows Lot Management with only the lots module grant and shows its navigation entry', async () => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['lots'],
+      profile: {
+        ...session.profile!,
+        modules: [{ key: 'lots', name: 'Lot Management', built_in: true }],
+      },
+    });
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'ui/lookups' ? { styles: [] } : [],
+    }));
+    await router.navigate('/lots');
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Lot Management' }),
+    ).toBeVisible();
+    expect(await screen.findByText('No lots found.')).toBeVisible();
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Open navigation menu' }));
+    expect(
+      screen.getByRole('link', { name: 'Lot Management' }),
+    ).toHaveAttribute('href', '/lots');
+    expect(
+      screen.queryByRole('link', { name: 'Style Management' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides Lot Management without its module grant even when the profile lists it', async () => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['users'],
+      profile: {
+        ...session.profile!,
+        modules: [
+          ...session.profile!.modules,
+          { key: 'lots', name: 'Lot Management', built_in: true },
+        ],
+      },
+    });
+    await router.navigate('/users');
+    renderWithProviders(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'User Management' });
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Open navigation menu' }));
+    expect(
+      screen.queryByRole('link', { name: 'Lot Management' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows Trolley Configurations next to Storage only when its backend module is granted', async () => {
     const session = readSession()!;
     setAuthenticatedSession({
@@ -146,6 +335,10 @@ describe('application routing', () => {
 
   it.each([
     '/dashboard',
+    '/lots',
+    '/lots/lot-id',
+    '/LOTS/lot-id',
+    '/%6cots/lot-id',
     '/users',
     '/users/user-id',
     '/roles',
@@ -250,7 +443,7 @@ describe('application routing', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('restricts New Style to owned records and blocks its users from Style Management', async () => {
+  it('uses shared Style Management for configurators while retaining backend ownership checks', async () => {
     signIn('style.configurator', 'Style@2026demo');
     localStorage.setItem(
       STYLE_STORAGE_KEY,
@@ -303,16 +496,34 @@ describe('application routing', () => {
     await router.navigate('/new-style');
     renderWithProviders(<App />);
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'New Style' }),
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Style Management',
+      }),
     ).toBeVisible();
     expect(
       await screen.findByRole('rowheader', { name: 'OWN-100' }),
     ).toBeVisible();
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/styles');
+    expect(
+      screen.queryByRole('button', { name: 'Edit OWN-100' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Style' })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Release style OWN-100' }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'View OWN-100' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'OWN-100' }),
     ).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: 'Revision History' }),
+    ).not.toBeInTheDocument();
+    expect(apiClient.get).not.toHaveBeenCalledWith(
+      expect.stringContaining('/revisions'),
+      expect.anything(),
+    );
     await act(() => router.navigate('/new-style/sty-1'));
     expect(
       await screen.findByText('Style is outside your access'),
@@ -320,7 +531,10 @@ describe('application routing', () => {
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
     await act(() => router.navigate('/styles'));
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Access denied' }),
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Style Management',
+      }),
     ).toBeVisible();
   });
 
@@ -349,6 +563,8 @@ describe('application routing', () => {
     '/configurations/tags',
     '/workspace',
     '/access-denied',
+    '/lots',
+    '/lots/lot-id',
   ])('requires login when opening %s without a session', async (path) => {
     signOut();
     await router.navigate(path);
@@ -378,7 +594,7 @@ describe('application routing', () => {
     {
       username: 'style.configurator',
       password: 'Style@2026demo',
-      title: 'New Style',
+      title: 'Style Management',
     },
   ])(
     'signs in $username and opens the first available module',

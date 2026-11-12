@@ -9,6 +9,7 @@ export const moduleKeys = [
   'users',
   'roles',
   'newstyle',
+  'lots',
 ] as const;
 export type ModuleKey = (typeof moduleKeys)[number];
 

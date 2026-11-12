@@ -136,14 +136,16 @@ export function signIn(username: string, _password?: string) {
   if (!user) throw new Error('Unknown test user');
   const role = records.roles.find((record) => record.name === user.role);
   const modules = role?.modules ?? [];
+  const roleCode =
+    user.role === 'Style Configurator' ? 'STYLE_CONFIGURATOR' : user.role;
   setAuthenticatedSession({
-    user,
+    user: { ...user, role: roleCode },
     modules,
     profile: {
       ...meResponse,
       id: user.id,
       username: user.username,
-      role: user.role,
+      role: roleCode,
       modules: orderedNavigationItems
         .filter((item) => modules.includes(item.permission))
         .map((item) => ({
@@ -157,7 +159,7 @@ export function signIn(username: string, _password?: string) {
     authentication: {
       ...loginResponse,
       username: user.username,
-      roles: [user.role],
+      roles: [roleCode],
       modules: orderedNavigationItems
         .filter((item) => modules.includes(item.permission))
         .map((item) => ({

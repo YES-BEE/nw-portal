@@ -119,6 +119,24 @@ export const router = createBrowserRouter([
             },
           },
           {
+            path: '/lots',
+            handle: { requiredModule: 'lots' },
+            lazy: async () => {
+              const { LotManagementPage } =
+                await import('../features/lots/LotManagementPage');
+              return { Component: LotManagementPage };
+            },
+          },
+          {
+            path: '/lots/:lotId',
+            handle: { requiredModule: 'lots' },
+            lazy: async () => {
+              const { LotDetailsPage } =
+                await import('../features/lots/LotDetailsPage');
+              return { Component: LotDetailsPage };
+            },
+          },
+          {
             path: '/roles',
             handle: { requiredModule: 'roles' },
             lazy: async () => {

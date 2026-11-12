@@ -19,7 +19,9 @@ beforeEach(() => {
         ? { processes: styleProcessOptions }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
-          : styleResponse,
+          : url.endsWith('/revisions')
+            ? []
+            : styleResponse,
   }));
 });
 function setup(mode: StyleMode = 'management') {
@@ -65,6 +67,14 @@ it.each(['management', 'own'] as const)(
       expect.stringContaining('/lots'),
       expect.anything(),
     );
+    if (mode === 'management') {
+      expect(await screen.findByText('No revisions recorded.')).toBeVisible();
+    } else {
+      expect(apiClient.get).not.toHaveBeenCalledWith(
+        expect.stringContaining('/revisions'),
+        expect.anything(),
+      );
+    }
   },
 );
 it('uses the process code if a route process is absent from current lookup choices', async () => {

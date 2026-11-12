@@ -50,3 +50,12 @@ export const styleRevisionResponse: StyleRevisionResponse = {
   affectedLots: 2,
   scope: 'UNSTARTED',
 };
+export const styleHistoryItem = {
+  id: 'revision-1',
+  revision_no: 1,
+  actor_id: 'hidden-actor-uuid',
+  actor_role: 'production_manager',
+  reason: 'Improve process order',
+  affected_lot_count: 2,
+  created_at: '2026-11-12T10:00:00Z',
+};
