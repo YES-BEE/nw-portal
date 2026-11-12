@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
 import {
@@ -13,6 +13,12 @@ import { seedTestData, signIn } from '../../test/fixtures';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import type { ListQuery } from '../../api/collections';
 import { DashboardPage } from './DashboardPage';
+import { getDashboardPollIntervalMs } from './dashboardConfig';
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+});
 
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
@@ -203,24 +209,79 @@ it('keeps summary metrics visible when the lot request is forbidden', async () =
     await screen.findByRole('region', { name: 'Total Lots' }),
   ).toBeVisible();
 });
-it('shows the lot details action only with the lots module and refreshes both requests', async () => {
+it('shows lot details with the lots module and polls both APIs at the configured interval', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '10');
   seedTestData();
   signIn('nw.admin');
   setAuthenticatedSession({
     ...readSession()!,
     modules: ['dashboard', 'lots'],
   });
-  const { user } = setup();
+  const { unmount } = setup();
   expect(
     await screen.findByRole('link', { name: 'View lot LOT-001' }),
   ).toHaveAttribute('href', '/lots/lot-id');
   await screen.findByRole('region', { name: 'Total Lots' });
   const before = vi.mocked(apiClient.get).mock.calls.length;
-  await user.click(screen.getByRole('button', { name: 'Refresh' }));
+  expect(
+    screen.queryByRole('button', { name: 'Refresh' }),
+  ).not.toBeInTheDocument();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(9999);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(screen.getByRole('rowheader', { name: 'LOT-001' })).toBeVisible();
+  unmount();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+});
+it('retains search filters while polling and respects a different configured interval', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '5');
+  const { user } = setup();
+  await screen.findByRole('rowheader', { name: 'LOT-001' });
+  await user.type(screen.getByRole('searchbox'), 'LOT');
   await waitFor(() =>
-    expect(vi.mocked(apiClient.get).mock.calls.length).toBe(before + 2),
+    expect(apiClient.get).toHaveBeenCalledWith(
+      'dashboard/lots',
+      expect.objectContaining({ params: { page: 0, size: 10, search: 'LOT' } }),
+    ),
+  );
+  const before = vi.mocked(apiClient.get).mock.calls.length;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(screen.getByRole('searchbox')).toHaveValue('LOT');
+  expect(apiClient.get).toHaveBeenLastCalledWith(
+    'dashboard/lots',
+    expect.objectContaining({ params: { page: 0, size: 10, search: 'LOT' } }),
   );
 });
+it('does not overlap requests if an earlier poll is still pending', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '10');
+  vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+  setup();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30000);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(2);
+});
+it.each([undefined, '', '0', '-1', 'bad', 'Infinity'])(
+  'falls back to ten seconds for invalid polling config %s',
+  (value) => {
+    vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', value);
+    expect(getDashboardPollIntervalMs()).toBe(10000);
+  },
+);
 it('aborts summary and lot requests on unmount', () => {
   vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
   const { unmount } = setup();

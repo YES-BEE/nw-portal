@@ -22,6 +22,7 @@ import {
   getAvailableLotTrolleys,
   assignLotTrolley,
   unassignLotTrolley,
+  updateLot,
 } from './lotsApi';
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -33,6 +34,29 @@ const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => ({
   data: lotResponse as unknown,
 }));
 const query = { page: 0, size: 10, search: '' };
+it('updates one lot using the backend request and full lot response', async () => {
+  const updated = { ...lotResponse, quantity: 120, version: 1 };
+  respond(updated);
+  await expect(
+    updateLot(lotResponse.id, { quantity: 120, reason: 'Recount' }),
+  ).resolves.toEqual(updated);
+  expect(adapter.mock.calls[0][0]).toMatchObject({
+    method: 'put',
+    url: 'lots/lot-id',
+  });
+  expect(JSON.parse(adapter.mock.calls[0][0].data)).toEqual({
+    quantity: 120,
+    reason: 'Recount',
+  });
+  respond({ ...updated, id: 'another-lot' });
+  await expect(
+    updateLot(lotResponse.id, { quantity: 120, reason: 'Recount' }),
+  ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+  respond({ ...updated, quantity: 100 });
+  await expect(
+    updateLot(lotResponse.id, { quantity: 120, reason: 'Recount' }),
+  ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+});
 it('uses the backend default batch count for null and accepts null quantities', async () => {
   const batch = {
     createdCount: 1,

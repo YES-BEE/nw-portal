@@ -25,10 +25,12 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import { LotQuantityDialog } from './LotQuantityDialog';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import { LotTrolleyDialog } from './LotTrolleyDialog';
-import { canMapLotTrolley } from './lotDisplay';
+import { canMapLotTrolley, canEditLotQuantity } from './lotDisplay';
 import { usePagedList } from '../../api/usePagedList';
 import { ListPagination } from '../../api/ListPagination';
 import { usePageMetadata } from '../../app/usePageMetadata';
@@ -76,7 +78,9 @@ function LotWorkspace({
   const [cancelled, setCancelled] = useState(false);
   const [createdCount, setCreatedCount] = useState(0);
   const [mapping, setMapping] = useState<LotResponse | null>(null);
-  const busy = creating || !!cancelling || !!mapping;
+  const [editing, setEditing] = useState<LotResponse | null>(null);
+  const [quantitySaved, setQuantitySaved] = useState(false);
+  const busy = creating || !!cancelling || !!mapping || !!editing;
   usePageMetadata(t('lots.pageTitle'), t('lots.description'));
   useEffect(() => {
     const controller = new AbortController();
@@ -99,6 +103,7 @@ function LotWorkspace({
     setCreating(false);
     setCancelling(null);
     setMapping(null);
+    setEditing(null);
     list.reload();
   }
   const styles = lookup.status === 'ready' ? lookup.styles : [];
@@ -268,6 +273,23 @@ function LotWorkspace({
                   <TableCell>{formatDateTime(lot.created_at)}</TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={0.5}>
+                      {canEditLotQuantity(lot.status) && (
+                        <Tooltip title={t('lots.editQuantity')}>
+                          <Box component="span">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              disabled={busy}
+                              aria-label={t('lots.editQuantityNamed', {
+                                number: lot.lot_number,
+                              })}
+                              onClick={() => setEditing(lot)}
+                            >
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Tooltip>
+                      )}
                       {canMapLotTrolley(lot.status) && (
                         <Tooltip
                           title={t(
@@ -391,17 +413,31 @@ function LotWorkspace({
           onSaved={reload}
         />
       )}
+      {editing && (
+        <LotQuantityDialog
+          lot={editing}
+          onClose={() => setEditing(null)}
+          onReload={reload}
+          onSaved={() => {
+            setQuantitySaved(true);
+            reload();
+          }}
+        />
+      )}
       <Snackbar
-        open={cancelled || createdCount > 0}
+        open={cancelled || quantitySaved || createdCount > 0}
         autoHideDuration={3500}
         onClose={() => {
           setCancelled(false);
+          setQuantitySaved(false);
           setCreatedCount(0);
         }}
         message={
-          createdCount > 0
-            ? t('lots.batchCreated', { count: createdCount })
-            : t('lots.cancelled')
+          quantitySaved
+            ? t('lots.quantitySaved')
+            : createdCount > 0
+              ? t('lots.batchCreated', { count: createdCount })
+              : t('lots.cancelled')
         }
       />
     </>

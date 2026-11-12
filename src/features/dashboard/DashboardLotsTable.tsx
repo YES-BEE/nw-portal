@@ -29,6 +29,7 @@ import { formatDateTime } from '../../utils/formatDateTime';
 import { dashboardFailure, getDashboardLots } from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
 import type { StationWip } from './types';
+import { getDashboardPollIntervalMs } from './dashboardConfig';
 
 export function DashboardLotsTable({
   status,
@@ -50,7 +51,7 @@ export function DashboardLotsTable({
       getDashboardLots(query, signal, status || undefined),
     [status],
   );
-  const list = usePagedList(load);
+  const list = usePagedList(load, getDashboardPollIntervalMs());
   const items = list.state.status === 'ready' ? list.state.data.items : [];
   const columns = canViewLot ? 8 : 7;
   return (

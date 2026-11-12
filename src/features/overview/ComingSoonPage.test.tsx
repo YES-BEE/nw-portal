@@ -4,10 +4,7 @@ import { renderWithProviders } from '../../test/render';
 import { ComingSoonPage } from './ComingSoonPage';
 
 describe('upcoming modules', () => {
-  it.each([
-    { module: 'dashboard', title: 'Dashboard' },
-    { module: 'reports', title: 'Reports/Analysis' },
-  ] as const)(
+  it.each([{ module: 'reports', title: 'Reports/Analysis' }] as const)(
     'identifies $title and shows its coming-soon message',
     ({ module, title }) => {
       renderWithProviders(<ComingSoonPage module={module} />);

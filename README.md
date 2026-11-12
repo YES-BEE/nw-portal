@@ -71,7 +71,10 @@ The login form sends `POST {VITE_API_BASE_URL}/api/{VITE_API_VERSION}/auth/login
 VITE_API_BASE_URL=http://192.168.0.106
 VITE_API_VERSION=v1
 VITE_AUTH_CLIENT_TYPE=PC
+VITE_DASHBOARD_POLL_INTERVAL_SECONDS=10
 ```
+
+The dashboard automatically polls its summary and current lot list at this interval in seconds, preserving the selected filters and page.
 
 Restart Vite after changing environment values. Vite exposes these variables to the browser; they contain public configuration. `LoginRequest`, `LoginResponse`, and `LoginModule` are defined in `src/features/auth/types.ts`. Process assignments are retained as `unknown[]` because the provided response only specifies an empty array, without an item schema.
 

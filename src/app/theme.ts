@@ -31,6 +31,16 @@ export const theme = createTheme({
         },
       },
     },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          fontSize: 16,
+          fontWeight: 600,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          marginBottom: theme.spacing(2),
+        }),
+      },
+    },
     MuiDialogContentText: {
       defaultProps: { variant: 'body2' },
       styleOverrides: { root: { fontSize: 13 } },

@@ -3,11 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Paper, Typography } from '@mui/material';
 import ConstructionOutlinedIcon from '@mui/icons-material/ConstructionOutlined';
 
-export function ComingSoonPage({
-  module,
-}: {
-  module: 'dashboard' | 'reports';
-}) {
+export function ComingSoonPage({ module }: { module: 'reports' }) {
   const { t } = useTranslation('translation');
   useEffect(() => {
     document.title = t('access.pageTitle', {

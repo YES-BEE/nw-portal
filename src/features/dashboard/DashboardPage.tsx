@@ -1,14 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Paper,
-  Stack,
-  Typography,
-} from '@mui/material';
-import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
+import { Box, CircularProgress, Paper, Stack, Typography } from '@mui/material';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { useLotLabels } from '../lots/lotDisplay';
@@ -17,6 +9,8 @@ import { DashboardFailureAlert } from './DashboardFailureAlert';
 import { DashboardLotsTable } from './DashboardLotsTable';
 import { StatusBreakdown, StationWipBreakdown } from './DashboardBreakdowns';
 import type { DashboardFailure, DashboardSummary, StatusCount } from './types';
+import { getDashboardPollIntervalMs } from './dashboardConfig';
+import { AnimatedCount } from './AnimatedCount';
 
 const knownStatuses = [
   'READY',
@@ -39,24 +33,39 @@ export function DashboardPage() {
   const [attempt, setAttempt] = useState(0);
   const [lotStatus, setLotStatus] = useState('');
   usePageMetadata(t('dashboard.pageTitle'), t('dashboard.description'));
+  const pollIntervalMs = getDashboardPollIntervalMs();
   useEffect(() => {
     const controller = new AbortController();
-    void getDashboard(controller.signal).then(
-      (data) => {
-        if (!controller.signal.aborted)
-          setState({
-            status: 'ready',
-            data,
-            loadedAt: new Date().toISOString(),
-          });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({ status: 'error', failure: dashboardFailure(error) });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt]);
+    let pending = false;
+    function poll() {
+      if (pending || controller.signal.aborted) return;
+      pending = true;
+      void getDashboard(controller.signal)
+        .then(
+          (data) => {
+            if (!controller.signal.aborted)
+              setState({
+                status: 'ready',
+                data,
+                loadedAt: new Date().toISOString(),
+              });
+          },
+          (error: unknown) => {
+            if (!controller.signal.aborted)
+              setState({ status: 'error', failure: dashboardFailure(error) });
+          },
+        )
+        .finally(() => {
+          pending = false;
+        });
+    }
+    poll();
+    const timer = setInterval(poll, pollIntervalMs);
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
+  }, [attempt, pollIntervalMs]);
   function refresh() {
     setState({ status: 'loading' });
     setAttempt((value) => value + 1);
@@ -107,14 +116,6 @@ export function DashboardPage() {
             </Typography>
           )}
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshOutlinedIcon />}
-          disabled={state.status === 'loading'}
-          onClick={refresh}
-        >
-          {t('dashboard.refresh')}
-        </Button>
       </Stack>
       {state.status === 'loading' && (
         <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -184,7 +185,7 @@ export function DashboardPage() {
                   {metric.label}
                 </Typography>
                 <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
-                  {metric.value.toLocaleString()}
+                  <AnimatedCount value={metric.value} />
                 </Typography>
               </Paper>
             ))}
@@ -218,7 +219,7 @@ export function DashboardPage() {
         </>
       )}
       <DashboardLotsTable
-        key={`${attempt}-${lotStatus}`}
+        key={lotStatus}
         status={lotStatus}
         statuses={statuses}
         onStatus={setLotStatus}

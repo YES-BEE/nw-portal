@@ -14,7 +14,8 @@ import { LotCancelDialog } from './LotCancelDialog';
 import { LotTimeline } from './LotTimeline';
 import { LotQcResults } from './LotQcResults';
 import { LotTrolleyDialog } from './LotTrolleyDialog';
-import { canMapLotTrolley } from './lotDisplay';
+import { LotQuantityDialog } from './LotQuantityDialog';
+import { canMapLotTrolley, canEditLotQuantity } from './lotDisplay';
 import { useLotLabels } from './lotDisplay';
 import type { LotResponse, LotsFailure } from './types';
 type State =
@@ -40,6 +41,8 @@ function LotDetails({ lotId }: { lotId?: string }) {
   const [attempt, setAttempt] = useState(0);
   const [cancelling, setCancelling] = useState(false);
   const [mapping, setMapping] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [quantitySaved, setQuantitySaved] = useState(false);
   const lot = state.status === 'ready' ? state.lot : null;
   const createdId = (location.state as { createdLotId?: unknown } | null)
     ?.createdLotId;
@@ -62,6 +65,7 @@ function LotDetails({ lotId }: { lotId?: string }) {
   function reload() {
     setCancelling(false);
     setMapping(false);
+    setEditing(false);
     setState({ status: 'loading' });
     setAttempt((value) => value + 1);
   }
@@ -134,12 +138,22 @@ function LotDetails({ lotId }: { lotId?: string }) {
               },
             ]}
           />
+          {quantitySaved && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              {t('lots.quantitySaved')}
+            </Alert>
+          )}
           {!['COMPLETED', 'CANCELLED'].includes(lot.status) && (
             <Stack
               direction="row"
               spacing={1.5}
               sx={{ justifyContent: 'flex-end', flexWrap: 'wrap', mb: 3 }}
             >
+              {canEditLotQuantity(lot.status) && (
+                <Button variant="outlined" onClick={() => setEditing(true)}>
+                  {t('lots.editQuantity')}
+                </Button>
+              )}
               {canMapLotTrolley(lot.status) && (
                 <Button variant="outlined" onClick={() => setMapping(true)}>
                   {t(
@@ -162,6 +176,18 @@ function LotDetails({ lotId }: { lotId?: string }) {
               onClose={() => setMapping(false)}
               onReload={reload}
               onSaved={reload}
+            />
+          )}
+          {editing && (
+            <LotQuantityDialog
+              lot={lot}
+              onClose={() => setEditing(false)}
+              onReload={reload}
+              onSaved={(updated) => {
+                setState({ status: 'ready', lot: updated });
+                setEditing(false);
+                setQuantitySaved(true);
+              }}
             />
           )}
           {cancelling && (

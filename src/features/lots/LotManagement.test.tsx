@@ -77,6 +77,67 @@ it('shows the newest lot first within the loaded page and style number in the fi
   expect(row.firstElementChild).toHaveTextContent('STY-001');
   expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent('Style');
 });
+it.each(['list', 'details'])(
+  'updates the displayed quantity from the %s view',
+  async (view) => {
+    let current = { ...lotResponse };
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data:
+        url === 'ui/lookups'
+          ? { styles: [lotStyleOption] }
+          : url === 'lots'
+            ? [current]
+            : url.endsWith('/timeline')
+              ? [lotEvent]
+              : url.endsWith('/qc')
+                ? lotQcResponse
+                : current,
+    }));
+    vi.spyOn(apiClient, 'put').mockImplementation(async () => {
+      current = { ...current, quantity: 120, version: 1 };
+      return { status: 200, data: current };
+    });
+    const user = userEvent.setup();
+    if (view === 'list') renderList();
+    else
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/lots/lot-id']}>
+          <Routes>
+            <Route path="/lots/:lotId" element={<LotDetailsPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    await user.click(
+      await screen.findByRole('button', {
+        name:
+          view === 'list'
+            ? 'Change quantity for lot LOT-001'
+            : 'Change Quantity',
+      }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await user.clear(within(dialog).getByRole('spinbutton'));
+    await user.type(within(dialog).getByRole('spinbutton'), '120');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: /Reason/ }),
+      'Recount',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Save Quantity' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(await screen.findByText('120')).toBeVisible();
+    expect(screen.getByText('Lot quantity updated.')).toBeVisible();
+    expect(apiClient.put).toHaveBeenCalledWith(
+      'lots/lot-id',
+      { quantity: 120, reason: 'Recount' },
+      expect.anything(),
+    );
+  },
+);
 it('creates a lot from a released style, then fetches its details and timeline', async () => {
   const user = userEvent.setup();
   renderList();

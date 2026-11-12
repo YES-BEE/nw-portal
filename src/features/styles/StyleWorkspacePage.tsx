@@ -71,7 +71,7 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
           <Typography component="h1" sx={{ fontSize: 26, fontWeight: 700 }}>
             {title}
           </Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             {t(
               own || configurator
                 ? 'styles.ownDescription'
@@ -184,46 +184,48 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                           </IconButton>
                         </Tooltip>
                         {!own && !configurator && (
-                          <>
-                            <Tooltip title={t('access.edit')}>
+                          <Tooltip title={t('access.edit')}>
+                            <Box component="span">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                disabled={busy}
+                                aria-label={t('access.editNamed', {
+                                  name: record.style_number,
+                                })}
+                                onClick={() => {
+                                  setSaved(false);
+                                  setForm({ id: record.id });
+                                }}
+                              >
+                                <EditOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Tooltip>
+                        )}
+                        {record.status === 'DRAFT' &&
+                          ((!own && !configurator) ||
+                            (configurator &&
+                              session?.modules.includes('newstyle') &&
+                              record.created_by === session.user.id)) && (
+                            <Tooltip title={t('styles.release')}>
                               <Box component="span">
-                                <IconButton
+                                <Chip
+                                  component="button"
+                                  type="button"
                                   size="small"
                                   color="primary"
+                                  variant="filled"
+                                  label={t('styles.release')}
                                   disabled={busy}
-                                  aria-label={t('access.editNamed', {
-                                    name: record.style_number,
+                                  aria-label={t('styles.releaseNamed', {
+                                    number: record.style_number,
                                   })}
-                                  onClick={() => {
-                                    setSaved(false);
-                                    setForm({ id: record.id });
-                                  }}
-                                >
-                                  <EditOutlinedIcon fontSize="small" />
-                                </IconButton>
+                                  onClick={() => setRelease(record)}
+                                />
                               </Box>
                             </Tooltip>
-                            {record.status === 'DRAFT' && (
-                              <Tooltip title={t('styles.release')}>
-                                <Box component="span">
-                                  <Chip
-                                    component="button"
-                                    type="button"
-                                    size="small"
-                                    color="primary"
-                                    variant="filled"
-                                    label={t('styles.release')}
-                                    disabled={busy}
-                                    aria-label={t('styles.releaseNamed', {
-                                      number: record.style_number,
-                                    })}
-                                    onClick={() => setRelease(record)}
-                                  />
-                                </Box>
-                              </Tooltip>
-                            )}
-                          </>
-                        )}
+                          )}
                       </Stack>
                     </TableCell>
                   </TableRow>

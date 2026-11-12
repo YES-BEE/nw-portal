@@ -15,6 +15,8 @@ import {
 } from '../../test/processDrag';
 import { StyleWorkspacePage } from './StyleWorkspacePage';
 import type { StyleMode, StyleResponse } from './types';
+import { seedTestData, signIn } from '../../test/fixtures';
+import { readSession, setAuthenticatedSession } from '../auth/session';
 let records: StyleResponse[];
 beforeEach(() => {
   records = [styleResponse];
@@ -119,6 +121,62 @@ it('offers only create and view actions in New Style mode', async () => {
     `/new-style/${styleResponse.id}`,
   );
 });
+it('allows configurators to release only their own drafts without enabling style editing', async () => {
+  seedTestData();
+  signIn('style.configurator');
+  const session = readSession()!;
+  setAuthenticatedSession({ ...session, modules: ['newstyle', 'lots'] });
+  records = [
+    { ...styleResponse, created_by: session.user.id },
+    {
+      ...styleResponse,
+      id: 'outside',
+      style_number: 'OUTSIDE',
+      created_by: 'another-user',
+    },
+    {
+      ...styleResponse,
+      id: 'released',
+      style_number: 'RELEASED',
+      created_by: session.user.id,
+      status: 'RELEASED',
+    },
+  ];
+  const post = vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+    records[0] = {
+      ...records[0],
+      status: 'RELEASED',
+      released_at: '2026-11-12T00:00:00Z',
+    };
+    return { status: 200, data: records[0] };
+  });
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Release style STY-1001' }),
+  );
+  expect(
+    screen.queryByRole('button', { name: 'Release style OUTSIDE' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Release style RELEASED' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Edit STY-1001' }),
+  ).not.toBeInTheDocument();
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Release to Production',
+    }),
+  );
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  expect(post).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/release`,
+    undefined,
+    expect.anything(),
+  );
+});
 it('confirms release and reloads the backend list after success', async () => {
   const post = vi.spyOn(apiClient, 'post').mockImplementation(async () => {
     records = [
@@ -136,7 +194,9 @@ it('confirms release and reloads the backend list after success', async () => {
   );
   expect(post).not.toHaveBeenCalled();
   await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Release to Production',
+    }),
   );
   expect(await screen.findByText('Released')).toBeVisible();
   expect(
@@ -161,7 +221,9 @@ it('shows a blocked release error and keeps the dialog open', async () => {
     await screen.findByRole('button', { name: 'Release style STY-1001' }),
   );
   await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Release to Production',
+    }),
   );
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'At least one Process is required',
@@ -241,7 +303,9 @@ it('confirms planned lots on release and uses only the backend release operation
   );
   expect(screen.getByText(/This will create 5 planned lots/)).toBeVisible();
   await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Release to Production',
+    }),
   );
   expect(await screen.findByText('In Production')).toBeVisible();
   expect(post).toHaveBeenCalledTimes(1);

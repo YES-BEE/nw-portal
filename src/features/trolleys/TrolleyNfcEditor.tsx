@@ -81,7 +81,6 @@ export function TrolleyNfcEditor({
   async function save() {
     setSubmitted(true);
     if (
-      !change ||
       pending.current ||
       !reason.trim() ||
       (change.mode !== 'unassign' && !selected)
@@ -253,7 +252,7 @@ export function TrolleyNfcEditor({
           </>
         )}
         <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          {failure && change && (
+          {failure && (
             <Button disabled={saving} onClick={onSaved}>
               {t('trolleys.nfc.review')}
             </Button>
@@ -261,23 +260,21 @@ export function TrolleyNfcEditor({
           <Button variant="outlined" disabled={saving} onClick={onClose}>
             {t('access.cancel')}
           </Button>
-          {change && (
-            <Button
-              variant="contained"
-              disabled={
-                blocked ||
-                loading ||
-                (change.mode !== 'unassign' && !available.length)
-              }
-              type="submit"
-            >
-              {t(
-                previousRemoved
-                  ? 'trolleys.nfc.finishReplacement'
-                  : 'trolleys.nfc.save',
-              )}
-            </Button>
-          )}
+          <Button
+            variant="contained"
+            disabled={
+              blocked ||
+              loading ||
+              (change.mode !== 'unassign' && !available.length)
+            }
+            type="submit"
+          >
+            {t(
+              previousRemoved
+                ? 'trolleys.nfc.finishReplacement'
+                : 'trolleys.nfc.save',
+            )}
+          </Button>
         </Stack>
       </Stack>
     </Paper>

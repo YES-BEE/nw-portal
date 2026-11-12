@@ -5,6 +5,7 @@ type Result<T> =
   { status: 'ready'; data: ApiPage<T> } | { status: 'error'; error: unknown };
 export function usePagedList<T>(
   load: (query: ListQuery, signal?: AbortSignal) => Promise<ApiPage<T>>,
+  pollIntervalMs = 0,
 ) {
   const [query, setQuery] = useState<ListQuery>({
     page: 0,
@@ -27,26 +28,41 @@ export function usePagedList<T>(
   }, [input, query.search]);
   useEffect(() => {
     const controller = new AbortController();
-    void load(query, controller.signal).then(
-      (data) => {
-        if (controller.signal.aborted) return;
-        const lastPage = Math.max(
-          0,
-          Math.ceil(data.totalElements / query.size) - 1,
-        );
-        if (query.page > lastPage) {
-          setQuery((current) => ({ ...current, page: lastPage }));
-          return;
-        }
-        setResult({ query, attempt, value: { status: 'ready', data } });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setResult({ query, attempt, value: { status: 'error', error } });
-      },
-    );
-    return () => controller.abort();
-  }, [query, attempt, load]);
+    let pending = false;
+    function refresh() {
+      if (pending || controller.signal.aborted) return;
+      pending = true;
+      void load(query, controller.signal)
+        .then(
+          (data) => {
+            if (controller.signal.aborted) return;
+            const lastPage = Math.max(
+              0,
+              Math.ceil(data.totalElements / query.size) - 1,
+            );
+            if (query.page > lastPage) {
+              setQuery((current) => ({ ...current, page: lastPage }));
+              return;
+            }
+            setResult({ query, attempt, value: { status: 'ready', data } });
+          },
+          (error: unknown) => {
+            if (!controller.signal.aborted)
+              setResult({ query, attempt, value: { status: 'error', error } });
+          },
+        )
+        .finally(() => {
+          pending = false;
+        });
+    }
+    refresh();
+    const timer =
+      pollIntervalMs > 0 ? setInterval(refresh, pollIntervalMs) : undefined;
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
+  }, [query, attempt, load, pollIntervalMs]);
   const state =
     result?.query === query && result.attempt === attempt
       ? result.value

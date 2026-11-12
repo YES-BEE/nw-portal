@@ -230,9 +230,14 @@ describe('application routing', () => {
       await screen.findByRole('heading', { level: 1, name: 'LOT-001' }),
     ).toBeVisible();
     expect(await screen.findByText('PASS')).toBeVisible();
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'QC results are outside the granted desktop modules',
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('region', { name: 'QC Results' }),
+      ).not.toBeInTheDocument(),
     );
+    expect(
+      screen.queryByText('QC results are outside the granted desktop modules'),
+    ).not.toBeInTheDocument();
   });
 
   it('allows Lot Management with only the lots module grant and shows its navigation entry', async () => {
@@ -557,8 +562,8 @@ describe('application routing', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Style' })).toBeEnabled();
     expect(
-      screen.queryByRole('button', { name: 'Release style OWN-100' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Release style OWN-100' }),
+    ).toBeEnabled();
     await user.click(screen.getByRole('link', { name: 'View OWN-100' }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'OWN-100' }),

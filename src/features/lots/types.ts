@@ -1,5 +1,5 @@
 import type { ApiCollection, ListQuery } from '../../api/collections';
-// ProductionController.LOT_SELECT, shared by list, detail, create and cancel.
+// ProductionController.LOT_SELECT, shared by list, detail, create, update and cancel.
 export interface LotResponse {
   id: string;
   style_id: string;
@@ -28,6 +28,10 @@ export interface LotTrolleyRequest {
   trolleyId: string;
 }
 export interface CancelLotRequest {
+  reason: string;
+}
+export interface UpdateLotRequest {
+  quantity: number;
   reason: string;
 }
 export interface CancelLotResponse extends LotResponse {
@@ -85,6 +89,7 @@ export interface LotsFailure {
     Record<
       | keyof CreateLotsRequest
       | keyof CancelLotRequest
+      | keyof UpdateLotRequest
       | keyof LotTrolleyRequest,
       string
     >

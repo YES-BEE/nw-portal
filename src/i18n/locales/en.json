@@ -48,7 +48,6 @@
   },
   "overview": {
     "comingSoon": "Coming soon",
-    "dashboard": "The Dashboard module is currently under development.",
     "reports": "The Reports/Analysis module is currently under development."
   },
   "styles": {
@@ -95,7 +94,6 @@
     "created": "Date of Creation",
     "description": "Description",
     "actions": "Actions",
-    "route": "Route",
     "viewNamed": "View {{name}}",
     "search": "Search styles",
     "searchPlaceholder": "Search by style number, description or status",
@@ -889,7 +887,6 @@
     "pageTitle": "NW Track | Dashboard",
     "description": "Current production summary, lot statuses and station work in progress.",
     "updated": "Updated {{date}}",
-    "refresh": "Refresh",
     "loading": "Loading dashboard summary",
     "totalLots": "Total Lots",
     "openLots": "Open Lots",
@@ -992,6 +989,14 @@
     "empty": "No lots found.",
     "noMatches": "No lots match your search.",
     "viewNamed": "View lot {{number}}",
+    "editQuantity": "Change Quantity",
+    "editQuantityNamed": "Change quantity for lot {{number}}",
+    "editQuantityTitle": "Change quantity for {{number}}",
+    "editQuantityHint": "This changes the quantity of this lot only. Other lots keep their current quantities.",
+    "quantityReasonPlaceholder": "Enter the reason for changing this lot's quantity",
+    "quantityReasonRequired": "Enter a reason for the quantity change (up to 500 characters).",
+    "saveQuantity": "Save Quantity",
+    "quantitySaved": "Lot quantity updated.",
     "cancel": "Delete lot",
     "cancelNamed": "Delete lot {{number}}",
     "cancelTitle": "Delete lot?",

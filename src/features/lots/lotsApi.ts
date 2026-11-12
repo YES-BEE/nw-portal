@@ -20,6 +20,7 @@ import type {
   LotQcResponse,
   CreateLotsResponse,
   LotTrolleyRequest,
+  UpdateLotRequest,
 } from './types';
 import type { TrolleyResponse } from '../trolleys/types';
 export class LotsError extends Error {
@@ -213,6 +214,24 @@ export async function createLots(
   )
     return invalid();
   return { createdCount: batch.createdCount, items: batch.items };
+}
+export async function updateLot(
+  id: string,
+  body: UpdateLotRequest,
+  signal?: AbortSignal,
+): Promise<LotResponse> {
+  const lot = single(
+    await request(() =>
+      apiClient.put<unknown>(
+        `lots/${encodeURIComponent(id)}`,
+        { quantity: body.quantity, reason: body.reason },
+        options(signal),
+      ),
+    ),
+    id,
+  );
+  if (lot.quantity !== body.quantity) return invalid();
+  return lot;
 }
 export async function getLotQc(
   id: string,
@@ -421,7 +440,7 @@ export async function assignLotTrolley(
     ),
     id,
   );
-  if (!isLot(lot) || lot.trolley_id !== body.trolleyId) return invalid();
+  if (lot.trolley_id !== body.trolleyId) return invalid();
   return lot;
 }
 export async function unassignLotTrolley(
@@ -437,6 +456,6 @@ export async function unassignLotTrolley(
     ),
     id,
   );
-  if (!isLot(lot) || lot.trolley_id !== null) return invalid();
+  if (lot.trolley_id !== null) return invalid();
   return lot;
 }

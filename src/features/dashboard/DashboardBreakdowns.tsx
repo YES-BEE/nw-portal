@@ -1,6 +1,8 @@
 import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import type { StationWip, StatusCount } from './types';
+import { useCallback } from 'react';
+import { AnimatedCount } from './AnimatedCount';
 
 const colors: Record<string, string> = {
   COMPLETED: '#15803d',
@@ -16,13 +18,13 @@ function Bar({
   value,
   max,
   color,
-  valueLabel,
+  formatValue,
 }: {
   label: string;
   value: number;
   max: number;
   color: string;
-  valueLabel?: string;
+  formatValue?: (value: number) => string;
 }) {
   return (
     <Box sx={{ width: '100%' }}>
@@ -32,7 +34,7 @@ function Bar({
       >
         <Typography sx={{ overflowWrap: 'anywhere' }}>{label}</Typography>
         <Typography sx={{ fontWeight: 600 }}>
-          {valueLabel || value.toLocaleString()}
+          <AnimatedCount value={value} format={formatValue} />
         </Typography>
       </Stack>
       <Box
@@ -49,6 +51,8 @@ function Bar({
             height: '100%',
             bgcolor: color,
             borderRadius: 1,
+            transition: 'width 650ms ease-out',
+            '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
           }}
         />
       </Box>
@@ -128,6 +132,10 @@ export function StatusBreakdown({
 }
 export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
   const { t } = useTranslation('translation');
+  const formatVisits = useCallback(
+    (count: number) => t('dashboard.stationVisitCount', { count }),
+    [t],
+  );
   const maximum = Math.max(1, ...stations.map((station) => station.wip));
   return (
     <Paper
@@ -153,9 +161,7 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
               key={station.id}
               label={station.name || t('common.notProvided')}
               value={station.wip}
-              valueLabel={t('dashboard.stationVisitCount', {
-                count: station.wip,
-              })}
+              formatValue={formatVisits}
               max={maximum}
               color="#0957f7"
             />
