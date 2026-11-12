@@ -107,7 +107,7 @@ export function ProcessConfigurationsPage() {
           <Typography component="h1" sx={{ fontSize: 26, fontWeight: 700 }}>
             {t('processes.title')}
           </Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 14, mt: 0.5 }}>
+          <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
             {t('processes.pageDescription')}
           </Typography>
         </Box>

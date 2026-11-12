@@ -394,7 +394,7 @@ export function ConfigurationLayout() {
                     height: 36,
                     bgcolor: 'primary.main',
                     color: 'primary.contrastText',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: 600,
                     flexShrink: 0,
                   }}

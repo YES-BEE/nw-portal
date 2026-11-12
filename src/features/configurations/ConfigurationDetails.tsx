@@ -111,7 +111,7 @@ export function ConfigurationDetails({
               sx={{
                 m: 0,
                 mb: { xs: 1, sm: 0 },
-                fontSize: 14,
+                fontSize: 13,
                 whiteSpace: 'pre-wrap',
                 overflowWrap: 'anywhere',
               }}

@@ -181,7 +181,7 @@ it('hides pagination on an empty collection and retries a failed list request', 
   );
   await user.click(screen.getByRole('button', { name: 'Try again' }));
   expect(
-    await screen.findByText('No storages configured. Click Add New Storage.'),
+    await screen.findByText('No storages configured'),
   ).toBeVisible();
   expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
 });

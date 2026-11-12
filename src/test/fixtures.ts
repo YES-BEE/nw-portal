@@ -10,7 +10,8 @@ interface RegisteredTag {
 }
 export const TAG_STORAGE_KEY = 'nw-track-tags-v2';
 
-import type { StyleRecord } from '../features/styles/styleData';
+export const STYLE_STORAGE_KEY = 'nw-track-styles-v2';
+export const PROCESS_STORAGE_KEY = 'nw-track-process-config-v4';
 
 import type { AccessUser, ModuleKey } from '../features/access/accessData';
 
@@ -60,7 +61,7 @@ export const defaultTags: RegisteredTag[] = [
   { name: 'Finisher 02 Tag', actual: 'NFC-DEV-004' },
 ].map((tag, index) => ({ ...tag, id: `tag-${index + 1}` }));
 
-export const sampleStyles: StyleRecord[] = [
+export const sampleStyles = [
   {
     id: 'sty-1',
     number: 'STY-1001',
@@ -114,8 +115,6 @@ export const defaultUsers: AccessUser[] = [
 }));
 
 import { ACCESS_STORAGE_KEY, loadAccessData } from './accessData';
-import { PROCESS_STORAGE_KEY } from '../features/processes/processData';
-import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
 import { setAuthenticatedSession } from '../features/auth/session';
 import { orderedNavigationItems } from '../app/navigation';
 import i18n from '../i18n';
@@ -127,8 +126,6 @@ export function seedTestData() {
     ACCESS_STORAGE_KEY,
     JSON.stringify({ users: defaultUsers, roles: defaultRoles }),
   );
-  localStorage.setItem(PROCESS_STORAGE_KEY, JSON.stringify(sampleProcesses));
-  localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(sampleStyles));
 }
 
 // Establish an identity for UI tests without using the application's login flow.

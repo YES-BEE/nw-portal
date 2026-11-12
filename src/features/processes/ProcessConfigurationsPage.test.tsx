@@ -10,7 +10,7 @@ import {
   processTags,
 } from '../../test/processes';
 import { readSession, setAuthenticatedSession } from '../auth/session';
-import { PROCESS_STORAGE_KEY } from './processData';
+import { PROCESS_STORAGE_KEY } from '../../test/fixtures';
 import { ProcessConfigurationsPage } from './ProcessConfigurationsPage';
 
 beforeEach(() => {

@@ -1,220 +1,197 @@
-import { sampleStyles, seedTestData } from '../../test/fixtures';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
 import {
   dragProcessToEnd,
   mockProcessDragLayout,
 } from '../../test/processDrag';
-import { PROCESS_STORAGE_KEY } from '../processes/processData';
-import { emptyStyle, toStyleDraft } from './styleData';
+import {
+  styleResponse,
+  styleRouteResponse,
+  styleProcessOptions,
+  styleRevisionResponse,
+} from '../../test/styles';
 import { StyleForm } from './StyleForm';
-
 beforeEach(() => {
-  seedTestData();
   mockProcessDragLayout();
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: styleProcessOptions }
+        : url.endsWith('/derived-route')
+          ? styleRouteResponse
+          : styleResponse,
+  }));
+  vi.spyOn(apiClient, 'post').mockImplementation(async (url) => ({
+    status: 200,
+    data: url === 'styles' ? styleResponse : styleRevisionResponse,
+  }));
 });
-
-describe('shared style form and drag-only process sequence', () => {
-  it('saves dragged processes with the same style fields and provides no process editing controls', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    renderWithProviders(
-      <StyleForm
-        initial={{
-          ...toStyleDraft(sampleStyles[0]),
-          id: 'new',
-          number: 'STY-DRAG-001',
-          steps: [],
-        }}
-        editing={false}
-        onSave={onSave}
-        onClose={vi.fn()}
-      />,
-    );
-    await dragProcessToEnd(user, 'Washing');
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
-        'Washing',
-      ),
-    ).toBeVisible();
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Dropdowns' }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).queryByRole(
-        'textbox',
-      ),
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(onSave).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        number: 'STY-DRAG-001',
-        steps: ['demo-2'],
-        garments: 2000,
-        avg: 1,
-      }),
-    );
+function setup(styleId?: string) {
+  const callbacks = { onClose: vi.fn(), onSaved: vi.fn(), onReload: vi.fn() };
+  return {
+    user: userEvent.setup(),
+    ...callbacks,
+    ...renderWithProviders(<StyleForm styleId={styleId} {...callbacks} />),
+  };
+}
+it('creates a style using backend fields and the dragged process order', async () => {
+  const { user, onSaved } = setup();
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    ' STY-1001 ',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Description' }),
+    ' Denim ',
+  );
+  await dragProcessToEnd(user, 'Drying');
+  await dragProcessToEnd(user, 'Washing');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).toHaveBeenCalledWith(
+    'styles',
+    {
+      styleNumber: 'STY-1001',
+      description: 'Denim',
+      processIds: [styleProcessOptions[1].id, styleProcessOptions[0].id],
+    },
+    expect.anything(),
+  );
+  expect(onSaved).toHaveBeenCalledWith(styleResponse.id);
+  expect(
+    screen.queryByRole('textbox', { name: /Client/ }),
+  ).not.toBeInTheDocument();
+});
+it('hides drag/drop panels and disables save when the system has no processes', async () => {
+  vi.mocked(apiClient.get).mockResolvedValue({
+    status: 200,
+    data: { processes: [] },
   });
-
-  it('shows inline field errors and clears the required-sequence error after a valid drag', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    renderWithProviders(
-      <StyleForm
-        initial={emptyStyle()}
-        editing={false}
-        onSave={onSave}
-        onClose={vi.fn()}
-      />,
-    );
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(
-      screen.getByRole('textbox', { name: /Style Number/ }),
-    ).toHaveAccessibleDescription('Enter a style number.');
-    expect(
-      screen.getByRole('spinbutton', { name: /Average Garment Weight/ }),
-    ).toHaveAccessibleDescription('Enter a weight greater than zero.');
-    expect(
-      screen.getByText('Add at least one process to the production sequence.'),
-    ).toBeVisible();
-    await dragProcessToEnd(user, 'Washing');
-    expect(
-      screen.queryByText(
-        'Add at least one process to the production sequence.',
-      ),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
-        'Washing',
-      ),
-    ).toBeVisible();
-    expect(onSave).not.toHaveBeenCalled();
+  setup();
+  expect(await screen.findByText(/No processes are available/)).toBeVisible();
+  expect(
+    screen.queryByRole('region', { name: 'Scrollable production sequence' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: /Drag / }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save Style' })).toBeDisabled();
+});
+it('requires a selected process and refuses duplicate process selections', async () => {
+  const { user } = setup();
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    'STY-1001',
+  );
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).not.toHaveBeenCalled();
+  await dragProcessToEnd(user, 'Washing');
+  await dragProcessToEnd(user, 'Washing');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(
+    await screen.findByText('Each process can only be added once.'),
+  ).toBeVisible();
+  expect(apiClient.post).not.toHaveBeenCalled();
+});
+it('loads fresh edit data, requires a revision reason and saves using the chosen revision scope', async () => {
+  const { user, onSaved } = setup(styleResponse.id);
+  const number = await screen.findByRole('textbox', { name: /Style Number/ });
+  expect(number).toHaveValue(styleResponse.style_number);
+  expect(number).toHaveAttribute('readonly');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(screen.getByText('Enter a reason for this change.')).toBeVisible();
+  await user.clear(screen.getByRole('textbox', { name: 'Description' }));
+  await user.type(
+    screen.getByRole('textbox', { name: 'Description' }),
+    'Revised description',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: /Reason for change/ }),
+    'Improve route',
+  );
+  await user.click(screen.getByRole('combobox', { name: 'Apply revision to' }));
+  await user.click(screen.getByRole('option', { name: 'In-progress lots' }));
+  vi.mocked(apiClient.post).mockResolvedValue({
+    status: 200,
+    data: { ...styleRevisionResponse, scope: 'ALL_IN_PROGRESS' },
   });
-
-  it('reorders with keyboard dragging, removes steps, and preserves manually entered average weight', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    const initial = {
-      ...toStyleDraft(sampleStyles[0]),
-      id: 'new',
-      number: ' STY-2002 ',
-      client: ' Client B ',
-      avg: '0.75',
-    };
-    renderWithProviders(
-      <StyleForm
-        initial={initial}
-        editing={false}
-        onSave={onSave}
-        onClose={vi.fn()}
-      />,
-    );
-    await user.click(
-      screen.getByRole('button', { name: 'Drag Step 2 to reorder' }),
-    );
-    await user.keyboard('[Space]');
-    await user.keyboard('[ArrowUp]');
-    await user.keyboard('[Space]');
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
-        'Washing',
-      ),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Remove step 2' }));
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(onSave).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        number: 'STY-2002',
-        client: 'Client B',
-        avg: 0.75,
-        steps: ['demo-2'],
-      }),
-    );
-    expect(initial.steps).toEqual(['demo-1', 'demo-2']);
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(apiClient.post).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/revisions/in-progress`,
+    {
+      description: 'Revised description',
+      processIds: [styleProcessOptions[0].id],
+      reason: 'Improve route',
+    },
+    expect.anything(),
+  );
+  expect(onSaved).toHaveBeenCalledOnce();
+});
+it('preserves entered fields and process order when the backend rejects a route', async () => {
+  vi.mocked(apiClient.post).mockResolvedValue({
+    status: 409,
+    data: {
+      code: 'REPEATED_STATION_NOT_ALLOWED',
+      detail: 'Derived route returns to Station 03',
+    },
   });
-
-  it('attaches duplicate numbers and earlier delivery dates to their fields', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    renderWithProviders(
-      <StyleForm
-        initial={{ ...toStyleDraft(sampleStyles[0]), id: 'new' }}
-        editing={false}
-        onSave={onSave}
-        onClose={vi.fn()}
-      />,
-    );
-    fireEvent.change(screen.getByLabelText(/Delivery Date/), {
-      target: { value: '2026-10-01' },
-    });
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(
-      screen.getByRole('textbox', { name: /Style Number/ }),
-    ).toHaveAccessibleDescription('This style number already exists.');
-    expect(screen.getByLabelText(/Delivery Date/)).toHaveAccessibleDescription(
-      'Delivery date cannot be earlier than creation date.',
-    );
-    expect(onSave).not.toHaveBeenCalled();
+  const { user, onSaved } = setup();
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    'STY-1001',
+  );
+  await dragProcessToEnd(user, 'Washing');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Derived route returns to Station 03',
+  );
+  expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
+  expect(screen.getByRole('textbox', { name: /Style Number/ })).toHaveValue(
+    'STY-1001',
+  );
+  expect(
+    within(screen.getByRole('region', { name: 'Step 1' })).getByText('Washing'),
+  ).toBeVisible();
+  expect(onSaved).not.toHaveBeenCalled();
+});
+it('blocks duplicate saves and aborts a pending create when unmounted', async () => {
+  let resolve!: (value: { status: number; data: unknown }) => void;
+  vi.mocked(apiClient.post).mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  const { user, unmount, onSaved } = setup();
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    'STY-1001',
+  );
+  await dragProcessToEnd(user, 'Washing');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  expect(apiClient.post).toHaveBeenCalledOnce();
+  const signal = vi.mocked(apiClient.post).mock.calls[0][2]?.signal;
+  unmount();
+  expect(signal?.aborted).toBe(true);
+  await act(async () => resolve({ status: 200, data: styleResponse }));
+  expect(onSaved).not.toHaveBeenCalled();
+});
+it('retries failed process lookups instead of showing an empty drag/drop area', async () => {
+  vi.mocked(apiClient.get).mockResolvedValueOnce({
+    status: 503,
+    data: { detail: 'Process lookup unavailable' },
   });
-
-  it('requires unavailable process references to be removed and replaced by dragging an available process', async () => {
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    renderWithProviders(
-      <StyleForm
-        initial={{ ...toStyleDraft(sampleStyles[0]), steps: ['removed'] }}
-        editing
-        onSave={onSave}
-        onClose={vi.fn()}
-      />,
-    );
-    expect(
-      within(screen.getByRole('region', { name: 'Step 1' })).getByText(
-        'Unavailable process (removed)',
-      ),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(
-      screen.getByText(
-        'Remove this step and drag an available process into the sequence.',
-      ),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('region', { name: 'Step 1' }),
-    ).toHaveAccessibleDescription(
-      'Remove this step and drag an available process into the sequence.',
-    );
-    expect(onSave).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Remove step 1' }));
-    await dragProcessToEnd(user, 'Washing');
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(onSave).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ steps: ['demo-2'] }),
-    );
-  });
-
-  it('prevents saves when process configurations cannot be verified and cancels without saving', async () => {
-    localStorage.setItem(PROCESS_STORAGE_KEY, '{invalid');
-    const user = userEvent.setup();
-    const onSave = vi.fn();
-    const onClose = vi.fn();
-    renderWithProviders(
-      <StyleForm
-        initial={emptyStyle()}
-        editing={false}
-        onSave={onSave}
-        onClose={onClose}
-      />,
-    );
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Process configurations could not be verified',
-    );
-    expect(screen.getByRole('button', { name: 'Save Style' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(onSave).not.toHaveBeenCalled();
-  });
+  const { user } = setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Process lookup unavailable',
+  );
+  expect(screen.getByRole('button', { name: 'Save Style' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Save Style' })).toBeEnabled(),
+  );
 });

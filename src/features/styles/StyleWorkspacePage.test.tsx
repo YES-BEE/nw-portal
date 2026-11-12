@@ -1,228 +1,222 @@
-import { sampleStyles, seedTestData, signIn } from '../../test/fixtures';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { loadStyles, STYLE_STORAGE_KEY } from './styleData';
-import { StyleWorkspacePage } from './StyleWorkspacePage';
-import { StyleDetailsPage } from './StyleDetailsPage';
 import {
-  dragProcessToEnd,
+  styleResponse,
+  styleRouteResponse,
+  styleProcessOptions,
+} from '../../test/styles';
+import {
   mockProcessDragLayout,
+  dragProcessToEnd,
 } from '../../test/processDrag';
-
+import { StyleWorkspacePage } from './StyleWorkspacePage';
+import type { StyleMode, StyleResponse } from './types';
+let records: StyleResponse[];
 beforeEach(() => {
+  records = [styleResponse];
   mockProcessDragLayout();
-  seedTestData();
-  sessionStorage.clear();
-  signIn('nw.admin', 'NW@2026demo');
-});
-
-describe('shared style workspace', () => {
-  it('shows reference styles with detail links, searches client/number/description and cancels edits', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <MemoryRouter>
-        <StyleWorkspacePage mode="management" />
-      </MemoryRouter>,
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
+    if (url === 'ui/lookups')
+      return { status: 200, data: { processes: styleProcessOptions } };
+    if (url.endsWith('/derived-route'))
+      return { status: 200, data: styleRouteResponse };
+    if (url !== 'styles') return { status: 200, data: styleResponse };
+    const query = config!.params as {
+      page: number;
+      size: number;
+      search: string;
+    };
+    const matches = records.filter((record) =>
+      record.style_number.toLowerCase().includes(query.search.toLowerCase()),
     );
-    expect(screen.getByRole('link', { name: 'View STY-1001' })).toHaveAttribute(
-      'href',
-      '/styles/sty-1',
-    );
-    expect(screen.getByText('2 processes')).toBeVisible();
-    const search = screen.getByRole('searchbox', { name: 'Search styles' });
-    await user.type(search, ' DENIM ');
-    expect(screen.getByRole('rowheader', { name: 'STY-1001' })).toBeVisible();
-    await user.clear(search);
-    await user.type(search, 'nothing');
-    expect(screen.getByText('No styles found.')).toBeVisible();
-    await user.clear(search);
-    await user.click(screen.getByRole('button', { name: 'Edit STY-1001' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBe(
-      JSON.stringify(sampleStyles),
-    );
-    expect(
-      screen.getByRole('table', { name: 'Existing Styles' }),
-    ).toBeVisible();
-  });
-
-  it('updates an existing style and keeps the production sequence intact', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <MemoryRouter>
-        <StyleWorkspacePage mode="management" />
-      </MemoryRouter>,
-    );
-    await user.click(screen.getByRole('button', { name: 'Edit STY-1001' }));
-    const client = screen.getByRole('textbox', { name: /Client/ });
-    await user.clear(client);
-    await user.paste('Updated Fabric Client');
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(screen.getByText('Updated Fabric Client')).toBeVisible();
-    expect(loadStyles().records[0].steps).toEqual(['demo-1', 'demo-2']);
-  });
-
-  it('requires delete confirmation and preserves an intentionally empty style registry', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <MemoryRouter>
-        <StyleWorkspacePage mode="management" />
-      </MemoryRouter>,
-    );
-    await user.click(screen.getByRole('button', { name: 'Delete STY-1001' }));
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'Cancel',
-      }),
-    );
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    );
-    expect(localStorage.getItem(STYLE_STORAGE_KEY)).toBe(
-      JSON.stringify(sampleStyles),
-    );
-    await user.click(screen.getByRole('button', { name: 'Delete STY-1001' }));
-    await user.click(
-      within(screen.getByRole('dialog')).getByRole('button', {
-        name: 'Delete',
-      }),
-    );
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
-    );
-    expect(loadStyles().records).toEqual([]);
-    expect(screen.getByText('No styles found.')).toBeVisible();
-  });
-
-  it.each([
-    {
-      mode: 'own' as const,
-      username: 'style.configurator',
-      password: 'Style@2026demo',
-      userId: 'user-7',
-      base: '/new-style',
-      action: 'New Style',
-      back: 'Back to My Styles',
-    },
-    {
-      mode: 'management' as const,
-      username: 'nw.admin',
-      password: 'NW@2026demo',
-      userId: 'user-1',
-      base: '/styles',
-      action: 'Create Style',
-      back: 'Back to Styles',
-    },
-  ])(
-    'shows the lot route immediately after creation in $mode mode',
-    async ({ mode, username, password, userId, base, action, back }) => {
-      signIn(username, password);
-      const user = userEvent.setup();
-      renderWithProviders(
-        <MemoryRouter initialEntries={[base]}>
-          <Routes>
-            <Route path={base} element={<StyleWorkspacePage mode={mode} />} />
-            <Route
-              path={`${base}/:styleId`}
-              element={<StyleDetailsPage mode={mode} />}
-            />
-          </Routes>
-        </MemoryRouter>,
-      );
-      if (mode === 'own')
-        expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: action }));
-      await user.type(
-        screen.getByRole('textbox', { name: /Style Number/ }),
-        'OWN-001',
-      );
-      fireEvent.change(screen.getByLabelText(/Date of Creation/), {
-        target: { value: '2026-11-01' },
-      });
-      await user.type(
-        screen.getByRole('textbox', { name: /Client/ }),
-        'Client B',
-      );
-      await user.type(
-        screen.getByRole('spinbutton', { name: /Number of Garments/ }),
-        '200',
-      );
-      await user.type(
-        screen.getByRole('spinbutton', { name: /Number of Lots/ }),
-        '2',
-      );
-      await user.type(
-        screen.getByRole('spinbutton', { name: /Weight per Lot/ }),
-        '50',
-      );
-      await user.type(
-        screen.getByRole('spinbutton', { name: /Average Garment Weight/ }),
-        '0.5',
-      );
-      fireEvent.change(screen.getByLabelText(/Delivery Date/), {
-        target: { value: '2026-12-01' },
-      });
-      await dragProcessToEnd(user, 'Washing');
-      await user.click(screen.getByRole('button', { name: 'Save Style' }));
-      expect(
-        await screen.findByRole('heading', { level: 1, name: 'OWN-001' }),
-      ).toBeVisible();
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Style created successfully.',
-      );
-      expect(
-        within(screen.getByRole('list', { name: 'Lot Route' })).getByText(
-          'Washing',
+    return {
+      status: 200,
+      data: {
+        items: matches.slice(
+          query.page * query.size,
+          (query.page + 1) * query.size,
         ),
-      ).toBeVisible();
-      expect(
-        screen.getByText('All 2 lots follow this route in the order shown.'),
-      ).toBeVisible();
-      await user.click(screen.getByRole('link', { name: back }));
-      expect(screen.getByRole('rowheader', { name: 'OWN-001' })).toBeVisible();
-      expect(
-        screen.getByRole('link', { name: 'View OWN-001' }),
-      ).toHaveAttribute('href', expect.stringContaining(`${base}/`));
-      if (mode === 'own') {
-        expect(
-          screen.queryByRole('button', { name: /^Edit / }),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByRole('button', { name: /^Delete / }),
-        ).not.toBeInTheDocument();
-      }
-      expect(loadStyles().records[0]).toMatchObject({
-        createdBy: username,
-        createdById: userId,
-        avg: 0.5,
-        steps: ['demo-2'],
-      });
-      expect(loadStyles().records).toHaveLength(2);
-    },
-    15000,
-  );
-
-  it('keeps edits intact after a failed write', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <MemoryRouter>
-        <StyleWorkspacePage mode="management" />
-      </MemoryRouter>,
-    );
-    await user.click(screen.getByRole('button', { name: 'Edit STY-1001' }));
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('Quota');
-    });
-    await user.click(screen.getByRole('button', { name: 'Save Style' }));
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Changes could not be saved',
-    );
-    expect(screen.getByRole('textbox', { name: /Style Number/ })).toHaveValue(
-      'STY-1001',
-    );
-    expect(loadStyles().records).toEqual(sampleStyles);
+        ...query,
+        totalElements: matches.length,
+      },
+    };
   });
+});
+function setup(mode: StyleMode = 'management') {
+  const base = mode === 'own' ? '/new-style' : '/styles';
+  return {
+    user: userEvent.setup(),
+    ...renderWithProviders(
+      <MemoryRouter initialEntries={[base]}>
+        <Routes>
+          <Route path={base} element={<StyleWorkspacePage mode={mode} />} />
+          <Route
+            path={`${base}/:styleId`}
+            element={<span>Backend style details</span>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    ),
+  };
+}
+it('lists server styles and status without reading browser-local style records', async () => {
+  localStorage.setItem(
+    'nw-track-styles-v2',
+    JSON.stringify([{ id: 'local', number: 'LOCAL-ONLY' }]),
+  );
+  setup();
+  expect(
+    await screen.findByRole('rowheader', { name: 'STY-1001' }),
+  ).toBeVisible();
+  expect(screen.getByText('Draft')).toBeVisible();
+  expect(screen.queryByText('LOCAL-ONLY')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: /Delete/ }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View STY-1001' })).toHaveAttribute(
+    'href',
+    `/styles/${styleResponse.id}`,
+  );
+});
+it('creates a backend style and navigates to the returned UUID', async () => {
+  const post = vi
+    .spyOn(apiClient, 'post')
+    .mockResolvedValue({ status: 200, data: styleResponse });
+  const { user } = setup();
+  await user.click(screen.getByRole('button', { name: 'Create Style' }));
+  await user.type(
+    await screen.findByRole('textbox', { name: /Style Number/ }),
+    'STY-1001',
+  );
+  await dragProcessToEnd(user, 'Washing');
+  await user.click(screen.getByRole('button', { name: 'Save Style' }));
+  expect(await screen.findByText('Backend style details')).toBeVisible();
+  expect(post).toHaveBeenCalledWith(
+    'styles',
+    expect.objectContaining({
+      styleNumber: 'STY-1001',
+      processIds: [styleProcessOptions[0].id],
+    }),
+    expect.anything(),
+  );
+});
+it('offers only create and view actions in New Style mode', async () => {
+  setup('own');
+  await screen.findByRole('rowheader', { name: 'STY-1001' });
+  expect(screen.getByRole('button', { name: 'New Style' })).toBeEnabled();
+  expect(
+    screen.queryByRole('button', { name: 'Edit STY-1001' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Release style STY-1001' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'View STY-1001' })).toHaveAttribute(
+    'href',
+    `/new-style/${styleResponse.id}`,
+  );
+});
+it('confirms release and reloads the backend list after success', async () => {
+  const post = vi.spyOn(apiClient, 'post').mockImplementation(async () => {
+    records = [
+      {
+        ...styleResponse,
+        status: 'RELEASED',
+        released_at: '2026-11-12T00:00:00Z',
+      },
+    ];
+    return { status: 200, data: records[0] };
+  });
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Release style STY-1001' }),
+  );
+  expect(post).not.toHaveBeenCalled();
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+  );
+  expect(await screen.findByText('Released')).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Release style STY-1001' }),
+  ).not.toBeInTheDocument();
+  expect(post).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/release`,
+    undefined,
+    expect.anything(),
+  );
+});
+it('shows a blocked release error and keeps the dialog open', async () => {
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
+    status: 409,
+    data: {
+      code: 'STYLE_PROCESS_REQUIRED',
+      detail: 'At least one Process is required',
+    },
+  });
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Release style STY-1001' }),
+  );
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Release' }),
+  );
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'At least one Process is required',
+  );
+  expect(screen.getByRole('dialog')).toBeVisible();
+  expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
+});
+it('opens an existing style as a backend revision and fetches a fresh route', async () => {
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Edit STY-1001' }),
+  );
+  expect(
+    await screen.findByRole('textbox', { name: /Reason for change/ }),
+  ).toBeVisible();
+  expect(apiClient.get).toHaveBeenCalledWith(
+    `styles/${styleResponse.id}/derived-route`,
+    expect.anything(),
+  );
+});
+it('uses backend search and pagination and resets the page on a new search', async () => {
+  records = Array.from({ length: 12 }, (_, index) => ({
+    ...styleResponse,
+    id: 'style-' + index,
+    style_number: 'STY-' + index,
+  }));
+  const { user } = setup();
+  await screen.findByRole('rowheader', { name: 'STY-0' });
+  await user.click(screen.getByRole('button', { name: 'Go to next page' }));
+  await screen.findByRole('rowheader', { name: 'STY-11' });
+  expect(screen.getAllByRole('rowheader')).toHaveLength(2);
+  await user.type(screen.getByRole('searchbox'), 'STY-3');
+  await screen.findByRole('rowheader', { name: 'STY-3' });
+  expect(apiClient.get).toHaveBeenCalledWith(
+    'styles',
+    expect.objectContaining({ params: { page: 0, size: 10, search: 'STY-3' } }),
+  );
+});
+it('accepts empty 200 responses and hides pagination', async () => {
+  records = [];
+  setup();
+  expect(await screen.findByText('No styles found.')).toBeVisible();
+  expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
+});
+it('retries a failed list fetch without discarding the backend message', async () => {
+  vi.mocked(apiClient.get).mockResolvedValueOnce({
+    status: 503,
+    data: { detail: 'Maintenance in progress' },
+  });
+  const { user } = setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Maintenance in progress',
+  );
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() =>
+    expect(screen.getByRole('rowheader', { name: 'STY-1001' })).toBeVisible(),
+  );
 });

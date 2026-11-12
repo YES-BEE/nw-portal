@@ -1,113 +1,174 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link as RouterLink, useLocation, useParams } from 'react-router-dom';
+import { formatDateTime } from '../../utils/formatDateTime';
+import { useEffect, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Stack, Typography } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useSession } from '../auth/useSession';
-import { loadProcesses } from '../processes/processData';
-import { ConfigurationDetails } from '../configurations/ConfigurationDetails';
-import { canViewStyle, loadStyles } from './styleData';
-import type { StyleMode } from './styleData';
+import { Alert, CircularProgress, Stack } from '@mui/material';
+import {
+  ConfigurationDetailHeader,
+  ConfigurationDetails,
+} from '../configurations/ConfigurationDetails';
 import { usePageMetadata } from '../../app/usePageMetadata';
+import {
+  getStyle,
+  getStyleRoute,
+  getStyleProcessOptions,
+  stylesFailure,
+} from './stylesApi';
+import { StyleFailureAlert } from './StyleFailureAlert';
 import { LotRouteStepper } from './LotRouteStepper';
-
+import { styleProcesses, orderedStyleProcesses } from './styleData';
+import type {
+  StyleMode,
+  StyleResponse,
+  StyleRouteResponse,
+  StyleProcessOption,
+  StylesFailure,
+} from './types';
+type State =
+  | { status: 'loading' }
+  | {
+      status: 'ready';
+      style: StyleResponse;
+      route: StyleRouteResponse;
+      options: StyleProcessOption[];
+    }
+  | { status: 'error'; failure: StylesFailure };
 export function StyleDetailsPage({ mode }: { mode: StyleMode }) {
-  const { t } = useTranslation('translation');
   const { styleId } = useParams();
+  return <StyleDetails key={styleId} styleId={styleId} mode={mode} />;
+}
+function StyleDetails({
+  styleId,
+  mode,
+}: {
+  styleId?: string;
+  mode: StyleMode;
+}) {
+  const { t } = useTranslation('translation');
   const location = useLocation();
-  const session = useSession();
-  const [data] = useState(loadStyles);
-  const processData = loadProcesses();
-  const record = data.records.find(
-    (style) => style.id === styleId && canViewStyle(style, session, mode),
+  const [state, setState] = useState<State>(
+    styleId
+      ? { status: 'loading' }
+      : {
+          status: 'error',
+          failure: { kind: 'invalidRequest', action: 'none' },
+        },
   );
-  const heading = useRef<HTMLHeadingElement>(null);
-  const title = record?.number ?? t('styles.details');
+  const [attempt, setAttempt] = useState(0);
+  const record = state.status === 'ready' ? state.style : null;
   usePageMetadata(
-    t('access.pageTitle', { title }),
+    t('access.pageTitle', {
+      title: record?.style_number || t('styles.details'),
+    }),
     t('styles.detailsDescription'),
   );
   useEffect(() => {
-    heading.current?.focus();
-  }, [title]);
-  const createdStyleId = (location.state as { createdStyleId?: unknown } | null)
+    const controller = new AbortController();
+    if (styleId)
+      void Promise.all([
+        getStyle(styleId, controller.signal),
+        getStyleRoute(styleId, controller.signal),
+        getStyleProcessOptions(controller.signal),
+      ]).then(
+        ([style, route, options]) => {
+          if (!controller.signal.aborted)
+            setState({ status: 'ready', style, route, options });
+        },
+        (error) => {
+          if (!controller.signal.aborted)
+            setState({ status: 'error', failure: stylesFailure(error) });
+        },
+      );
+    return () => controller.abort();
+  }, [styleId, attempt]);
+  function reload() {
+    setState({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  }
+  const createdId = (location.state as { createdStyleId?: unknown } | null)
     ?.createdStyleId;
-
   return (
     <>
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        sx={{
-          alignItems: { xs: 'flex-start', sm: 'center' },
-          justifyContent: 'space-between',
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        <Typography
-          ref={heading}
-          tabIndex={-1}
-          component="h1"
-          sx={{ fontSize: 26, fontWeight: 700, overflowWrap: 'anywhere' }}
-        >
-          {title}
-        </Typography>
-        <Button
-          component={RouterLink}
-          to={mode === 'own' ? '/new-style' : '/styles'}
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-        >
-          {t(mode === 'own' ? 'styles.backToMine' : 'styles.backToList')}
-        </Button>
-      </Stack>
-      {data.storageUnavailable && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {t('styles.loadWarning')}
-        </Alert>
+      <ConfigurationDetailHeader
+        title={record?.style_number || t('styles.details')}
+        listTitle={t(
+          mode === 'own' ? 'navigation.newstyle' : 'navigation.styles',
+        )}
+        listPath={mode === 'own' ? '/new-style' : '/styles'}
+        backLabel={t(
+          mode === 'own' ? 'styles.backToMine' : 'styles.backToList',
+        )}
+      />
+      {state.status === 'loading' && (
+        <Stack sx={{ py: 3 }}>
+          <CircularProgress size={28} aria-label={t('common.loading')} />
+        </Stack>
       )}
-      {record ? (
+      {state.status === 'error' && (
+        <StyleFailureAlert
+          failure={state.failure}
+          onReload={reload}
+          onRetry={reload}
+        />
+      )}
+      {state.status === 'ready' && (
         <>
-          {createdStyleId === record.id && (
+          {createdId === state.style.id && (
             <Alert severity="success" sx={{ mb: 3 }}>
               {t('styles.createdSuccess')}
             </Alert>
           )}
-          {processData.storageUnavailable && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {t('styles.processesUnavailable')}
-            </Alert>
-          )}
-          <LotRouteStepper
-            processIds={record.steps}
-            processes={
-              processData.storageUnavailable ? [] : processData.records
-            }
-            lots={record.lots}
-          />
           <ConfigurationDetails
             fields={[
-              { label: t('styles.number'), value: record.number },
-              { label: t('styles.created'), value: record.created },
-              { label: t('styles.description'), value: record.description },
-              { label: t('styles.client'), value: record.client },
-              { label: t('styles.garments'), value: String(record.garments) },
-              { label: t('styles.lots'), value: String(record.lots) },
+              { label: t('styles.number'), value: state.style.style_number },
               {
-                label: t('styles.weight'),
-                value: t('styles.weightValue', { value: record.weight }),
+                label: t('styles.description'),
+                value: state.style.description || '',
               },
               {
-                label: t('styles.avg'),
-                value: t('styles.weightValue', { value: record.avg }),
+                label: t('styles.status'),
+                value: t(`styles.statusValues.${state.style.status}`),
               },
-              { label: t('styles.delivery'), value: record.delivery },
-              { label: t('styles.createdBy'), value: record.createdBy ?? '' },
+              {
+                label: t('styles.created'),
+                value: formatDateTime(state.style.created_at),
+              },
+              {
+                label: t('styles.released'),
+                value: state.style.released_at
+                  ? formatDateTime(state.style.released_at)
+                  : t('styles.notReleased'),
+              },
             ]}
           />
+          {state.route.length ? (
+            <LotRouteStepper
+              processIds={orderedStyleProcesses(state.route)}
+              processes={styleProcesses([
+                ...state.options,
+                ...state.route.flatMap((entry) =>
+                  entry.processes
+                    .filter(
+                      (process) =>
+                        !state.options.some(
+                          (option) => option.id === process.processId,
+                        ),
+                    )
+                    .map((process) => ({
+                      id: process.processId,
+                      name: process.processCode,
+                      station_id: process.stationId,
+                      stationNumber: process.stationCode,
+                    })),
+                ),
+              ])}
+              lots={0}
+              description={t('styles.routePreviewHint')}
+            />
+          ) : (
+            <Alert severity="info">{t('styles.noRoute')}</Alert>
+          )}
         </>
-      ) : (
-        <Alert severity="info">{t('styles.notFound')}</Alert>
       )}
     </>
   );

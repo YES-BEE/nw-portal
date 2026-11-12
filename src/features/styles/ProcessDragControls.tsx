@@ -39,6 +39,7 @@ function ProcessTile({ process }: { process: ProcessConfiguration }) {
     >
       <Tooltip title={t('styles.dragProcess', { name: process.name })}>
         <IconButton
+          size="small"
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
@@ -49,7 +50,7 @@ function ProcessTile({ process }: { process: ProcessConfiguration }) {
             '&:active': { cursor: 'grabbing' },
           }}
         >
-          <DragIndicatorIcon />
+          <DragIndicatorIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -93,7 +94,13 @@ export function ProcessPalette({
       <Typography
         id="process-palette-heading"
         component="h4"
-        sx={{ fontWeight: 600, mb: 1, color: 'primary.dark', flexShrink: 0 }}
+        sx={{
+          fontSize: 16,
+          fontWeight: 600,
+          mb: 1,
+          color: 'primary.dark',
+          flexShrink: 0,
+        }}
       >
         {t('styles.availableProcesses')}
       </Typography>
@@ -196,6 +203,7 @@ export function SortableProcessStep({
       <Stack direction="row" sx={{ alignItems: 'center', gap: 0.5, mb: 0.5 }}>
         <Tooltip title={t('styles.dragStep', { name: label })}>
           <IconButton
+            size="small"
             ref={setActivatorNodeRef}
             {...attributes}
             {...listeners}
@@ -207,7 +215,7 @@ export function SortableProcessStep({
               '&:active': { cursor: 'grabbing' },
             }}
           >
-            <DragIndicatorIcon />
+            <DragIndicatorIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         <Typography

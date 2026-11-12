@@ -1,3 +1,8 @@
+import {
+  styleResponse,
+  styleRouteResponse,
+  styleProcessOptions,
+} from '../test/styles';
 import { storageAreaResponse, storageTags } from '../test/storages';
 import { apiClient } from '../api/client';
 import { processResponse } from '../test/processes';
@@ -16,7 +21,7 @@ import {
   signOut,
 } from '../features/auth/session';
 import { ACCESS_STORAGE_KEY, loadAccessData } from '../test/accessData';
-import { STYLE_STORAGE_KEY } from '../features/styles/styleData';
+import { STYLE_STORAGE_KEY } from '../test/fixtures';
 
 afterAll(() => {
   router.dispose();
@@ -27,12 +32,21 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { tags: storageTags }
-        : url.startsWith('storage-areas/')
-          ? { ...storageAreaResponse, id: url.slice('storage-areas/'.length) }
-          : url.startsWith('processes/')
-            ? { ...processResponse, id: url.slice('processes/'.length) }
-            : [],
+        ? { tags: storageTags, processes: styleProcessOptions }
+        : url === 'styles'
+          ? [styleResponse]
+          : url.startsWith('styles/') && url.endsWith('/derived-route')
+            ? styleRouteResponse
+            : url.startsWith('styles/')
+              ? { ...styleResponse, id: url.slice('styles/'.length) }
+              : url.startsWith('storage-areas/')
+                ? {
+                    ...storageAreaResponse,
+                    id: url.slice('storage-areas/'.length),
+                  }
+                : url.startsWith('processes/')
+                  ? { ...processResponse, id: url.slice('processes/'.length) }
+                  : [],
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -251,13 +265,49 @@ describe('application routing', () => {
         },
       ]),
     );
+    const originalGet = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation(async (url, config) => {
+      if (url === 'styles')
+        return {
+          status: 200,
+          data: [
+            {
+              ...styleResponse,
+              id: 'owned-style',
+              style_number: 'OWN-100',
+              created_by: 'user-7',
+            },
+          ],
+        };
+      if (url === 'styles/owned-style')
+        return {
+          status: 200,
+          data: {
+            ...styleResponse,
+            id: 'owned-style',
+            style_number: 'OWN-100',
+            created_by: 'user-7',
+          },
+        };
+      if (url === 'styles/sty-1')
+        return {
+          status: 403,
+          data: {
+            code: 'ACCESS_DENIED',
+            detail: 'Style is outside your access',
+          },
+        };
+      return originalGet(url, config);
+    });
     const user = userEvent.setup();
     await router.navigate('/new-style');
     renderWithProviders(<App />);
     expect(
       await screen.findByRole('heading', { level: 1, name: 'New Style' }),
     ).toBeVisible();
-    expect(screen.getByRole('rowheader', { name: 'OWN-100' })).toBeVisible();
+    expect(
+      await screen.findByRole('rowheader', { name: 'OWN-100' }),
+    ).toBeVisible();
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'View OWN-100' }));
     expect(
@@ -265,9 +315,7 @@ describe('application routing', () => {
     ).toBeVisible();
     await act(() => router.navigate('/new-style/sty-1'));
     expect(
-      await screen.findByText(
-        'This style was not found or is not available to your account.',
-      ),
+      await screen.findByText('Style is outside your access'),
     ).toBeVisible();
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
     await act(() => router.navigate('/styles'));

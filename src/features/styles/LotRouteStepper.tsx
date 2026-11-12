@@ -20,6 +20,7 @@ export function LotRouteStepper({
   title,
   orientation,
   fillHeight = false,
+  description,
 }: {
   processIds: string[];
   processes: ProcessConfiguration[];
@@ -27,6 +28,7 @@ export function LotRouteStepper({
   title?: string;
   orientation?: 'horizontal' | 'vertical';
   fillHeight?: boolean;
+  description?: string;
 }) {
   const { t } = useTranslation('translation');
   const headingId = useId();
@@ -59,9 +61,10 @@ export function LotRouteStepper({
         variant="body2"
         sx={{ mt: 0.5, mb: 3 }}
       >
-        {processIds.length
-          ? t('styles.lotRouteDescription', { count: lots })
-          : t('styles.emptyOverview')}
+        {description ??
+          (processIds.length
+            ? t('styles.lotRouteDescription', { count: lots })
+            : t('styles.emptyOverview'))}
       </Typography>
       <Box
         role="region"

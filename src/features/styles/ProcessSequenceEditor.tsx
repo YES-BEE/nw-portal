@@ -24,6 +24,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import {
+  Alert,
   Box,
   Chip,
   FormHelperText,
@@ -81,7 +82,7 @@ export interface ProcessStep {
   processId: string;
 }
 
-export function ProcessSequenceEditor({
+function ProcessSequenceContent({
   steps,
   processes,
   errors,
@@ -250,7 +251,7 @@ export function ProcessSequenceEditor({
               <Typography
                 id="selected-processes-heading"
                 component="h4"
-                sx={{ fontWeight: 600 }}
+                sx={{ fontSize: 16, fontWeight: 600 }}
               >
                 {t('styles.selectedProcesses')}
               </Typography>
@@ -337,6 +338,7 @@ export function ProcessSequenceEditor({
                             title={t('styles.removeStep', { count: index + 1 })}
                           >
                             <IconButton
+                              size="small"
                               color="error"
                               aria-label={t('styles.removeStep', {
                                 count: index + 1,
@@ -347,7 +349,7 @@ export function ProcessSequenceEditor({
                                 )
                               }
                             >
-                              <DeleteOutlinedIcon />
+                              <DeleteOutlinedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         </Stack>
@@ -379,6 +381,7 @@ export function ProcessSequenceEditor({
               processIds={steps.map((step) => step.processId)}
               processes={processes}
               lots={1}
+              description={t('styles.routePreviewHint')}
               orientation="vertical"
               fillHeight
             />
@@ -401,4 +404,13 @@ export function ProcessSequenceEditor({
       </DragOverlay>
     </DndContext>
   );
+}
+
+export function ProcessSequenceEditor(
+  props: Parameters<typeof ProcessSequenceContent>[0],
+) {
+  const { t } = useTranslation('translation');
+  if (!props.processes.length)
+    return <Alert severity="info">{t('styles.noProcesses')}</Alert>;
+  return <ProcessSequenceContent {...props} />;
 }

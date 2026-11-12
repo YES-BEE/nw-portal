@@ -294,3 +294,24 @@ describe('process drag-and-drop option', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+it('replaces the entire drag/drop area with guidance when no processes are available', () => {
+  renderWithProviders(
+    <ProcessSequenceEditor
+      processes={[]}
+      steps={[]}
+      errors={[]}
+      requiredError={false}
+      onChange={vi.fn()}
+    />,
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'No processes are available',
+  );
+  expect(
+    screen.queryByRole('region', { name: 'Scrollable production sequence' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: /Drag / }),
+  ).not.toBeInTheDocument();
+});

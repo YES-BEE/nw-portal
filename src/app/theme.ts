@@ -6,9 +6,23 @@ export const theme = createTheme({
     text: { primary: '#091832', secondary: '#65718a' },
     background: { default: '#00102d', paper: '#ffffff' },
   },
-  typography: { fontFamily: '"Inter Variable", Arial, Helvetica, sans-serif' },
+  typography: {
+    fontFamily: '"Inter Variable", Arial, Helvetica, sans-serif',
+    body1: { fontSize: 13 },
+    body2: { fontSize: 13 },
+    button: { fontSize: 13 },
+  },
   shape: { borderRadius: 5 },
   components: {
+    MuiAlertTitle: {
+      styleOverrides: { root: { fontSize: 16 } },
+    },
+    MuiFormLabel: {
+      styleOverrides: { root: { fontSize: 13 } },
+    },
+    MuiInputBase: {
+      styleOverrides: { root: { fontSize: 13 } },
+    },
     MuiDialogContent: {
       styleOverrides: {
         root: {
@@ -89,7 +103,12 @@ export const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { textTransform: 'none', fontWeight: 600, minHeight: 47 },
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          fontSize: 13,
+          minHeight: 47,
+        },
       },
     },
     MuiOutlinedInput: {

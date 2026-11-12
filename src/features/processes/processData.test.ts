@@ -3,11 +3,9 @@ import {
   seedTestData,
   defaultTags,
 } from '../../test/fixtures';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  loadProcesses,
   normalizeProcess,
-  PROCESS_STORAGE_KEY,
   getProcessFieldErrors as validateProcess,
 } from './processData';
 import type { ProcessConfiguration } from './types';
@@ -111,54 +109,6 @@ describe('process validation', () => {
     expect(normalizeProcess(record)).toMatchObject({
       processTag: '',
       devices: [{ ...record.devices[0], name: 'Washer 01' }, record.devices[1]],
-    });
-  });
-});
-
-describe('local process records', () => {
-  it('preserves a saved empty list rather than repopulating demo records', () => {
-    localStorage.setItem(PROCESS_STORAGE_KEY, '[]');
-    expect(loadProcesses()).toEqual({ records: [], storageUnavailable: false });
-  });
-
-  it.each(['{broken json', '{"unexpected":true}', '[{"id":"incomplete"}]'])(
-    'recovers malformed data without overwriting it: %s',
-    (stored) => {
-      localStorage.setItem(PROCESS_STORAGE_KEY, stored);
-      expect(loadProcesses()).toEqual({
-        records: [],
-        storageUnavailable: true,
-      });
-      expect(localStorage.getItem(PROCESS_STORAGE_KEY)).toBe(stored);
-    },
-  );
-
-  it('supports records from the HTML reference without device IDs', () => {
-    const records = structuredClone(sampleProcesses);
-    const legacy = records.map((record) => ({
-      ...record,
-      devices: record.devices.map(({ name, description, tag }) => ({
-        name,
-        description,
-        tag,
-      })),
-    }));
-    localStorage.setItem(PROCESS_STORAGE_KEY, JSON.stringify(legacy));
-    const loaded = loadProcesses();
-    expect(loaded.storageUnavailable).toBe(false);
-    expect(loaded.records[1].devices[0]).toMatchObject({
-      name: 'Washer 01',
-      id: 'demo-2-device-0',
-    });
-  });
-
-  it('reports unavailable browser storage and provides usable demo records', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('Storage denied');
-    });
-    expect(loadProcesses()).toEqual({
-      records: [],
-      storageUnavailable: true,
     });
   });
 });

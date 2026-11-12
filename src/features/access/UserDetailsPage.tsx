@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../utils/formatDateTime';
 import { useEffect, useRef, useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +38,7 @@ export function UserDetailsPage() {
 }
 
 function UserDetails({ userId }: { userId: string | undefined }) {
-  const { t, i18n } = useTranslation('translation');
+  const { t } = useTranslation('translation');
   const [state, setState] = useState<DetailState>(
     userId
       ? { status: 'loading' }
@@ -197,10 +198,7 @@ function UserDetails({ userId }: { userId: string | undefined }) {
               },
               {
                 label: t('access.users.createdAt'),
-                value: new Intl.DateTimeFormat(i18n.resolvedLanguage ?? 'en', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                }).format(new Date(record.created_at)),
+                value: formatDateTime(record.created_at, { seconds: false }),
               },
             ]}
           />

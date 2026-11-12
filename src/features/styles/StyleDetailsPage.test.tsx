@@ -1,115 +1,133 @@
-import { sampleStyles, seedTestData, signIn } from '../../test/fixtures';
 import { screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { STYLE_STORAGE_KEY } from './styleData';
-import type { StyleMode } from './styleData';
+import {
+  styleResponse,
+  styleRouteResponse,
+  styleProcessOptions,
+} from '../../test/styles';
 import { StyleDetailsPage } from './StyleDetailsPage';
-
+import type { StyleMode } from './types';
 beforeEach(() => {
-  seedTestData();
-  sessionStorage.clear();
-  signIn('nw.admin', 'NW@2026demo');
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: styleProcessOptions }
+        : url.endsWith('/derived-route')
+          ? styleRouteResponse
+          : styleResponse,
+  }));
 });
-function renderDetails(mode: StyleMode, id = 'sty-1') {
-  const base = mode === 'own' ? '/new-style' : '/styles';
-  return renderWithProviders(
-    <MemoryRouter initialEntries={[`${base}/${id}`]}>
+function setup(mode: StyleMode = 'management') {
+  renderWithProviders(
+    <MemoryRouter
+      initialEntries={[
+        `/${mode === 'own' ? 'new-style' : 'styles'}/${styleResponse.id}`,
+      ]}
+    >
       <Routes>
         <Route
-          path={`${base}/:styleId`}
+          path="/styles/:styleId"
+          element={<StyleDetailsPage mode={mode} />}
+        />
+        <Route
+          path="/new-style/:styleId"
           element={<StyleDetailsPage mode={mode} />}
         />
       </Routes>
     </MemoryRouter>,
   );
+  return userEvent.setup();
 }
-
-describe('shared style details', () => {
-  it('shows read-only details with a connected lot route and a return link', () => {
-    renderDetails('management');
+it.each(['management', 'own'] as const)(
+  'loads backend detail and derived route for %s',
+  async (mode) => {
+    setup(mode);
     expect(
-      screen.getByRole('heading', { level: 1, name: 'STY-1001' }),
-    ).toHaveFocus();
-    expect(screen.getByText('100 kg')).toBeVisible();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    const rows = within(
-      screen.getByRole('list', { name: 'Lot Route' }),
-    ).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('Lot Preparation');
-    expect(rows[1]).toHaveTextContent('Washing');
-    expect(
-      screen.getByText('All 20 lots follow this route in the order shown.'),
+      await screen.findByRole('heading', { level: 1, name: 'STY-1001' }),
     ).toBeVisible();
+    expect(screen.getByText('Denim wash style')).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Back to Styles' }),
-    ).toHaveAttribute('href', '/styles');
-    expect(localStorage.length).toBe(5);
-  });
-
-  it('does not expose another creator’s style through a guessed own-mode URL', () => {
-    signIn('style.configurator', 'Style@2026demo');
-    localStorage.setItem(
-      STYLE_STORAGE_KEY,
-      JSON.stringify([
-        { ...sampleStyles[0], createdBy: 'nw.admin', createdById: 'user-1' },
-      ]),
-    );
-    renderDetails('own');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'not available to your account',
-    );
-    expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('list', { name: 'Lot Route' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('allows creators to view their style and handles missing process references explicitly', () => {
-    signIn('style.configurator', 'Style@2026demo');
-    localStorage.setItem(
-      STYLE_STORAGE_KEY,
-      JSON.stringify([
-        { ...sampleStyles[0], createdById: 'user-7', steps: ['removed'] },
-      ]),
-    );
-    renderDetails('own');
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'STY-1001' }),
+      within(
+        screen.getByRole('region', { name: 'Ordered lot process route' }),
+      ).getByText('Washing'),
     ).toBeVisible();
-    expect(screen.getByText('Unavailable process (removed)')).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Back to My Styles' }),
-    ).toHaveAttribute('href', '/new-style');
-  });
-
-  it('shows every step of a long production sequence in its original order', () => {
-    localStorage.setItem(
-      STYLE_STORAGE_KEY,
-      JSON.stringify([
-        {
-          ...sampleStyles[0],
-          steps: Array.from({ length: 25 }, (_, index) =>
-            index % 2 ? 'demo-2' : 'demo-1',
-          ),
-        },
-      ]),
+    expect(screen.queryByText(styleResponse.id)).not.toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith(
+      `styles/${styleResponse.id}/derived-route`,
+      expect.anything(),
     );
-    renderDetails('management');
-    const route = screen.getByRole('list', { name: 'Lot Route' });
-    const steps = within(route).getAllByRole('listitem');
-    expect(steps).toHaveLength(25);
-    expect(steps[0]).toHaveAccessibleName('Step 1: Lot Preparation');
-    expect(steps[10]).toHaveAccessibleName('Step 11: Lot Preparation');
-    expect(steps[24]).toHaveAccessibleName('Step 25: Lot Preparation');
-  });
-
-  it('handles a missing style with a return link', () => {
-    renderDetails('management', 'missing');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'This style was not found',
+    expect(apiClient.get).not.toHaveBeenCalledWith(
+      expect.stringContaining('/lots'),
+      expect.anything(),
     );
-    expect(screen.getByRole('link', { name: 'Back to Styles' })).toBeVisible();
+  },
+);
+it('uses the process code if a route process is absent from current lookup choices', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: [] }
+        : url.endsWith('/derived-route')
+          ? styleRouteResponse
+          : styleResponse,
+  }));
+  setup();
+  expect(await screen.findByText('WASH')).toBeVisible();
+  expect(screen.queryByText(styleProcessOptions[0].id)).not.toBeInTheDocument();
+});
+it('shows an informative empty route message for a draft without selected processes', async () => {
+  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+    status: url.endsWith('/derived-route') ? 409 : 200,
+    data:
+      url === 'ui/lookups'
+        ? { processes: [] }
+        : url.endsWith('/derived-route')
+          ? {
+              code: 'STYLE_PROCESS_REQUIRED',
+              detail: 'At least one Process is required',
+            }
+          : styleResponse,
+  }));
+  setup();
+  expect(
+    await screen.findByText('No process route is configured for this style.'),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('heading', { level: 1, name: 'STY-1001' }),
+  ).toBeVisible();
+});
+it.each([403, 404])(
+  'shows backend error %s without leaking local style details',
+  async (status) => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status,
+      data: { detail: 'Style is outside your access' },
+    });
+    setup();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Style is outside your access',
+    );
+    expect(screen.queryByText('Denim wash style')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
+  },
+);
+it('retries failed style loads', async () => {
+  vi.mocked(apiClient.get).mockResolvedValueOnce({
+    status: 503,
+    data: { detail: 'Maintenance in progress' },
   });
+  const user = setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Maintenance in progress',
+  );
+  await user.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(
+    await screen.findByRole('heading', { level: 1, name: 'STY-1001' }),
+  ).toBeVisible();
 });
