@@ -5,6 +5,11 @@ import {
 } from '../test/styles';
 import { storageAreaResponse, storageTags } from '../test/storages';
 import { lotResponse, lotEvent, lotStyleOption } from '../test/lots';
+import {
+  emptyDashboard,
+  dashboardResponse,
+  dashboardLot,
+} from '../test/dashboard';
 import { apiClient } from '../api/client';
 import { processResponse } from '../test/processes';
 import { userResponse, usersResponse } from '../test/users';
@@ -32,22 +37,24 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
     data:
-      url === 'ui/lookups'
-        ? { tags: storageTags, processes: styleProcessOptions }
-        : url === 'styles'
-          ? [styleResponse]
-          : url.startsWith('styles/') && url.endsWith('/derived-route')
-            ? styleRouteResponse
-            : url.startsWith('styles/')
-              ? { ...styleResponse, id: url.slice('styles/'.length) }
-              : url.startsWith('storage-areas/')
-                ? {
-                    ...storageAreaResponse,
-                    id: url.slice('storage-areas/'.length),
-                  }
-                : url.startsWith('processes/')
-                  ? { ...processResponse, id: url.slice('processes/'.length) }
-                  : [],
+      url === 'dashboard'
+        ? emptyDashboard
+        : url === 'ui/lookups'
+          ? { tags: storageTags, processes: styleProcessOptions }
+          : url === 'styles'
+            ? [styleResponse]
+            : url.startsWith('styles/') && url.endsWith('/derived-route')
+              ? styleRouteResponse
+              : url.startsWith('styles/')
+                ? { ...styleResponse, id: url.slice('styles/'.length) }
+                : url.startsWith('storage-areas/')
+                  ? {
+                      ...storageAreaResponse,
+                      id: url.slice('storage-areas/'.length),
+                    }
+                  : url.startsWith('processes/')
+                    ? { ...processResponse, id: url.slice('processes/'.length) }
+                    : [],
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -56,6 +63,40 @@ beforeEach(() => {
 });
 
 describe('application routing', () => {
+  it('loads dashboard metrics with only dashboard access and does not require other modules', async () => {
+    const session = readSession()!;
+    setAuthenticatedSession({
+      ...session,
+      modules: ['dashboard'],
+      profile: {
+        ...session.profile!,
+        modules: [{ key: 'dashboard', name: 'Dashboard', built_in: true }],
+      },
+    });
+    vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+      status: 200,
+      data: url === 'dashboard' ? dashboardResponse : [dashboardLot],
+    }));
+    await router.navigate('/dashboard');
+    renderWithProviders(<App />);
+    expect(
+      await screen.findByRole('region', { name: 'Total Lots' }),
+    ).toBeVisible();
+    expect(
+      await screen.findByRole('rowheader', { name: 'LOT-001' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'View lot LOT-001' }),
+    ).not.toBeInTheDocument();
+    expect(
+      vi
+        .mocked(apiClient.get)
+        .mock.calls.every(
+          ([url]) => url === 'dashboard' || url === 'dashboard/lots',
+        ),
+    ).toBe(true);
+  });
+
   it('shows shared style/lot menus and only backend-supported style actions for configurators', async () => {
     signIn('style.configurator', 'Style@2026demo');
     const session = readSession()!;

@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+﻿import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTagResponse } from '../../test/tags';
@@ -110,7 +110,7 @@ function setup() {
 }
 
 describe('trolley configuration', () => {
-  it('lists trolley codes, availability, active state and actions using the paginated API', async () => {
+  it('lists trolley numbers, availability, active state and actions using the paginated API', async () => {
     setup();
     const row = (
       await screen.findByRole('rowheader', { name: 'TR-01' })
@@ -128,10 +128,10 @@ describe('trolley configuration', () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Add Trolley' }));
     await user.click(screen.getByRole('button', { name: 'Save Trolley' }));
-    expect(await screen.findByText('Enter a trolley code.')).toBeVisible();
+    expect(await screen.findByText('Enter a trolley number.')).toBeVisible();
     expect(apiClient.post).not.toHaveBeenCalled();
     await user.type(
-      screen.getByRole('textbox', { name: /Trolley Code/ }),
+      screen.getByRole('textbox', { name: /Trolley Number/ }),
       ' tr-03 ',
     );
     await user.click(screen.getByRole('button', { name: 'Save Trolley' }));
@@ -160,7 +160,7 @@ describe('trolley configuration', () => {
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close' }));
     await user.click(screen.getByRole('button', { name: 'Edit TR-01' }));
-    const code = await screen.findByRole('textbox', { name: /Trolley Code/ });
+    const code = await screen.findByRole('textbox', { name: /Trolley Number/ });
     expect(code).toHaveValue('TR-01');
     await user.clear(code);
     await user.type(code, 'TR-EDIT');
@@ -242,7 +242,7 @@ describe('trolley configuration', () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Add Trolley' }));
     await user.type(
-      screen.getByRole('textbox', { name: /Trolley Code/ }),
+      screen.getByRole('textbox', { name: /Trolley Number/ }),
       'TR-01',
     );
     await user.click(screen.getByRole('button', { name: 'Save Trolley' }));
@@ -250,7 +250,7 @@ describe('trolley configuration', () => {
       'Trolley code already exists',
     );
     expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP 409');
-    expect(screen.getByRole('textbox', { name: /Trolley Code/ })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: /Trolley Number/ })).toHaveValue(
       'TR-01',
     );
     expect(apiClient.post).toHaveBeenCalledTimes(1);
@@ -285,7 +285,7 @@ describe('trolley configuration', () => {
     const { user, unmount } = setup();
     await user.click(screen.getByRole('button', { name: 'Add Trolley' }));
     await user.type(
-      screen.getByRole('textbox', { name: /Trolley Code/ }),
+      screen.getByRole('textbox', { name: /Trolley Number/ }),
       'TR-99',
     );
     await user.click(screen.getByRole('button', { name: 'Save Trolley' }));
@@ -309,7 +309,7 @@ describe('trolley configuration', () => {
       'Requested resource was not found',
     );
     expect(
-      screen.queryByRole('textbox', { name: /Trolley Code/ }),
+      screen.queryByRole('textbox', { name: /Trolley Number/ }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Trolley' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Reload trolleys' }));
