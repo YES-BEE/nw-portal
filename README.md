@@ -71,10 +71,10 @@ The login form sends `POST {VITE_API_BASE_URL}/api/{VITE_API_VERSION}/auth/login
 VITE_API_BASE_URL=http://192.168.0.106
 VITE_API_VERSION=v1
 VITE_AUTH_CLIENT_TYPE=PC
-VITE_DASHBOARD_POLL_INTERVAL_SECONDS=10
+VITE_FACTORY_TIME_ZONE=Asia/Kolkata
 ```
 
-The dashboard automatically polls its summary and current lot list at this interval in seconds, preserving the selected filters and page.
+The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in `VITE_FACTORY_TIME_ZONE` (default Asia/Kolkata). Failed refreshes retain the last values and timestamp and show a stale indicator. Dashboard readers can view read-only lot details through `GET /dashboard/lots/{id}` without Lot Management access.
 
 Restart Vite after changing environment values. Vite exposes these variables to the browser; they contain public configuration. `LoginRequest`, `LoginResponse`, and `LoginModule` are defined in `src/features/auth/types.ts`. Process assignments are retained as `unknown[]` because the provided response only specifies an empty array, without an item schema.
 
@@ -110,7 +110,7 @@ Password-change session setup has a persisted completion flag, without passwords
 
 ## User and role management
 
-`/users` and `/roles` follow `NW_Track_Role_Based_Modules_v21.html`, using MUI throughout. The shared sidebar also links to `/dashboard` and `/reports`, each with a Coming soon message. Existing configuration URLs remain available.
+`/users` and `/roles` follow `NW_Track_Role_Based_Modules_v21.html`, using MUI throughout. The shared sidebar also links to the live `/dashboard` and the `/reports` placeholder. Existing configuration URLs remain available.
 
 The Users page loads `GET /api/{VITE_API_VERSION}/users` on entry through the shared authenticated Axios client. It shows the backend username, display name, role code (including unassigned roles), and enabled status, with client-side search and pagination. The typed response also retains password-change status, creation time, and process assignments as defined by `UserController` and `ProcessAssignmentService.View`. No local user records supply this list or are written by it. Edit fetches `GET /api/{VITE_API_VERSION}/users/{userId}` using the selected row's UUID before prefilling the form. The detail response must match that UUID; loading and failed requests never show stale list-row values as editable details. The form includes the backend username, display name, status, and role. Add User opens the create form. Delete and saving edits to existing users remain disabled until their backend mutations are integrated.
 

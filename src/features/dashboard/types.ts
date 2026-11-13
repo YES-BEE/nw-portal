@@ -1,4 +1,4 @@
-import type { ApiCollection } from '../../api/collections';
+import type { ApiPage } from '../../api/collections';
 import type { LotResponse } from '../lots/types';
 
 export interface StatusCount {
@@ -10,11 +10,30 @@ export interface StationWip {
   code: string;
   name: string;
   wip: number;
+  share_percent: number;
+}
+export type StationWorkload = Omit<StationWip, 'share_percent'>;
+export interface DashboardMetricsResponse {
+  totalLots: number;
+  openLots: number;
+  completedLots: number;
+  stylesWithLots: number;
+  storedLots: number;
+  availableTrolleys: number;
+  completedSharePercent: number;
+  inTransitLots: number;
+  readyToStartLots: number;
+  totalStationLotVisits: number;
+  highestStationWorkloadCount: number;
+  highestStationWorkload: StationWorkload | null;
 }
 export interface DashboardResponse {
+  snapshotAt: string;
+  refreshIntervalSeconds: number;
+  metrics: DashboardMetricsResponse;
   styles: StatusCount[];
   lots: StatusCount[];
-  stations: ApiCollection<StationWip>;
+  stations: ApiPage<StationWip>;
   storageOccupancies: number;
   availableTrolleys: number;
 }
@@ -28,6 +47,9 @@ export interface DashboardLot extends Omit<
 > {
   current_station: string | null;
   current_process: string | null;
+  current_process_id: string | null;
+  current_process_status: string | null;
+  location_label: string | null;
 }
 export interface DashboardFailure {
   kind:

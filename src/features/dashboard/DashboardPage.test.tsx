@@ -13,7 +13,6 @@ import { seedTestData, signIn } from '../../test/fixtures';
 import { readSession, setAuthenticatedSession } from '../auth/session';
 import type { ListQuery } from '../../api/collections';
 import { DashboardPage } from './DashboardPage';
-import { getDashboardPollIntervalMs } from './dashboardConfig';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -23,6 +22,8 @@ afterEach(() => {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
     if (url === 'dashboard') return { status: 200, data: dashboardResponse };
+    if (url.startsWith('dashboard/lots/'))
+      return { status: 200, data: dashboardLot };
     const query = config?.params as ListQuery & { status?: string };
     return {
       status: 200,
@@ -75,7 +76,7 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
   expect(
     await within(table).findByRole('rowheader', { name: 'LOT-001' }),
   ).toBeVisible();
-  expect(within(table).getAllByText('Washing')).toHaveLength(2);
+  expect(within(table).getAllByText('Washing')).toHaveLength(3);
   expect(within(table).queryByText('03')).not.toBeInTheDocument();
   expect(within(table).getByText(/12\/11\/2026/)).toBeVisible();
   expect(screen.queryByText('lot-id')).not.toBeInTheDocument();
@@ -84,6 +85,66 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
     screen.queryByRole('link', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
 });
+it('shows backend snapshot time and readable locations and permits dashboard-only lot viewing', async () => {
+  seedTestData();
+  signIn('nw.admin');
+  setAuthenticatedSession({ ...readSession()!, modules: ['dashboard'] });
+  vi.stubEnv('VITE_FACTORY_TIME_ZONE', 'Asia/Kolkata');
+  const { user } = setup();
+  expect(await screen.findByText('Updated 13/11/2026, 13:30:00')).toBeVisible();
+  const table = screen.getByRole('table', { name: 'Production Lots' });
+  expect(within(table).queryByText('In progress')).not.toBeInTheDocument();
+  expect(within(table).getAllByText('Washing')).toHaveLength(3);
+  await user.click(
+    within(table).getByRole('button', { name: 'View lot LOT-001' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  expect(await within(dialog).findByText('LOT-001')).toBeVisible();
+  expect(apiClient.get).toHaveBeenCalledWith(
+    'dashboard/lots/lot-id',
+    expect.anything(),
+  );
+  expect(within(dialog).queryByText('process-id')).not.toBeInTheDocument();
+  expect(
+    within(dialog).queryByRole('button', { name: /Delete|Change Quantity/ }),
+  ).not.toBeInTheDocument();
+  await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+});
+it.each(['summary', 'lots'])(
+  'retains previous values and timestamp and marks live updates stale after a %s refresh failure',
+  async (target) => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { unmount } = setup();
+    await screen.findByText('Live updates');
+    const timestamp = screen.getByText(/^Updated /).textContent;
+    const original = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation((url, config) =>
+      (target === 'summary' ? url === 'dashboard' : url === 'dashboard/lots')
+        ? Promise.resolve({
+            status: 503,
+            data: { detail: 'Refresh unavailable' },
+          })
+        : original(url, config),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(
+      screen.getByText('Updates unavailable · showing last data'),
+    ).toBeVisible();
+    expect(screen.getByText(/^Updated /).textContent).toBe(timestamp);
+    expect(
+      within(screen.getByRole('region', { name: 'Total Lots' })).getByText('9'),
+    ).toBeVisible();
+    expect(screen.getByRole('rowheader', { name: 'LOT-001' })).toBeVisible();
+    vi.mocked(apiClient.get).mockImplementation(original);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(screen.getByText('Live updates')).toBeVisible();
+    unmount();
+  },
+);
 it('filters lots through clickable status counts and the backend status query', async () => {
   const { user } = setup();
   await user.click(
@@ -209,9 +270,8 @@ it('keeps summary metrics visible when the lot request is forbidden', async () =
     await screen.findByRole('region', { name: 'Total Lots' }),
   ).toBeVisible();
 });
-it('shows lot details with the lots module and polls both APIs at the configured interval', async () => {
+it('allows read-only lot viewing and polls both APIs using only the backend interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '10');
   seedTestData();
   signIn('nw.admin');
   setAuthenticatedSession({
@@ -220,15 +280,15 @@ it('shows lot details with the lots module and polls both APIs at the configured
   });
   const { unmount } = setup();
   expect(
-    await screen.findByRole('link', { name: 'View lot LOT-001' }),
-  ).toHaveAttribute('href', '/lots/lot-id');
+    await screen.findByRole('button', { name: 'View lot LOT-001' }),
+  ).toBeVisible();
   await screen.findByRole('region', { name: 'Total Lots' });
   const before = vi.mocked(apiClient.get).mock.calls.length;
   expect(
     screen.queryByRole('button', { name: 'Refresh' }),
   ).not.toBeInTheDocument();
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(9999);
+    await vi.advanceTimersByTimeAsync(4999);
   });
   expect(apiClient.get).toHaveBeenCalledTimes(before);
   await act(async () => {
@@ -242,9 +302,8 @@ it('shows lot details with the lots module and polls both APIs at the configured
   });
   expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
 });
-it('retains search filters while polling and respects a different configured interval', async () => {
+it('retains search filters while polling and uses the response interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '5');
   const { user } = setup();
   await screen.findByRole('rowheader', { name: 'LOT-001' });
   await user.type(screen.getByRole('searchbox'), 'LOT');
@@ -260,14 +319,18 @@ it('retains search filters while polling and respects a different configured int
   });
   expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
   expect(screen.getByRole('searchbox')).toHaveValue('LOT');
-  expect(apiClient.get).toHaveBeenLastCalledWith(
+  expect(
+    vi
+      .mocked(apiClient.get)
+      .mock.calls.filter(([url]) => url === 'dashboard/lots')
+      .at(-1),
+  ).toEqual([
     'dashboard/lots',
     expect.objectContaining({ params: { page: 0, size: 10, search: 'LOT' } }),
-  );
+  ]);
 });
-it('does not overlap requests if an earlier poll is still pending', async () => {
+it('does not start polling until the response provides an interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', '10');
   vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
   setup();
   await act(async () => {
@@ -275,13 +338,36 @@ it('does not overlap requests if an earlier poll is still pending', async () => 
   });
   expect(apiClient.get).toHaveBeenCalledTimes(2);
 });
-it.each([undefined, '', '0', '-1', 'bad', 'Infinity'])(
-  'falls back to ten seconds for invalid polling config %s',
-  (value) => {
-    vi.stubEnv('VITE_DASHBOARD_POLL_INTERVAL_SECONDS', value);
-    expect(getDashboardPollIntervalMs()).toBe(10000);
-  },
-);
+it('reschedules summary and lot polling when the response interval changes', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  const original = vi.mocked(apiClient.get).getMockImplementation()!;
+  let seconds = 5;
+  vi.mocked(apiClient.get).mockImplementation(async (url, config) =>
+    url === 'dashboard'
+      ? {
+          status: 200,
+          data: { ...dashboardResponse, refreshIntervalSeconds: seconds },
+        }
+      : original(url, config),
+  );
+  setup();
+  await screen.findByText('Live updates');
+  const before = vi.mocked(apiClient.get).mock.calls.length;
+  seconds = 2;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(screen.getByText('Updates every 2 seconds')).toBeVisible();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1999);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(apiClient.get).toHaveBeenCalledTimes(before + 4);
+});
 it('aborts summary and lot requests on unmount', () => {
   vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
   const { unmount } = setup();

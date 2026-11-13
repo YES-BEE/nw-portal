@@ -9,9 +9,62 @@ import {
 import {
   getDashboard,
   getDashboardLots,
+  getDashboardLot,
   parseDashboardFailure,
 } from './dashboardApi';
 beforeEach(() => vi.restoreAllMocks());
+it('loads the dashboard read-only lot detail endpoint and validates the new fields', async () => {
+  const get = vi
+    .spyOn(apiClient, 'get')
+    .mockResolvedValue({ status: 200, data: dashboardLot });
+  expect(await getDashboardLot(dashboardLot.id)).toEqual(dashboardLot);
+  expect(get).toHaveBeenCalledWith(
+    'dashboard/lots/lot-id',
+    expect.objectContaining({ signal: undefined }),
+  );
+  get.mockResolvedValue({
+    status: 200,
+    data: { ...dashboardLot, id: 'outside' },
+  });
+  await expect(getDashboardLot(dashboardLot.id)).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  get.mockResolvedValue({
+    status: 200,
+    data: { ...dashboardLot, location_label: undefined },
+  });
+  await expect(getDashboardLot(dashboardLot.id)).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+  get.mockResolvedValue({
+    status: 403,
+    data: { detail: 'Lot outside your access' },
+  });
+  await expect(getDashboardLot(dashboardLot.id)).rejects.toMatchObject({
+    failure: { kind: 'access', message: 'Lot outside your access' },
+  });
+});
+it.each([
+  { ...dashboardResponse, snapshotAt: undefined },
+  { ...dashboardResponse, refreshIntervalSeconds: 0 },
+  { ...dashboardResponse, metrics: undefined },
+  {
+    ...dashboardResponse,
+    metrics: { ...dashboardResponse.metrics, completedSharePercent: 101 },
+  },
+  {
+    ...dashboardResponse,
+    stations: {
+      ...dashboardResponse.stations,
+      items: [{ ...dashboardResponse.stations.items[0], share_percent: -1 }],
+    },
+  },
+])('rejects invalid new dashboard contracts: %j', async (data) => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data });
+  await expect(getDashboard()).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
 it('loads backend summary counts and validates empty summaries', async () => {
   const get = vi
     .spyOn(apiClient, 'get')
@@ -26,7 +79,7 @@ it('loads backend summary counts and validates empty summaries', async () => {
     expect.objectContaining({ params: { page: 0, size: 100 } }),
   );
   get.mockResolvedValue({ status: 200, data: emptyDashboard });
-  expect(await getDashboard()).toEqual(emptyDashboard);
+  expect(await getDashboard()).toEqual({ ...emptyDashboard, stations: [] });
 });
 it('collects all station pages so the WIP chart is not limited to the first page', async () => {
   const stations = Array.from({ length: 101 }, (_, index) => ({
@@ -34,6 +87,7 @@ it('collects all station pages so the WIP chart is not limited to the first page
     code: String(index),
     name: 'Station',
     wip: index,
+    share_percent: Number(((index / 5050) * 100).toFixed(2)),
   }));
   const get = vi
     .spyOn(apiClient, 'get')

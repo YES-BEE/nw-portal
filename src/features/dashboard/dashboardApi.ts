@@ -15,6 +15,8 @@ import type {
   DashboardSummary,
   StationWip,
   StatusCount,
+  DashboardMetricsResponse,
+  StationWorkload,
 } from './types';
 
 export class DashboardError extends Error {
@@ -114,7 +116,7 @@ function isCounts(value: unknown): value is StatusCount[] {
     new Set(value.map((row: StatusCount) => row.status)).size === value.length
   );
 }
-function isStation(value: unknown): value is StationWip {
+function isWorkload(value: unknown): value is StationWorkload {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
@@ -122,6 +124,39 @@ function isStation(value: unknown): value is StationWip {
     text(row.code) &&
     typeof row.name === 'string' &&
     count(row.wip)
+  );
+}
+const percent = (value: unknown): value is number =>
+  typeof value === 'number' &&
+  Number.isFinite(value) &&
+  value >= 0 &&
+  value <= 100;
+function isStation(value: unknown): value is StationWip {
+  return (
+    isWorkload(value) &&
+    'share_percent' in value &&
+    percent(value.share_percent)
+  );
+}
+function isMetrics(value: unknown): value is DashboardMetricsResponse {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    [
+      'totalLots',
+      'openLots',
+      'completedLots',
+      'stylesWithLots',
+      'storedLots',
+      'availableTrolleys',
+      'inTransitLots',
+      'readyToStartLots',
+      'totalStationLotVisits',
+      'highestStationWorkloadCount',
+    ].every((key) => count(row[key])) &&
+    percent(row.completedSharePercent) &&
+    (row.highestStationWorkload === null ||
+      isWorkload(row.highestStationWorkload))
   );
 }
 async function summaryPage(
@@ -136,6 +171,11 @@ async function summaryPage(
   const row = data as Record<string, unknown>;
   if (
     !isCounts(row.styles) ||
+    !date(row.snapshotAt) ||
+    !count(row.refreshIntervalSeconds) ||
+    row.refreshIntervalSeconds < 1 ||
+    row.refreshIntervalSeconds * 1000 > 2147483647 ||
+    !isMetrics(row.metrics) ||
     !isCounts(row.lots) ||
     !count(row.storageOccupancies) ||
     !count(row.availableTrolleys)
@@ -149,6 +189,9 @@ async function summaryPage(
     invalid,
   );
   return {
+    snapshotAt: row.snapshotAt,
+    refreshIntervalSeconds: row.refreshIntervalSeconds,
+    metrics: row.metrics,
     styles: row.styles,
     lots: row.lots,
     storageOccupancies: row.storageOccupancies,
@@ -184,10 +227,27 @@ function isLot(value: unknown): value is DashboardLot {
       'current_location_id',
       'current_station',
       'current_process',
+      'current_process_id',
+      'current_process_status',
+      'location_label',
     ].every((key) => nullableText(row[key])) &&
     date(row.created_at) &&
     (row.completed_at === null || date(row.completed_at))
   );
+}
+export async function getDashboardLot(
+  id: string,
+  signal?: AbortSignal,
+): Promise<DashboardLot> {
+  const data = await request(() =>
+    apiClient.get<unknown>(
+      `dashboard/lots/${encodeURIComponent(id)}`,
+      options(signal),
+    ),
+  );
+  if (!isLot(data) || data.id.toLowerCase() !== id.toLowerCase())
+    return invalid();
+  return data;
 }
 export async function getDashboardLots(
   query: ListQuery,

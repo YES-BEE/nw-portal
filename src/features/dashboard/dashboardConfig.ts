@@ -1,7 +1,13 @@
-export function getDashboardPollIntervalMs(): number {
-  const seconds = Number(import.meta.env.VITE_DASHBOARD_POLL_INTERVAL_SECONDS);
-  const interval = seconds * 1000;
-  return Number.isFinite(interval) && interval >= 1000 && interval <= 2147483647
-    ? interval
-    : 10000;
+export function getFactoryTimeZone(): string {
+  const configured = import.meta.env.VITE_FACTORY_TIME_ZONE?.trim();
+  if (configured) {
+    try {
+      return new Intl.DateTimeFormat('en', {
+        timeZone: configured,
+      }).resolvedOptions().timeZone;
+    } catch {
+      /* Fall back to the factory's default zone. */
+    }
+  }
+  return 'Asia/Kolkata';
 }

@@ -53,25 +53,25 @@ function Bar({
           <AnimatedCount value={value} format={formatValue} />
         </Typography>
       </Stack>
-      <Box
+      <LinearProgress
+        variant="determinate"
+        value={Math.min(100, Math.max(0, (value / Math.max(1, max)) * 100))}
+        aria-label={label}
+        aria-valuetext={
+          formatValue ? formatValue(value) : value.toLocaleString()
+        }
         sx={{
           height: 8,
           bgcolor: '#eef2f7',
           borderRadius: 1,
-          overflow: 'hidden',
-        }}
-      >
-        <Box
-          sx={{
-            width: `${(value / Math.max(1, max)) * 100}%`,
-            height: '100%',
+          '& .MuiLinearProgress-bar': {
             bgcolor: color,
             borderRadius: 1,
-            transition: 'width 650ms ease-out',
+            transition: 'transform 650ms ease-out',
             '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
-          }}
-        />
-      </Box>
+          },
+        }}
+      />
     </Box>
   );
 }
@@ -146,7 +146,13 @@ export function StatusBreakdown({
     </Paper>
   );
 }
-export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
+export function StationWipBreakdown({
+  stations,
+  totalVisits,
+}: {
+  stations: StationWip[];
+  totalVisits?: number;
+}) {
   const { t } = useTranslation('translation');
   const formatVisits = useCallback(
     (count: number) => t('dashboard.stationVisitCount', { count }),
@@ -163,7 +169,6 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
         borderRadius: 2,
         borderColor: '#e7edf5',
         minWidth: 0,
-        height: '100%',
       }}
     >
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
@@ -176,6 +181,12 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
           {t('dashboard.stationWip')}
         </Typography>
       </Stack>
+      {totalVisits !== undefined && (
+        <Typography color="text.secondary" sx={{ mb: 1, fontSize: 11 }}>
+          {t('dashboard.totalStationVisits')}:{' '}
+          <AnimatedCount value={totalVisits} />
+        </Typography>
+      )}
       <Typography color="text.secondary" sx={{ mb: 2, fontSize: 11 }}>
         {t('dashboard.stationHint')}
       </Typography>
@@ -185,8 +196,6 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
             gap: 1.25,
-            maxHeight: 260,
-            overflowY: 'auto',
           }}
         >
           {stations.map((station) => (
@@ -219,7 +228,6 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
 
 export function StationStatusTable({ stations }: { stations: StationWip[] }) {
   const { t } = useTranslation('translation');
-  const total = stations.reduce((sum, station) => sum + station.wip, 0);
   return (
     <Paper
       component="section"
@@ -230,7 +238,6 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
         borderColor: '#e7edf5',
         minWidth: 0,
         overflow: 'hidden',
-        height: '100%',
       }}
     >
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 2 }}>
@@ -244,12 +251,19 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
         </Typography>
       </Stack>
       {stations.length ? (
-        <TableContainer sx={{ maxHeight: 280 }}>
+        <TableContainer sx={{ overflow: 'visible' }}>
           <Table
             size="small"
-            stickyHeader
             aria-labelledby="station-status-title"
-            sx={{ '& .MuiTableCell-root': { px: 1.5, py: 1.25 } }}
+            sx={{
+              width: '100%',
+              tableLayout: 'fixed',
+              '& .MuiTableCell-root': {
+                px: 1.5,
+                py: 1.25,
+                overflowWrap: 'anywhere',
+              },
+            }}
           >
             <TableHead>
               <TableRow>
@@ -260,9 +274,7 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
             </TableHead>
             <TableBody>
               {stations.map((station) => {
-                const share = total
-                  ? Math.round((station.wip / total) * 100)
-                  : 0;
+                const share = station.share_percent;
                 return (
                   <TableRow key={station.id}>
                     <TableCell sx={{ fontWeight: 600 }}>
@@ -275,7 +287,7 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
                       <Stack
                         direction="row"
                         spacing={1}
-                        sx={{ alignItems: 'center', minWidth: 85 }}
+                        sx={{ alignItems: 'center', minWidth: 0 }}
                       >
                         <LinearProgress
                           variant="determinate"

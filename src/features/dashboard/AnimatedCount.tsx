@@ -26,13 +26,16 @@ export function AnimatedCount({
       return;
     }
     const started = performance.now();
-    node.textContent = format(Math.round(from));
+    const round = Number.isInteger(value)
+      ? Math.round
+      : (n: number) => Math.round(n * 100) / 100;
+    node.textContent = format(round(from));
     let frame: number;
     function animate(now: number) {
       const progress = Math.min(1, Math.max(0, (now - started) / durationMs));
       const next = from + (value - from) * (1 - (1 - progress) ** 3);
       displayed.current = next;
-      node!.textContent = format(Math.round(next));
+      node!.textContent = format(progress === 1 ? value : round(next));
       if (progress < 1) frame = requestAnimationFrame(animate);
     }
     frame = requestAnimationFrame(animate);

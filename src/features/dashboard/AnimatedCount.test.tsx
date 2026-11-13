@@ -80,3 +80,9 @@ it('uses the latest value immediately when reduced motion is enabled', () => {
   expect(container.textContent).toBe('100');
   expect(requestAnimationFrame).not.toHaveBeenCalled();
 });
+it('preserves two-decimal backend percentages at the end of an animation', () => {
+  const { container, rerender } = render(<AnimatedCount value={0} />);
+  rerender(<AnimatedCount value={22.22} />);
+  advance(650);
+  expect(container.textContent).toBe('22.22');
+});

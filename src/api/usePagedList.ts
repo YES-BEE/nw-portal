@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ApiPage, ListQuery } from './collections';
 
 type Result<T> =
-  { status: 'ready'; data: ApiPage<T> } | { status: 'error'; error: unknown };
+  | { status: 'ready'; data: ApiPage<T>; error?: unknown }
+  | { status: 'error'; error: unknown };
 export function usePagedList<T>(
   load: (query: ListQuery, signal?: AbortSignal) => Promise<ApiPage<T>>,
   pollIntervalMs = 0,
+  retainDataOnError = false,
 ) {
   const [query, setQuery] = useState<ListQuery>({
     page: 0,
@@ -14,6 +16,7 @@ export function usePagedList<T>(
   });
   const [input, setInput] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const refreshRef = useRef<() => void>(() => {});
   const [result, setResult] = useState<{
     query: ListQuery;
     attempt: number;
@@ -48,23 +51,37 @@ export function usePagedList<T>(
           },
           (error: unknown) => {
             if (!controller.signal.aborted)
-              setResult({ query, attempt, value: { status: 'error', error } });
+              setResult((previous) => ({
+                query,
+                attempt,
+                value:
+                  retainDataOnError &&
+                  previous?.query === query &&
+                  previous.value.status === 'ready'
+                    ? { ...previous.value, error }
+                    : { status: 'error', error },
+              }));
           },
         )
         .finally(() => {
           pending = false;
         });
     }
+    refreshRef.current = refresh;
     refresh();
-    const timer =
-      pollIntervalMs > 0 ? setInterval(refresh, pollIntervalMs) : undefined;
     return () => {
-      clearInterval(timer);
       controller.abort();
     };
-  }, [query, attempt, load, pollIntervalMs]);
+  }, [query, attempt, load, retainDataOnError]);
+  useEffect(() => {
+    if (pollIntervalMs <= 0) return;
+    const timer = setInterval(() => refreshRef.current(), pollIntervalMs);
+    return () => clearInterval(timer);
+  }, [pollIntervalMs]);
   const state =
-    result?.query === query && result.attempt === attempt
+    result?.query === query &&
+    (result.attempt === attempt ||
+      (retainDataOnError && result.value.status === 'ready'))
       ? result.value
       : { status: 'loading' as const };
   return {
