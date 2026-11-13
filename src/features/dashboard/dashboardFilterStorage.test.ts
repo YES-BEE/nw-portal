@@ -16,7 +16,6 @@ it('stores every selection and list query separately for each user', () => {
       stations: { id: 'st1', label: 'Washing' },
       processes: { id: 'p1', label: 'Wash' },
       status: 'IN_PROCESS',
-      routeScope: 'ANY' as const,
     },
     query: { page: 2, size: 25, search: 'denim' },
   };
@@ -57,4 +56,22 @@ it('keeps storage failures from breaking filtering', () => {
   expect(() =>
     saveDashboardFilters('user-1', readDashboardFilters()),
   ).not.toThrow();
+});
+
+it('ignores a previously saved route scope while preserving the remaining filters', () => {
+  sessionStorage.setItem(
+    dashboardFilterKey('user-1'),
+    JSON.stringify({
+      selection: {
+        ...emptyProductionFilters,
+        status: 'IN_PROCESS',
+        routeScope: 'ANY',
+      },
+      query: { page: 0, size: 10, search: '' },
+    }),
+  );
+  expect(readDashboardFilters('user-1').selection).toEqual({
+    ...emptyProductionFilters,
+    status: 'IN_PROCESS',
+  });
 });

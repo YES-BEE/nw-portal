@@ -1,3 +1,4 @@
+import { readSession, setAuthenticatedSession } from '../features/auth/session';
 import { apiClient } from '../api/client';
 import { loginResponse, refreshTokenResponse, meResponse } from '../test/auth';
 import { signIn as backendSignIn } from '../features/auth/session';
@@ -27,6 +28,74 @@ afterEach(() => {
 });
 
 describe('persistent desktop navigation', () => {
+  it.each([false, true])(
+    'shows New Style and Lot Management at the top level for configurators (other configurations: %s)',
+    async (otherConfigurations) => {
+      signIn('style.configurator');
+      const session = readSession()!;
+      const granted = [
+        { key: 'newstyle', name: 'New Style', built_in: true },
+        { key: 'lots', name: 'Lot Management', built_in: true },
+        ...(otherConfigurations
+          ? [{ key: 'process', name: 'Process Configurations', built_in: true }]
+          : []),
+      ];
+      setAuthenticatedSession({
+        ...session,
+        modules: otherConfigurations
+          ? ['newstyle', 'lots', 'process']
+          : ['newstyle', 'lots'],
+        profile: { ...session.profile!, modules: granted },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(
+        <MemoryRouter initialEntries={['/styles']}>
+          <ConfigurationLayout />
+        </MemoryRouter>,
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Open navigation menu' }),
+      );
+      const styles = screen.getByRole('link', { name: 'New Style' });
+      const lots = screen.getByRole('link', { name: 'Lot Management' });
+      expect(styles).toHaveAttribute('href', '/styles');
+      expect(styles).toHaveAttribute('aria-current', 'page');
+      expect(lots).toHaveAttribute('href', '/lots');
+      expect(
+        screen.queryByRole('link', { name: 'Style Management' }),
+      ).not.toBeInTheDocument();
+      const submenu = screen.queryByLabelText('Configurations submenu');
+      if (otherConfigurations) {
+        expect(submenu).not.toContainElement(styles);
+        expect(submenu).not.toContainElement(lots);
+        expect(
+          within(submenu!).getByRole('link', {
+            name: 'Process Configurations',
+          }),
+        ).toBeVisible();
+      } else expect(submenu).not.toBeInTheDocument();
+    },
+  );
+  it('does not show Lot Management for a configurator without lots access', async () => {
+    signIn('style.configurator');
+    const user = userEvent.setup();
+    renderWithProviders(
+      <MemoryRouter>
+        <ConfigurationLayout />
+      </MemoryRouter>,
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation menu' }),
+    );
+    expect(screen.getByRole('link', { name: 'New Style' })).toHaveAttribute(
+      'href',
+      '/styles',
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Lot Management' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('maps current-user response module names to sidebar links using their keys', async () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://backend.test');
     vi.spyOn(apiClient, 'post').mockResolvedValueOnce({

@@ -240,8 +240,7 @@ export function ProductionLotFilters({
         value={value.status}
         onChange={(event) =>
           onChange({
-            ...emptyProductionFilters,
-            routeScope: value.routeScope,
+            ...value,
             status: event.target.value,
           })
         }
@@ -255,25 +254,6 @@ export function ProductionLotFilters({
             {labels.statusLabel(status)}
           </MenuItem>
         ))}
-      </TextField>
-      <TextField
-        select
-        size="small"
-        label={t('productionFilters.routeScope')}
-        value={value.routeScope}
-        onChange={(event) =>
-          onChange({
-            ...value,
-            routeScope: event.target
-              .value as ProductionFilterSelection['routeScope'],
-            stations: null,
-            processes: null,
-          })
-        }
-        sx={{ minWidth: 180, flex: '1 1 180px' }}
-      >
-        <MenuItem value="CURRENT">{t('productionFilters.current')}</MenuItem>
-        <MenuItem value="ANY">{t('productionFilters.any')}</MenuItem>
       </TextField>
       <Button
         variant="outlined"

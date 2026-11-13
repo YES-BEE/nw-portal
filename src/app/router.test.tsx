@@ -139,16 +139,16 @@ describe('application routing', () => {
     await user.click(
       screen.getByRole('button', { name: 'Open navigation menu' }),
     );
+    const menu = screen.getByRole('navigation', { name: 'Main navigation' });
     expect(
-      screen.queryByRole('link', { name: 'New Style' }),
-    ).not.toBeInTheDocument();
-    const menu = screen.getByLabelText('Configurations submenu');
-    expect(
-      within(menu).getByRole('link', { name: 'Style Management' }),
+      within(menu).getByRole('link', { name: 'New Style' }),
     ).toHaveAttribute('href', '/styles');
     expect(
       within(menu).getByRole('link', { name: 'Lot Management' }),
     ).toHaveAttribute('href', '/lots');
+    expect(
+      screen.queryByLabelText('Configurations submenu'),
+    ).not.toBeInTheDocument();
   });
 
   it('lets a configurator create a lot associated with a released style through Lot Management', async () => {

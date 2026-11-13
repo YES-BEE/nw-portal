@@ -50,7 +50,7 @@ function setup() {
     ...renderWithProviders(<ReportsPage />),
   };
 }
-it('uses reports-only option endpoints and combines dependent filters with ANY route matching', async () => {
+it('uses reports-only option endpoints and combines dependent filters', async () => {
   const { get, user } = setup();
   await screen.findByText('LOT-001');
   await user.click(screen.getByRole('combobox', { name: 'Style' }));
@@ -65,8 +65,6 @@ it('uses reports-only option endpoints and combines dependent filters with ANY r
       params: { page: 0, size: 100, search: '', styleId: 's1' },
     }),
   );
-  await user.click(screen.getByRole('combobox', { name: 'Route Matching' }));
-  await user.click(screen.getByRole('option', { name: 'Any Route Step' }));
   await user.click(screen.getByRole('combobox', { name: 'Station' }));
   await user.click(await screen.findByRole('option', { name: 'Washing' }));
   await user.click(screen.getByRole('combobox', { name: 'Process' }));
@@ -83,7 +81,6 @@ it('uses reports-only option endpoints and combines dependent filters with ANY r
           lotId: 'lot-id',
           stationId: 'station-03',
           processId: 'process-id',
-          routeScope: 'ANY',
         },
       }),
     ),
@@ -98,7 +95,6 @@ it('uses reports-only option endpoints and combines dependent filters with ANY r
         styleId: 's1',
         lotId: 'lot-id',
         stationId: 'station-03',
-        routeScope: 'ANY',
       },
     }),
   );
@@ -123,7 +119,6 @@ it('uses reports-only option endpoints and combines dependent filters with ANY r
           size: 10,
           search: '',
           styleId: 's2',
-          routeScope: 'ANY',
         },
       }),
     ),

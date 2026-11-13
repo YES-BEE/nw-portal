@@ -56,7 +56,6 @@ it('restores all filters and the query on remount and sends them in the first re
       stations: { id: 'st1', label: 'Washing' },
       processes: { id: 'p1', label: 'Wash' },
       status: 'IN_PROCESS',
-      routeScope: 'ANY',
     },
     query: { page: 1, size: 25, search: 'denim' },
   });
@@ -79,7 +78,6 @@ it('restores all filters and the query on remount and sends them in the first re
     stationId: 'st1',
     processId: 'p1',
     status: 'IN_PROCESS',
-    routeScope: 'ANY',
   };
   expect(apiClient.get).toHaveBeenLastCalledWith(
     'dashboard/lots',
@@ -100,15 +98,14 @@ it('restores all filters and the query on remount and sends them in the first re
   );
   expect(screen.getByRole('searchbox')).toHaveValue('cotton');
   expect(
-    screen.getByRole('combobox', { name: 'Route Matching' }),
-  ).toHaveTextContent('Any Route Step');
+    screen.queryByRole('combobox', { name: 'Route Matching' }),
+  ).not.toBeInTheDocument();
 });
 it('persists clearing the structured filters when leaving and returning', async () => {
   saveDashboardFilters('dashboard-user', {
     selection: {
       ...emptyProductionFilters,
       status: 'IN_PROCESS',
-      routeScope: 'ANY',
     },
     query: { page: 0, size: 10, search: '' },
   });
@@ -124,5 +121,51 @@ it('persists clearing the structured filters when leaving and returning', async 
       'dashboard/lots',
       expect.objectContaining({ params: { page: 0, size: 10, search: '' } }),
     ),
+  );
+});
+
+it('preserves all other filters when status changes and persists the combined request', async () => {
+  const selection = {
+    ...emptyProductionFilters,
+    styles: { id: 's1', label: 'STYLE-01' },
+    lots: { id: 'l1', label: 'LOT-01' },
+    stations: { id: 'st1', label: 'Washing' },
+    processes: { id: 'p1', label: 'Wash' },
+  };
+  saveDashboardFilters('dashboard-user', {
+    selection,
+    query: { page: 1, size: 25, search: 'denim' },
+  });
+  setup();
+  await screen.findByText(dashboardLot.lot_number);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('combobox', { name: 'Status' }));
+  await user.click(screen.getByRole('option', { name: 'In Process' }));
+  await waitFor(() =>
+    expect(apiClient.get).toHaveBeenLastCalledWith(
+      'dashboard/lots',
+      expect.objectContaining({
+        params: {
+          page: 0,
+          size: 25,
+          search: 'denim',
+          styleId: 's1',
+          lotId: 'l1',
+          stationId: 'st1',
+          processId: 'p1',
+
+          status: 'IN_PROCESS',
+        },
+      }),
+    ),
+  );
+  expect(readDashboardFilters('dashboard-user').selection).toEqual({
+    ...selection,
+    status: 'IN_PROCESS',
+  });
+  await user.click(screen.getByRole('combobox', { name: 'Status' }));
+  await user.click(screen.getByRole('option', { name: 'All statuses' }));
+  await waitFor(() =>
+    expect(readDashboardFilters('dashboard-user').selection).toEqual(selection),
   );
 });

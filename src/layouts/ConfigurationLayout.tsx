@@ -71,34 +71,34 @@ export function ConfigurationLayout() {
   const modules = profile?.modules ?? [];
   const permissions = session?.modules ?? [];
   const configurator = session?.user.role === 'STYLE_CONFIGURATOR';
-  const visibleMainItems = mapNavigationModules(
-    mainNavigationItems,
-    modules,
-    permissions,
-  ).filter((item) => !configurator || item.permission !== 'newstyle');
+  const visibleMainItems = [
+    ...mapNavigationModules(mainNavigationItems, modules, permissions).map(
+      (item) =>
+        configurator && item.permission === 'newstyle'
+          ? {
+              ...item,
+              path: '/styles' as const,
+              name: t('navigation.newstyle'),
+            }
+          : item,
+    ),
+    ...(configurator
+      ? mapNavigationModules(
+          configurationItems.filter((item) => item.permission === 'lots'),
+          modules,
+          permissions,
+        )
+      : []),
+  ];
   const visibleConfigurationItems = mapNavigationModules(
-    configurationItems,
+    configurationItems.filter(
+      (item) =>
+        !configurator ||
+        (item.permission !== 'styles' && item.permission !== 'lots'),
+    ),
     modules,
     permissions,
   );
-  if (
-    configurator &&
-    !visibleConfigurationItems.some((item) => item.permission === 'styles') &&
-    permissions.includes('newstyle') &&
-    modules.some((module) => module.key === 'newstyle')
-  ) {
-    const styleItem = configurationItems.find(
-      (item) => item.permission === 'styles',
-    )!;
-    const lotIndex = visibleConfigurationItems.findIndex(
-      (item) => item.permission === 'lots',
-    );
-    visibleConfigurationItems.splice(
-      lotIndex < 0 ? visibleConfigurationItems.length : lotIndex,
-      0,
-      { ...styleItem, name: t('navigation.styles') },
-    );
-  }
   const hasConfigurations = visibleConfigurationItems.length > 0;
   const isActive = (path: string) =>
     pathname === path || pathname.startsWith(path + '/');

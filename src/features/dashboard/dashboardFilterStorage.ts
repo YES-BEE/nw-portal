@@ -41,7 +41,6 @@ export function readDashboardFilters(userId?: string): SavedDashboardFilters {
       ) ||
       typeof selection.status !== 'string' ||
       selection.status.length > 200 ||
-      !['CURRENT', 'ANY'].includes(selection.routeScope) ||
       !Number.isSafeInteger(query.page) ||
       query.page < 0 ||
       !Number.isInteger(query.size) ||
@@ -58,7 +57,6 @@ export function readDashboardFilters(userId?: string): SavedDashboardFilters {
         stations: selection.stations,
         processes: selection.processes,
         status: selection.status,
-        routeScope: selection.routeScope,
       },
       query: {
         page: query.page,

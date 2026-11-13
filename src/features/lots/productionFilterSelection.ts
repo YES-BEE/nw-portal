@@ -1,7 +1,4 @@
-import type {
-  ProductionLotFilters as Filters,
-  RouteScope,
-} from '../../api/productionFilters';
+import type { ProductionLotFilters as Filters } from '../../api/productionFilters';
 
 export interface Choice {
   id: string;
@@ -13,7 +10,6 @@ export interface ProductionFilterSelection {
   stations: Choice | null;
   processes: Choice | null;
   status: string;
-  routeScope: RouteScope;
 }
 export const emptyProductionFilters: ProductionFilterSelection = {
   lots: null,
@@ -21,7 +17,6 @@ export const emptyProductionFilters: ProductionFilterSelection = {
   stations: null,
   processes: null,
   status: '',
-  routeScope: 'CURRENT',
 };
 export const lotStatuses = [
   'READY',
@@ -42,6 +37,5 @@ export function productionFilterParams(
     ...(selection.stations && { stationId: selection.stations.id }),
     ...(selection.processes && { processId: selection.processes.id }),
     ...(selection.status && { status: selection.status }),
-    ...(selection.routeScope === 'ANY' && { routeScope: 'ANY' as const }),
   };
 }
