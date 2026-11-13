@@ -12,9 +12,7 @@ export interface TagResponse {
   status: 'ACTIVE' | 'DELETED';
   assigned: boolean;
   asset_type: string | null;
-}
 
-export interface TagDetailsResponse extends TagResponse {
   trolley_id: string | null;
   station_id: string | null;
   process_id: string | null;
@@ -24,6 +22,7 @@ export interface TagDetailsResponse extends TagResponse {
   version: number;
 }
 
+export type TagDetailsResponse = TagResponse;
 export type CreateTagResponse = TagDetailsResponse;
 export type UpdateTagResponse = TagDetailsResponse;
 
@@ -158,13 +157,12 @@ function isTag(value: unknown): value is TagResponse {
     ) &&
     (tag.status === 'ACTIVE' || tag.status === 'DELETED') &&
     typeof tag.assigned === 'boolean' &&
-    (tag.asset_type === null || typeof tag.asset_type === 'string')
+    (tag.asset_type === null || typeof tag.asset_type === 'string') &&
+    hasTagReferences(tag)
   );
 }
 
-export function isTagDetails(value: unknown): value is TagDetailsResponse {
-  if (!isTag(value)) return false;
-  const details = value as TagResponse & Record<string, unknown>;
+function hasTagReferences(details: Record<string, unknown>): boolean {
   const references = [
     'trolley_id',
     'station_id',
@@ -184,6 +182,8 @@ export function isTagDetails(value: unknown): value is TagDetailsResponse {
     details.version >= 0
   );
 }
+
+export const isTagDetails = isTag;
 
 export async function getTag(
   tagId: string,
@@ -309,6 +309,8 @@ export async function createTag(
     throw new TagsError(
       parseTagsFailure(response.data, response.status, 'create'),
     );
+  if (!isTagDetails(response.data))
+    throw new TagsError({ kind: 'invalidResponse', action: 'retry' });
   return response.data;
 }
 

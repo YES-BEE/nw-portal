@@ -1,4 +1,4 @@
-import type { ApiCollection, ListQuery } from '../../api/collections';
+import type { ApiPage, ListQuery } from '../../api/collections';
 // ProductionController.LOT_SELECT, shared by list, detail, create, update and cancel.
 export interface LotResponse {
   id: string;
@@ -66,7 +66,7 @@ export interface LotStyleOption {
   status: 'RELEASED' | 'IN_PRODUCTION' | 'COMPLETED';
 }
 export interface LotLookupsResponse {
-  styles: ApiCollection<LotStyleOption>;
+  styles: ApiPage<LotStyleOption>;
 }
 export interface LotsFailure {
   kind:

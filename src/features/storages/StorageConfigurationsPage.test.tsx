@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,7 +13,10 @@ beforeEach(() => {
   records = [area];
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
     if (url === 'ui/lookups')
-      return { status: 200, data: { tags: storageTags } };
+      return {
+        status: 200,
+        data: { tags: apiPage(storageTags, config?.params, 20) },
+      };
     if (url !== 'storage-areas')
       return {
         status: 200,
@@ -180,8 +184,6 @@ it('hides pagination on an empty collection and retries a failed list request', 
     'Maintenance in progress',
   );
   await user.click(screen.getByRole('button', { name: 'Try again' }));
-  expect(
-    await screen.findByText('No storages configured'),
-  ).toBeVisible();
+  expect(await screen.findByText('No storages configured')).toBeVisible();
   expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
 });

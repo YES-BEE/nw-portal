@@ -1,3 +1,5 @@
+import type { ApiPage } from '../../api/collections';
+import { apiPage } from '../../test/apiPage';
 import {
   act,
   fireEvent,
@@ -32,11 +34,22 @@ const roles: AccessRoleResponse[] = defaultRoles.map((role) => ({
 
 beforeEach(() => {
   vi.spyOn(accessRolesApi, 'getModules').mockResolvedValue(modulesResponse);
-  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: roles });
-  vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 204, data: null });
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: apiPage(roles, undefined, 10),
+  });
+  vi.spyOn(apiClient, 'put').mockResolvedValue({
+    status: 200,
+    data: apiPage(roles, undefined, 20),
+  });
   vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
-    data: { code: 'CUSTOM_OPS' },
+    data: {
+      ...roles[0],
+      code: 'CUSTOM_OPS',
+      name: 'Custom Operations',
+      built_in: false,
+    },
   });
 });
 
@@ -90,7 +103,7 @@ describe('backend role management', () => {
   it('shows loading until the response arrives', async () => {
     let resolve!: (value: {
       status: number;
-      data: AccessRoleResponse[];
+      data: ApiPage<AccessRoleResponse>;
     }) => void;
     vi.mocked(apiClient.get).mockReturnValue(
       new Promise((done) => {
@@ -100,13 +113,18 @@ describe('backend role management', () => {
     renderWithProviders(<RoleManagementPage />);
     expect(screen.getByRole('progressbar')).toBeVisible();
     expect(screen.queryAllByRole('rowheader')).toHaveLength(0);
-    await act(async () => resolve({ status: 200, data: roles }));
+    await act(async () =>
+      resolve({ status: 200, data: apiPage(roles, undefined, 10) }),
+    );
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     expect(screen.getAllByRole('rowheader')).toHaveLength(roles.length);
   });
 
   it('handles an empty list', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: apiPage([], undefined, 10),
+    });
     renderWithProviders(<RoleManagementPage />);
     expect(await screen.findByText('No roles found.')).toBeVisible();
   });
@@ -158,7 +176,11 @@ describe('backend role management', () => {
   it('keeps unknown module keys visible and includes inactive roles', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [{ ...roles[0], active: false, modules: ['future-module'] }],
+      data: apiPage(
+        [{ ...roles[0], active: false, modules: ['future-module'] }],
+        undefined,
+        10,
+      ),
     });
     renderWithProviders(<RoleManagementPage />);
     expect(await screen.findByText('future-module')).toBeVisible();
@@ -270,16 +292,20 @@ describe('backend role management', () => {
     await user.click(screen.getByRole('checkbox', { name: 'PAD access' }));
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [
-        ...roles,
-        {
-          ...roles[0],
-          code: 'CUSTOM_OPS',
-          name: 'Custom Operations',
-          modules: ['dashboard', 'reports'],
-          pad_access: false,
-        },
-      ],
+      data: apiPage(
+        [
+          ...roles,
+          {
+            ...roles[0],
+            code: 'CUSTOM_OPS',
+            name: 'Custom Operations',
+            modules: ['dashboard', 'reports'],
+            pad_access: false,
+          },
+        ],
+        undefined,
+        10,
+      ),
     });
     await user.click(screen.getByRole('button', { name: 'Save Role' }));
     expect(apiClient.post).toHaveBeenCalledWith(
@@ -312,7 +338,10 @@ describe('backend role management', () => {
       pc_access: false,
       pad_access: true,
     };
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [record] });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: apiPage([record], undefined, 10),
+    });
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);
     await screen.findByRole('rowheader', { name: 'IT Admin' });
@@ -350,16 +379,20 @@ describe('backend role management', () => {
   it('disables PC access when the last module is removed while preserving PAD access', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [
-        {
-          ...roles[0],
-          name: 'PC Role',
-          code: 'PC_ROLE',
-          modules: ['dashboard'],
-          pc_access: true,
-          pad_access: true,
-        },
-      ],
+      data: apiPage(
+        [
+          {
+            ...roles[0],
+            name: 'PC Role',
+            code: 'PC_ROLE',
+            modules: ['dashboard'],
+            pc_access: true,
+            pad_access: true,
+          },
+        ],
+        undefined,
+        10,
+      ),
     });
     const user = userEvent.setup();
     renderWithProviders(<RoleManagementPage />);

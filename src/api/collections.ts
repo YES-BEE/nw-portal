@@ -1,11 +1,10 @@
-// Backend ApiPage<T>. Older deployments return a bare array instead.
+// Current backend ApiPage<T> contract.
 export interface ApiPage<T> {
   items: T[];
   page: number;
   size: number;
   totalElements: number;
 }
-export type ApiCollection<T> = T[] | ApiPage<T>;
 export interface PageQuery {
   page: number;
   size: number;
@@ -21,17 +20,6 @@ export function readApiPage<T>(
   key: (item: T) => string,
   invalid: () => never,
 ): ApiPage<T> {
-  // Some deployments still return arrays; treat them as the returned page.
-  if (Array.isArray(data)) {
-    if (!data.every(isItem) || new Set(data.map(key)).size !== data.length)
-      return invalid();
-    return {
-      items: data,
-      page: query.page,
-      size: query.size,
-      totalElements: data.length ? query.page * query.size + data.length : 0,
-    };
-  }
   if (!data || typeof data !== 'object') return invalid();
   const value = data as Record<string, unknown>;
   if (
@@ -72,10 +60,6 @@ export async function collectApiItems<T>(
       keys.add(id);
       result.push(item);
     }
-  }
-  if (Array.isArray(first)) {
-    append(first);
-    return result;
   }
   function page(
     value: unknown,

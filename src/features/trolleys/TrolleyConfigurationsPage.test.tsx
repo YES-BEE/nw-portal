@@ -1,4 +1,5 @@
-﻿import { act, screen, waitFor, within } from '@testing-library/react';
+import { apiPage } from '../../test/apiPage';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTagResponse } from '../../test/tags';
@@ -35,8 +36,12 @@ beforeEach(() => {
     if (url === 'nfc-tags')
       return {
         status: 200,
-        data: tagRecords.filter(
-          (tag) => assigned === undefined || tag.assigned === assigned,
+        data: apiPage(
+          tagRecords.filter(
+            (tag) => assigned === undefined || tag.assigned === assigned,
+          ),
+          config?.params,
+          10,
         ),
       };
     if (url.startsWith('nfc-tags/'))
@@ -255,8 +260,11 @@ describe('trolley configuration', () => {
     );
     expect(apiClient.post).toHaveBeenCalledTimes(1);
   });
-  it('shows a successful bare empty array as an empty list', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+  it('shows a successful empty page as an empty list', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: apiPage([], undefined, 10),
+    });
     setup();
     expect(await screen.findByText('No trolleys found.')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { collectApiItems } from './collections';
+import { collectApiItems, readApiPage } from './collections';
 
 interface Item {
   id: string;
@@ -17,12 +17,26 @@ const collect = (
 ) => collectApiItems(fetch, isItem, (item) => item.id, invalid);
 
 describe('API collections', () => {
-  it.each([
-    { data: [] },
-    { data: { items: [], page: 0, size: 20, totalElements: 0 } },
-  ])('accepts successful empty responses: %j', async ({ data }) => {
-    await expect(collect(async () => data)).resolves.toEqual([]);
-  });
+  it.each([{ data: [] }, { data: [{ id: 'a' }] }])(
+    'rejects obsolete bare arrays when reading a single page: %j',
+    ({ data }) => {
+      expect(() =>
+        readApiPage(
+          data,
+          { page: 0, size: 10, search: '' },
+          isItem,
+          (row) => row.id,
+          invalid,
+        ),
+      ).toThrow('Invalid collection');
+    },
+  );
+  it.each([{ data: { items: [], page: 0, size: 20, totalElements: 0 } }])(
+    'accepts successful empty responses: %j',
+    async ({ data }) => {
+      await expect(collect(async () => data)).resolves.toEqual([]);
+    },
+  );
   it('reads every page and keeps the backend page size', async () => {
     const fetch = vi
       .fn()
@@ -42,11 +56,14 @@ describe('API collections', () => {
     expect(fetch).toHaveBeenNthCalledWith(1);
     expect(fetch).toHaveBeenNthCalledWith(2, { page: 1, size: 1 });
   });
-  it('continues to support legacy arrays', async () => {
-    await expect(collect(async () => [{ id: 'a' }])).resolves.toEqual([
-      { id: 'a' },
-    ]);
-  });
+  it.each([{ data: [] }, { data: [{ id: 'a' }] }])(
+    'rejects obsolete bare-array responses: %j',
+    async ({ data }) => {
+      await expect(collect(async () => data)).rejects.toThrow(
+        'Invalid collection',
+      );
+    },
+  );
   it.each([
     {},
     null,

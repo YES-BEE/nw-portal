@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -9,7 +10,10 @@ import { StorageDetailsPage } from './StorageDetailsPage';
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'ui/lookups' ? { tags: storageTags } : area,
+    data:
+      url === 'ui/lookups'
+        ? { tags: apiPage(storageTags, undefined, 20) }
+        : area,
   }));
 });
 function setup() {
@@ -42,7 +46,10 @@ it.each([
 ])('shows a backend failure for status %s', async (status, _kind, detail) => {
   vi.mocked(apiClient.get).mockImplementation(async (url) => ({
     status: url === 'ui/lookups' ? 200 : status,
-    data: url === 'ui/lookups' ? { tags: storageTags } : { detail },
+    data:
+      url === 'ui/lookups'
+        ? { tags: apiPage(storageTags, undefined, 20) }
+        : { detail },
   }));
   setup();
   expect(await screen.findByRole('alert')).toHaveTextContent(detail);

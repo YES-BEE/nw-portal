@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,7 +29,10 @@ describe('tag details', () => {
     };
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'nfc-tags' ? tagsResponse.slice(0, 2) : detail,
+      data:
+        url === 'nfc-tags'
+          ? apiPage(tagsResponse.slice(0, 2), undefined, 10)
+          : detail,
     }));
     const user = userEvent.setup();
     renderWithProviders(<TagManagementPage />);

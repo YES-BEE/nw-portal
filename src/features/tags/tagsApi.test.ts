@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
@@ -20,7 +21,7 @@ const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
   status = 200,
-  data: unknown = tagsResponse,
+  data: unknown = apiPage(tagsResponse, config?.params, 10),
 ) => ({ config, status, data, statusText: '', headers: {} });
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) =>
   response(config),
@@ -44,6 +45,29 @@ afterEach(() => {
 });
 
 describe('tags API', () => {
+  it.each(['list', 'create'] as const)(
+    'rejects incomplete %s tag records',
+    async (operation) => {
+      const incomplete = { ...createTagResponse, version: undefined };
+      adapter.mockImplementation(async (config) =>
+        response(
+          config,
+          200,
+          operation === 'list'
+            ? apiPage([incomplete], config.params, 10)
+            : incomplete,
+        ),
+      );
+      const pending =
+        operation === 'list'
+          ? getTags()
+          : createTag({ name: 'Tag', uid: '1234' });
+      await expect(pending).rejects.toMatchObject({
+        failure: { kind: 'invalidResponse' },
+      });
+    },
+  );
+
   it('deletes by encoded ID with no body and returns the full deleted record', async () => {
     const deleted = {
       ...createTagResponse,

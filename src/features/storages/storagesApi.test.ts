@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CanceledError } from 'axios';
 import { apiClient } from '../../api/client';
@@ -15,12 +16,10 @@ import {
 const query = { page: 0, size: 10, search: 'holding' };
 beforeEach(() => vi.restoreAllMocks());
 it('uses backend paging and search with strictly validated storage area aliases', async () => {
-  const get = vi
-    .spyOn(apiClient, 'get')
-    .mockResolvedValue({
-      status: 200,
-      data: { items: [area], ...query, totalElements: 1 },
-    });
+  const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: { items: [area], ...query, totalElements: 1 },
+  });
   expect((await getStorageAreas(query)).items).toEqual([area]);
   expect(get).toHaveBeenCalledWith(
     'storage-areas',
@@ -38,10 +37,10 @@ it('uses backend paging and search with strictly validated storage area aliases'
     failure: { kind: 'invalidResponse' },
   });
 });
-it('accepts empty arrays and validates detail response identity', async () => {
+it('accepts empty pages and validates detail response identity', async () => {
   const get = vi
     .spyOn(apiClient, 'get')
-    .mockResolvedValue({ status: 200, data: [] });
+    .mockResolvedValue({ status: 200, data: apiPage([], undefined, 10) });
   expect((await getStorageAreas(query)).totalElements).toBe(0);
   get.mockResolvedValue({ status: 200, data: area });
   expect(await getStorageArea(area.id)).toEqual(area);
@@ -53,12 +52,10 @@ it('sends AreaCommand for POST and PUT without UI-only fields', async () => {
   const post = vi
     .spyOn(apiClient, 'post')
     .mockResolvedValue({ status: 200, data: area });
-  const put = vi
-    .spyOn(apiClient, 'put')
-    .mockResolvedValue({
-      status: 200,
-      data: { ...area, id: 'area/with space' },
-    });
+  const put = vi.spyOn(apiClient, 'put').mockResolvedValue({
+    status: 200,
+    data: { ...area, id: 'area/with space' },
+  });
   const body = {
     storageNumber: 'ST-001',
     stationNumber: '03',
@@ -75,12 +72,10 @@ it('sends AreaCommand for POST and PUT without UI-only fields', async () => {
   );
 });
 it('uses DELETE with no body and checks the inactive response; restore uses PATCH status', async () => {
-  const remove = vi
-    .spyOn(apiClient, 'delete')
-    .mockResolvedValue({
-      status: 200,
-      data: { ...area, active: false, nfcUid: null, nfc_uid: null },
-    });
+  const remove = vi.spyOn(apiClient, 'delete').mockResolvedValue({
+    status: 200,
+    data: { ...area, active: false, nfcUid: null, nfc_uid: null },
+  });
   expect((await deleteStorageArea(area.id)).active).toBe(false);
   expect(remove).toHaveBeenCalledWith(
     'storage-areas/area-1',

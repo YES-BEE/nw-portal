@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
@@ -24,7 +25,11 @@ const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
   status = 200,
-  data: unknown = [],
+  data: unknown = apiPage(
+    [],
+    config?.params,
+    config.method === 'put' ? 20 : 10,
+  ),
 ) => ({
   config,
   status,
@@ -56,6 +61,53 @@ afterEach(() => {
 });
 
 describe('access roles API transport', () => {
+  it('accepts nullable role descriptions from the backend projection', async () => {
+    const role = { ...accessRolesResponse[0], description: null };
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, apiPage([role], config.params, 10)),
+    );
+    await expect(getAccessRoles()).resolves.toEqual([role]);
+  });
+
+  it.each(['create', 'delete'] as const)(
+    'rejects malformed successful %s role responses',
+    async (operation) => {
+      adapter.mockImplementation(async (config) =>
+        response(
+          config,
+          200,
+          operation === 'create'
+            ? { code: 'CUSTOM' }
+            : { code: 'OTHER', active: false },
+        ),
+      );
+      const pending =
+        operation === 'create'
+          ? createAccessRole({
+              name: 'Custom',
+              modules: [],
+              pcAccess: true,
+              padAccess: false,
+            })
+          : deleteAccessRole('CUSTOM');
+      await expect(pending).rejects.toMatchObject({
+        failure: { kind: 'invalidResponse' },
+      });
+    },
+  );
+
+  it('rejects obsolete bare-array role update responses', async () => {
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, accessRolesResponse),
+    );
+    await expect(
+      saveAccessRole('CUSTOM_ROLE', {
+        modules: [],
+        pcAccess: true,
+        padAccess: false,
+      }),
+    ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
+  });
   it('deletes an encoded role code with no body and returns its inactive status', async () => {
     const deletedRole = { code: 'CUSTOM/OPS', active: false };
     adapter.mockImplementation(async (config) =>
@@ -99,7 +151,7 @@ describe('access roles API transport', () => {
   );
   it('loads the typed module catalog with bearer authentication and no request body', async () => {
     adapter.mockImplementation(async (config) =>
-      response(config, 200, modulesResponse),
+      response(config, 200, apiPage(modulesResponse, config?.params, 20)),
     );
     const controller = new AbortController();
     await expect(getModules(controller.signal)).resolves.toEqual(
@@ -119,10 +171,12 @@ describe('access roles API transport', () => {
 
   it.each([
     { data: {} },
-    { data: [{ key: 'dashboard', name: 'Dashboard' }] },
-    { data: [{ ...modulesResponse[0], active: 'true' }] },
-    { data: [{ ...modulesResponse[0], key: '' }] },
-    { data: [modulesResponse[0], modulesResponse[0]] },
+    { data: apiPage([{ key: 'dashboard', name: 'Dashboard' }], undefined, 10) },
+    {
+      data: apiPage([{ ...modulesResponse[0], active: 'true' }], undefined, 10),
+    },
+    { data: apiPage([{ ...modulesResponse[0], key: '' }], undefined, 10) },
+    { data: apiPage([modulesResponse[0], modulesResponse[0]], undefined, 20) },
   ])('rejects malformed module responses: %j', async ({ data }) => {
     adapter.mockImplementation(async (config) => response(config, 200, data));
     await expect(getModules()).rejects.toMatchObject({
@@ -148,7 +202,11 @@ describe('access roles API transport', () => {
   );
   it('loads code/name options with bearer authentication and an abort signal', async () => {
     adapter.mockImplementation(async (config) =>
-      response(config, 200, accessRoleOptionsResponse),
+      response(
+        config,
+        200,
+        apiPage(accessRoleOptionsResponse, config?.params, 20),
+      ),
     );
     const controller = new AbortController();
     await expect(getAccessRoleOptions(controller.signal)).resolves.toEqual(
@@ -168,10 +226,16 @@ describe('access roles API transport', () => {
 
   it.each([
     { data: {} },
-    { data: [{ code: 'NW' }] },
-    { data: [{ code: '', name: 'NW' }] },
-    { data: [{ code: 'NW', name: 42 }] },
-    { data: [accessRoleOptionsResponse[0], accessRoleOptionsResponse[0]] },
+    { data: apiPage([{ code: 'NW' }], undefined, 10) },
+    { data: apiPage([{ code: '', name: 'NW' }], undefined, 10) },
+    { data: apiPage([{ code: 'NW', name: 42 }], undefined, 10) },
+    {
+      data: apiPage(
+        [accessRoleOptionsResponse[0], accessRoleOptionsResponse[0]],
+        undefined,
+        20,
+      ),
+    },
   ])('rejects malformed or duplicate role options: %j', async ({ data }) => {
     adapter.mockImplementation(async (config) => response(config, 200, data));
     await expect(getAccessRoleOptions()).rejects.toMatchObject({
@@ -322,7 +386,11 @@ describe('access roles API transport', () => {
     'saves only the documented PUT body and accepts HTTP %s',
     async (status) => {
       adapter.mockImplementation(async (config) =>
-        response(config, status, accessRolesResponse),
+        response(
+          config,
+          status,
+          apiPage(accessRolesResponse, config?.params, 20),
+        ),
       );
       const body = {
         modules: ['dashboard', 'reports'],
@@ -330,7 +398,7 @@ describe('access roles API transport', () => {
         padAccess: false,
       };
       await expect(saveAccessRole('CUSTOM/OPS', body)).resolves.toEqual(
-        accessRolesResponse,
+        apiPage(accessRolesResponse, undefined, 20),
       );
       const config = adapter.mock.calls[0][0];
       expect(apiClient.getUri(config).split('?')[0]).toBe(

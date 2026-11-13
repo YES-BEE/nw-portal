@@ -1,3 +1,4 @@
+import { isUserProcessAssignment } from '../access/userAssignments';
 import { apiClient } from '../../api/client';
 import { LoginError } from './loginApi';
 import { parseLoginFailure } from './loginFailure';
@@ -14,8 +15,8 @@ export function isMeResponse(value: unknown): value is MeResponse {
     typeof profile.display_name === 'string' &&
     typeof profile.enabled === 'boolean' &&
     typeof profile.must_change_password === 'boolean' &&
-    (profile.initial_password_expires_at === undefined ||
-      profile.initial_password_expires_at === null ||
+    (profile.status === 'ACTIVE' || profile.status === 'INACTIVE') &&
+    (profile.initial_password_expires_at === null ||
       (typeof profile.initial_password_expires_at === 'string' &&
         Number.isFinite(Date.parse(profile.initial_password_expires_at)))) &&
     typeof profile.role === 'string' &&
@@ -23,6 +24,7 @@ export function isMeResponse(value: unknown): value is MeResponse {
     Array.isArray(profile.permissions) &&
     profile.permissions.every((permission) => typeof permission === 'string') &&
     Array.isArray(profile.processAssignments) &&
+    profile.processAssignments.every(isUserProcessAssignment) &&
     Array.isArray(profile.modules) &&
     profile.modules.every((value: unknown) => {
       if (!value || typeof value !== 'object') return false;

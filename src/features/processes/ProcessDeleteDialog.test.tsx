@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -17,7 +18,7 @@ const deleted = {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: processesResponse,
+    data: apiPage(processesResponse, undefined, 10),
   });
   vi.spyOn(apiClient, 'delete').mockResolvedValue({
     status: 200,
@@ -72,7 +73,7 @@ describe('backend process deletion', () => {
     ).toBe(1);
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [deleted],
+      data: apiPage([deleted], undefined, 10),
     });
     await act(async () => resolve({ status: 200, data: deleted }));
     expect(await screen.findByText('No processes configured.')).toBeVisible();

@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -20,7 +21,7 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { processes: styleProcessOptions }
+        ? { processes: apiPage(styleProcessOptions, undefined, 20) }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
           : styleResponse,
@@ -69,7 +70,7 @@ it('creates a style using backend fields and the dragged process order', async (
 it('hides drag/drop panels and disables save when the system has no processes', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({
     status: 200,
-    data: { processes: [] },
+    data: { processes: apiPage([], undefined, 20) },
   });
   setup();
   expect(await screen.findByText(/No processes are available/)).toBeVisible();
@@ -81,8 +82,15 @@ it('hides drag/drop panels and disables save when the system has no processes', 
   ).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Save Style' })).toBeDisabled();
 });
-it('requires a selected process and refuses duplicate process selections', async () => {
-  const { user } = setup();
+it('requires a selected process and displays the backend rejection for duplicates', async () => {
+  vi.mocked(apiClient.post).mockResolvedValue({
+    status: 400,
+    data: {
+      code: 'INVALID_ARGUMENT',
+      detail: 'Process IDs must be unique and non-null',
+    },
+  });
+  const { user, onSaved } = setup();
   await user.type(
     await screen.findByRole('textbox', { name: /Style Number/ }),
     'STY-1001',
@@ -93,16 +101,23 @@ it('requires a selected process and refuses duplicate process selections', async
   await dragProcessToEnd(user, 'Washing');
   await user.click(screen.getByRole('button', { name: 'Save Style' }));
   expect(
-    await screen.findByText('Each process can only be added once.'),
+    await screen.findByText('Process IDs must be unique and non-null'),
   ).toBeVisible();
-  expect(apiClient.post).not.toHaveBeenCalled();
+  expect(apiClient.post).toHaveBeenCalledWith(
+    'styles',
+    expect.objectContaining({
+      processIds: [styleProcessOptions[0].id, styleProcessOptions[0].id],
+    }),
+    expect.anything(),
+  );
+  expect(onSaved).not.toHaveBeenCalled();
 });
 it('loads fresh edit data, requires a revision reason and saves using the chosen revision scope', async () => {
   vi.mocked(apiClient.get).mockImplementation(async (url) => ({
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { processes: styleProcessOptions }
+        ? { processes: apiPage(styleProcessOptions, undefined, 20) }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
           : { ...styleResponse, status: 'RELEASED' },
@@ -232,7 +247,7 @@ it('validates optional per-lot quantity and sends it in the selected revision sc
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { processes: styleProcessOptions }
+        ? { processes: apiPage(styleProcessOptions, undefined, 20) }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
           : { ...styleResponse, status: 'IN_PRODUCTION' },

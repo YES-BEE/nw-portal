@@ -46,6 +46,20 @@
     "tagline": "Process Control & Production Intelligence",
     "logout": "Logout"
   },
+  "productionFilters": {
+    "styles": "Style",
+    "lots": "Lot Number",
+    "stations": "Station",
+    "processes": "Process",
+    "routeScope": "Route Matching",
+    "current": "Current Step",
+    "any": "Any Route Step",
+    "select": "Search or select",
+    "loading": "Loading options…",
+    "empty": "No matching options available.",
+    "failed": "Unable to load options. Try again.",
+    "clear": "Clear Filters"
+  },
   "reports": {
     "description": "View production progress for all styles and lots available to your account.",
     "reportType": "Report type",
@@ -181,7 +195,6 @@
     "reload": "Reload styles",
     "noProcesses": "No processes are available. Add a process in Process Configurations or contact your administrator before creating a style.",
     "noRoute": "No process route is configured for this style.",
-    "uniqueProcesses": "Each process can only be added once.",
     "routePreviewHint": "Processes follow this order, with consecutive processes grouped by station.",
     "revisionScope": "Apply revision to",
     "unstarted": "Unstarted lots",

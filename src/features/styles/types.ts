@@ -1,4 +1,4 @@
-import type { ApiCollection } from '../../api/collections';
+import type { ApiPage } from '../../api/collections';
 export type StyleMode = 'management' | 'own';
 export type StyleStatus = 'DRAFT' | 'RELEASED' | 'IN_PRODUCTION' | 'COMPLETED';
 export interface StyleResponse {
@@ -65,7 +65,7 @@ export interface StyleProcessOption {
   stationNumber: string;
 }
 export interface StyleLookupsResponse {
-  processes: ApiCollection<StyleProcessOption>;
+  processes: ApiPage<StyleProcessOption>;
 }
 export interface StylesFailure {
   kind:

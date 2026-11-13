@@ -1,3 +1,5 @@
+import type { ApiPage } from '../../api/collections';
+import { apiPage } from '../../test/apiPage';
 import { MemoryRouter } from 'react-router-dom';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -35,7 +37,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: usersResponse,
+    data: apiPage(usersResponse, undefined, 10),
   });
 });
 
@@ -72,7 +74,11 @@ describe('backend user listing', () => {
     expect(apiClient.get).toHaveBeenCalledTimes(1);
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: usersResponse.map((record) => ({ ...record, enabled: false })),
+      data: apiPage(
+        usersResponse.map((record) => ({ ...record, enabled: false })),
+        undefined,
+        10,
+      ),
     });
     await act(async () =>
       resolve({ status: 200, data: { ...userResponse, enabled: false } }),
@@ -197,16 +203,20 @@ describe('backend user listing', () => {
     ).not.toBeInTheDocument();
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [
-        ...usersResponse,
-        {
-          ...userResponse,
-          id: 'new-user-uuid',
-          username: 'new.manager',
-          display_name: 'Process Manager',
-          role: 'ADMIN_IT',
-        },
-      ],
+      data: apiPage(
+        [
+          ...usersResponse,
+          {
+            ...userResponse,
+            id: 'new-user-uuid',
+            username: 'new.manager',
+            display_name: 'Process Manager',
+            role: 'ADMIN_IT',
+          },
+        ],
+        undefined,
+        10,
+      ),
     });
     await user.click(screen.getByRole('button', { name: 'Save User' }));
     expect(apiClient.post).toHaveBeenCalledWith(
@@ -262,7 +272,7 @@ describe('backend user listing', () => {
     };
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'users' ? usersResponse : fresh,
+      data: url === 'users' ? apiPage(usersResponse, undefined, 10) : fresh,
     }));
     const user = userEvent.setup();
     renderPage();
@@ -304,7 +314,7 @@ describe('backend user listing', () => {
   it('reloads the list when the selected user no longer exists', async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) =>
       url === 'users'
-        ? { status: 200, data: usersResponse }
+        ? { status: 200, data: apiPage(usersResponse, undefined, 10) }
         : {
             status: 404,
             data: {
@@ -365,7 +375,10 @@ describe('backend user listing', () => {
   });
 
   it('shows a loader until the request completes, with no false empty or error state', async () => {
-    let resolve!: (response: { status: number; data: UserResponse[] }) => void;
+    let resolve!: (response: {
+      status: number;
+      data: ApiPage<UserResponse>;
+    }) => void;
     vi.mocked(apiClient.get).mockReturnValue(
       new Promise((done) => {
         resolve = done;
@@ -376,7 +389,9 @@ describe('backend user listing', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByText('No users found.')).not.toBeInTheDocument();
     expect(screen.getByRole('searchbox')).toBeEnabled();
-    await act(async () => resolve({ status: 200, data: usersResponse }));
+    await act(async () =>
+      resolve({ status: 200, data: apiPage(usersResponse, undefined, 10) }),
+    );
     expect(screen.getAllByRole('rowheader')).toHaveLength(1);
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });

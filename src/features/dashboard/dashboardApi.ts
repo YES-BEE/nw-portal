@@ -1,10 +1,15 @@
 import axios, { type AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
 import {
+  readFilterOptions,
+  type FilterOptionMap,
+  type FilterOptionType,
+  type ProductionLotsQuery,
+} from '../../api/productionFilters';
+import {
   collectApiItems,
   readApiPage,
   type ApiPage,
-  type ListQuery,
   type PageQuery,
 } from '../../api/collections';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
@@ -276,6 +281,7 @@ export function isDashboardLot(value: unknown): value is DashboardLot {
       'current_location_type',
       'current_location_id',
       'current_station',
+      'current_station_id',
       'current_process',
       'current_process_id',
       'current_process_status',
@@ -286,15 +292,14 @@ export function isDashboardLot(value: unknown): value is DashboardLot {
   );
 }
 export async function getDashboardLots(
-  query: ListQuery,
+  query: ProductionLotsQuery,
   signal?: AbortSignal,
-  status?: string,
 ): Promise<ApiPage<DashboardLot>> {
   const page = readApiPage(
     await request(() =>
       apiClient.get<unknown>('dashboard/lots', {
         ...options(signal),
-        params: { ...query, ...(status ? { status } : {}) },
+        params: query,
       }),
     ),
     query,
@@ -302,7 +307,25 @@ export async function getDashboardLots(
     (row) => row.id,
     invalid,
   );
-  if (status && page.items.some((row) => row.status !== status))
+  const selectedStatus = query.status;
+  if (selectedStatus && page.items.some((row) => row.status !== selectedStatus))
     return invalid();
   return page;
+}
+export async function getDashboardFilterOptions<K extends FilterOptionType>(
+  kind: K,
+  query: ProductionLotsQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<FilterOptionMap[K]>> {
+  return readFilterOptions(
+    kind,
+    await request(() =>
+      apiClient.get<unknown>(`dashboard/filter-options/${kind}`, {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
+    invalid,
+  );
 }

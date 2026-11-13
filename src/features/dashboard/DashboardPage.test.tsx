@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -48,6 +49,57 @@ function setup() {
     ),
   };
 }
+it('keeps table filters during polling without applying them to dashboard summary requests', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  const original = vi.mocked(apiClient.get).getMockImplementation()!;
+  const get = vi
+    .mocked(apiClient.get)
+    .mockImplementation(async (url, config) =>
+      url === 'dashboard/filter-options/styles'
+        ? {
+            status: 200,
+            data: {
+              items: [{ id: 'style-id', style_number: 'FILTER-STYLE' }],
+              page: 0,
+              size: 100,
+              totalElements: 1,
+            },
+          }
+        : original(url, config),
+    );
+  const { user, unmount } = setup();
+  await user.click(await screen.findByRole('combobox', { name: 'Style' }));
+  await user.click(await screen.findByRole('option', { name: 'FILTER-STYLE' }));
+  await waitFor(() =>
+    expect(get).toHaveBeenLastCalledWith(
+      'dashboard/lots',
+      expect.objectContaining({
+        params: { page: 0, size: 10, search: '', styleId: 'style-id' },
+      }),
+    ),
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(
+    get.mock.calls
+      .filter(([url]) => url === 'dashboard')
+      .every(([, config]) => !('styleId' in (config?.params as ListQuery))),
+  ).toBe(true);
+  expect(get).toHaveBeenCalledWith(
+    'dashboard/lots',
+    expect.objectContaining({
+      params: { page: 0, size: 10, search: '', styleId: 'style-id' },
+    }),
+  );
+  expect(
+    within(screen.getByRole('region', { name: 'Total Lots' })).getByText('9'),
+  ).toBeVisible();
+  expect(screen.getByRole('combobox', { name: 'Style' })).toHaveValue(
+    'FILTER-STYLE',
+  );
+  unmount();
+});
 it('renders server summary metrics, station WIP, and live lot data', async () => {
   setup();
   await screen.findByRole('region', { name: 'Total Lots' });
@@ -209,7 +261,7 @@ it('sends search, page size and page changes to the backend', async () => {
 it('handles empty successful data with zero metrics and no table pagination', async () => {
   vi.mocked(apiClient.get).mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'dashboard' ? emptyDashboard : [],
+    data: url === 'dashboard' ? emptyDashboard : apiPage([], undefined, 10),
   }));
   setup();
   await screen.findByRole('region', { name: 'Total Lots' });

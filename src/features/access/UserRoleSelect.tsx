@@ -12,11 +12,11 @@ import {
 import { signOut } from '../auth/session';
 import { getAccessRoleOptions } from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
-import type { AccessRolesFailure, AccessRoleOptionsResponse } from './types';
+import type { AccessRolesFailure, AccessRoleOptionResponse } from './types';
 
 type RolesState =
   | { status: 'loading' }
-  | { status: 'ready'; roles: AccessRoleOptionsResponse }
+  | { status: 'ready'; roles: AccessRoleOptionResponse[] }
   | { status: 'error'; failure: AccessRolesFailure };
 
 export function UserRoleSelect({

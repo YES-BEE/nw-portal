@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +16,10 @@ const detail = {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'nfc-tags' ? tagsResponse.slice(0, 2) : detail,
+    data:
+      url === 'nfc-tags'
+        ? apiPage(tagsResponse.slice(0, 2), undefined, 10)
+        : detail,
   }));
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 200, data: detail });
 });
@@ -48,7 +52,7 @@ describe('backend tag editing', () => {
     vi.mocked(apiClient.put).mockResolvedValue({ status: 200, data: updated });
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [updated, tagsResponse[1]],
+      data: apiPage([updated, tagsResponse[1]], undefined, 10),
     });
     await user.click(screen.getByRole('button', { name: 'Save Tag' }));
     expect(apiClient.put).toHaveBeenCalledWith(

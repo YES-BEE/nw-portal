@@ -98,7 +98,6 @@ export function StyleForm({
   const selected = steps.map((step) => step.processId);
   const available = new Set(options.map((process) => process.id));
   const invalidSteps = selected.map((id) => !available.has(id));
-  const duplicates = new Set(selected).size !== selected.length;
   const draftEdit = !!styleId && source?.status === 'DRAFT';
   const revisionEdit = !!styleId && !!source && !draftEdit;
   const quantityValue = Number(quantity);
@@ -118,7 +117,6 @@ export function StyleForm({
       !number.trim() ||
       !steps.length ||
       invalidSteps.some(Boolean) ||
-      duplicates ||
       (revisionEdit && (!reason.trim() || !validQuantity)) ||
       (!styleId && (!validPlanCount || !validQuantity))
     )
@@ -318,11 +316,6 @@ export function StyleForm({
           {failure?.fieldErrors?.processIds && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {failure.fieldErrors.processIds}
-            </Alert>
-          )}
-          {submitted && duplicates && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {t('styles.uniqueProcesses')}
             </Alert>
           )}
           <ProcessSequenceEditor

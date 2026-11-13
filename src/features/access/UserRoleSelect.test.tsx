@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,7 +14,7 @@ import { UserForm } from './UserForm';
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: accessRoleOptionsResponse,
+    data: apiPage(accessRoleOptionsResponse, undefined, 20),
   });
 });
 
@@ -52,7 +53,10 @@ describe('backend user role dropdown', () => {
     );
     expect(screen.getByText('Loading roles...')).toBeVisible();
     await act(async () =>
-      resolve({ status: 200, data: accessRoleOptionsResponse }),
+      resolve({
+        status: 200,
+        data: apiPage(accessRoleOptionsResponse, undefined, 20),
+      }),
     );
     expect(screen.getByRole('combobox', { name: /Role/ })).toHaveTextContent(
       'IT Admin',
@@ -99,7 +103,10 @@ describe('backend user role dropdown', () => {
   });
 
   it('handles an empty role list without offering fabricated options', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: apiPage([], undefined, 10),
+    });
     renderWithProviders(<UserRoleSelect value={null} onChange={vi.fn()} />);
     expect(
       await screen.findByText('No roles are available for selection.'),

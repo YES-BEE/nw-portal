@@ -93,6 +93,7 @@ export const dashboardLot: DashboardLot = {
   completed_processes: 1,
   total_processes: 3,
   current_station: '03',
+  current_station_id: 'station-03',
   current_process: 'Washing',
   current_process_id: 'process-id',
   current_process_status: 'IN_PROGRESS',

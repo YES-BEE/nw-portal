@@ -133,7 +133,7 @@ export function StyleProgressReport() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={headings.length}>
+                  <TableCell colSpan={headings.length} align="center">
                     {t('reports.noStyles')}
                   </TableCell>
                 </TableRow>

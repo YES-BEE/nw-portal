@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,7 +16,7 @@ const customRole = {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: [...accessRolesResponse, customRole],
+    data: apiPage([...accessRolesResponse, customRole], undefined, 10),
   });
   vi.spyOn(apiClient, 'delete').mockResolvedValue({
     status: 200,
@@ -99,7 +100,7 @@ describe('role deletion', () => {
     expect(apiClient.get).toHaveBeenCalledTimes(1);
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: accessRolesResponse,
+      data: apiPage(accessRolesResponse, undefined, 10),
     });
     await act(async () =>
       resolve({ status: 200, data: { code: customRole.code, active: false } }),
@@ -177,7 +178,7 @@ describe('role deletion', () => {
     );
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: accessRolesResponse,
+      data: apiPage(accessRolesResponse, undefined, 10),
     });
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() =>

@@ -1,9 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
 import { renderWithProviders } from '../test/render';
+import { apiPage } from '../test/apiPage';
 import { UserManagementPage } from '../features/access/UserManagementPage';
 import { RoleManagementPage } from '../features/access/RoleManagementPage';
 import { TagManagementPage } from '../features/tags/TagManagementPage';
@@ -64,6 +65,8 @@ describe('server-driven management lists', () => {
     '$name sends pagination and search to the API and renders its results without local search or pagination',
     async ({ name, path, Component, items }) => {
       vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
+        if (url === 'ui/lookups')
+          return { status: 200, data: { tags: apiPage([], undefined, 20) } };
         expect(url).toBe(path);
         const query = config?.params as {
           page: number;
@@ -94,8 +97,10 @@ describe('server-driven management lists', () => {
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(10),
       );
-      expect(apiClient.get).toHaveBeenCalledTimes(1);
-      expect(apiClient.get).toHaveBeenLastCalledWith(
+      expect(
+        vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === path),
+      ).toHaveLength(1);
+      expect(apiClient.get).toHaveBeenCalledWith(
         path,
         expect.objectContaining({
           params: expect.objectContaining({ page: 0, size: 10, search: '' }),
@@ -103,7 +108,7 @@ describe('server-driven management lists', () => {
       );
       await user.click(screen.getByRole('button', { name: 'Go to next page' }));
       await waitFor(() =>
-        expect(apiClient.get).toHaveBeenLastCalledWith(
+        expect(apiClient.get).toHaveBeenCalledWith(
           path,
           expect.objectContaining({
             params: expect.objectContaining({ page: 1, size: 10, search: '' }),
@@ -120,17 +125,19 @@ describe('server-driven management lists', () => {
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(23),
       );
-      expect(apiClient.get).toHaveBeenLastCalledWith(
+      expect(apiClient.get).toHaveBeenCalledWith(
         path,
         expect.objectContaining({
           params: expect.objectContaining({ page: 0, size: 25, search: '' }),
         }),
       );
-      await user.type(screen.getByRole('searchbox'), '  Not A Local Match  ');
+      fireEvent.change(screen.getByRole('searchbox'), {
+        target: { value: '  Not A Local Match  ' },
+      });
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(1),
       );
-      expect(apiClient.get).toHaveBeenLastCalledWith(
+      expect(apiClient.get).toHaveBeenCalledWith(
         path,
         expect.objectContaining({
           params: expect.objectContaining({
@@ -140,7 +147,9 @@ describe('server-driven management lists', () => {
           }),
         }),
       );
-      expect(apiClient.get).toHaveBeenCalledTimes(4);
+      expect(
+        vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === path),
+      ).toHaveLength(4);
       if (path === 'nfc-tags')
         expect(
           vi

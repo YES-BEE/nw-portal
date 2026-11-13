@@ -1,6 +1,6 @@
-import type { ModulesResponse } from '../features/access/types';
+import type { ModuleResponse } from '../features/access/types';
 
-export const modulesResponse: ModulesResponse = [
+export const modulesResponse: ModuleResponse[] = [
   { key: 'dashboard', name: 'Dashboard', built_in: true, active: true },
   { key: 'reports', name: 'Reports/Analysis', built_in: true, active: true },
   {

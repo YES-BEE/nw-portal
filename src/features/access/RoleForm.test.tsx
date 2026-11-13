@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,7 +33,7 @@ function setup(draft = initial, editing = false) {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: modulesResponse,
+    data: apiPage(modulesResponse, undefined, 20),
   });
 });
 
@@ -40,14 +41,18 @@ describe('backend role module choices', () => {
   it('uses backend names and keys including custom modules when creating a role', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [
-        {
-          key: 'custom_factory',
-          name: 'Factory tools',
-          active: true,
-          built_in: false,
-        },
-      ],
+      data: apiPage(
+        [
+          {
+            key: 'custom_factory',
+            name: 'Factory tools',
+            active: true,
+            built_in: false,
+          },
+        ],
+        undefined,
+        10,
+      ),
     });
     const user = userEvent.setup();
     const { onSave } = setup();
@@ -144,7 +149,10 @@ describe('backend role module choices', () => {
   });
 
   it('allows an empty module selection after loading an empty catalog', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      status: 200,
+      data: apiPage([], undefined, 10),
+    });
     setup();
     expect(await screen.findByText('No modules are available.')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Save Role' })).toBeEnabled();

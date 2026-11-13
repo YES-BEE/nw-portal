@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import {
@@ -52,21 +53,22 @@ describe('trolley NFC API', () => {
       page: 1,
       size: 1,
     });
-    get.mockResolvedValueOnce({ status: 200, data: [] });
+    get.mockResolvedValueOnce({
+      status: 200,
+      data: apiPage([], undefined, 10),
+    });
     expect(await getTrolleyNfcTags()).toEqual([]);
   });
   it('assigns using the backend model and validates the returned asset', async () => {
-    const put = vi
-      .spyOn(apiClient, 'put')
-      .mockResolvedValue({
-        status: 200,
-        data: {
-          ...tag,
-          assigned: true,
-          asset_type: 'TROLLEY',
-          trolley_id: body.assetId,
-        },
-      });
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({
+      status: 200,
+      data: {
+        ...tag,
+        assigned: true,
+        asset_type: 'TROLLEY',
+        trolley_id: body.assetId,
+      },
+    });
     await assignTrolleyNfcTag(tag.id, body);
     expect(put).toHaveBeenCalledWith(
       'nfc-assignments/tag-1',

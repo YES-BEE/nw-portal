@@ -1,4 +1,5 @@
-﻿import { screen, within, waitFor } from '@testing-library/react';
+import { apiPage } from '../../test/apiPage';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -23,7 +24,10 @@ beforeEach(() => {
   mockProcessDragLayout();
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
     if (url === 'ui/lookups')
-      return { status: 200, data: { processes: styleProcessOptions } };
+      return {
+        status: 200,
+        data: { processes: apiPage(styleProcessOptions, config?.params, 20) },
+      };
     if (url.endsWith('/derived-route'))
       return { status: 200, data: styleRouteResponse };
     if (url !== 'styles') return { status: 200, data: styleResponse };

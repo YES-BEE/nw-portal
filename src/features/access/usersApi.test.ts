@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
@@ -20,7 +21,7 @@ const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
   status = 200,
-  data: unknown = usersResponse,
+  data: unknown = apiPage(usersResponse, config?.params, 10),
 ) => ({ config, status, data, statusText: '', headers: {} });
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) =>
   response(config),
@@ -45,6 +46,31 @@ afterEach(() => {
 });
 
 describe('users API', () => {
+  it.each(['create', 'delete'] as const)(
+    'rejects malformed successful %s user responses',
+    async (operation) => {
+      adapter.mockImplementation(async (config) =>
+        response(config, 200, {
+          ...userResponse,
+          initial_password_expires_at: undefined,
+        }),
+      );
+      const pending =
+        operation === 'delete'
+          ? deleteUser(userResponse.id)
+          : createUser({
+              username: 'manager',
+              displayName: 'Manager',
+              initialPassword: 'temporary',
+              role: 'PROCESS_MANAGER',
+              processAssignments: [],
+            });
+      await expect(pending).rejects.toMatchObject({
+        failure: { kind: 'invalidResponse' },
+      });
+    },
+  );
+
   it('updates user details and multiple assignments with PUT, without password or status fields', async () => {
     const body = {
       username: 'manager',
@@ -82,7 +108,9 @@ describe('users API', () => {
       },
     ];
     adapter.mockImplementation(async (config) =>
-      response(config, 200, { processes }),
+      response(config, 200, {
+        processes: apiPage(processes, config?.params, 20),
+      }),
     );
     await expect(getUserProcessOptions()).resolves.toEqual(processes);
     expect(adapter.mock.calls[0][0].url).toBe('ui/lookups');
@@ -165,12 +193,22 @@ describe('users API', () => {
   it('deletes the encoded user ID with a bearer token and no request body', async () => {
     vi.stubEnv('VITE_API_VERSION', 'v1');
     adapter.mockImplementation(async (config) =>
-      response(config, 200, { ...userResponse, enabled: false }),
+      response(config, 200, {
+        ...userResponse,
+        id: 'id/with space',
+        enabled: false,
+        status: 'INACTIVE',
+      }),
     );
     const controller = new AbortController();
     await expect(
       deleteUser('id/with space', controller.signal),
-    ).resolves.toEqual({ ...userResponse, enabled: false });
+    ).resolves.toEqual({
+      ...userResponse,
+      id: 'id/with space',
+      enabled: false,
+      status: 'INACTIVE',
+    });
     const config = adapter.mock.calls[0][0];
     expect(apiClient.getUri(config).split('?')[0]).toBe(
       'http://backend.test/api/v1/users/id%2Fwith%20space',
@@ -231,6 +269,7 @@ describe('users API', () => {
 
   it('renews a rejected access token once before repeating the same create body', async () => {
     adapter
+      .mockImplementation(async (config) => response(config, 200, userResponse))
       .mockImplementationOnce(async (config) => response(config, 401, ''))
       .mockImplementationOnce(async (config) =>
         response(config, 200, {

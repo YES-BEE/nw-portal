@@ -1,4 +1,5 @@
-﻿import {
+import { apiPage } from '../test/apiPage';
+import {
   styleResponse,
   styleRouteResponse,
   styleProcessOptions,
@@ -45,9 +46,12 @@ beforeEach(() => {
       url === 'dashboard'
         ? emptyDashboard
         : url === 'ui/lookups'
-          ? { tags: storageTags, processes: styleProcessOptions }
+          ? {
+              tags: apiPage(storageTags, undefined, 20),
+              processes: apiPage(styleProcessOptions, undefined, 20),
+            }
           : url === 'styles'
-            ? [styleResponse]
+            ? apiPage([styleResponse], undefined, 10)
             : url.startsWith('styles/') && url.endsWith('/derived-route')
               ? styleRouteResponse
               : url.startsWith('styles/')
@@ -59,7 +63,7 @@ beforeEach(() => {
                     }
                   : url.startsWith('processes/')
                     ? { ...processResponse, id: url.slice('processes/'.length) }
-                    : [],
+                    : apiPage([], undefined, 10),
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -80,7 +84,10 @@ describe('application routing', () => {
     });
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'dashboard' ? dashboardResponse : [dashboardLot],
+      data:
+        url === 'dashboard'
+          ? dashboardResponse
+          : apiPage([dashboardLot], undefined, 10),
     }));
     await router.navigate('/dashboard');
     renderWithProviders(<App />);
@@ -162,9 +169,9 @@ describe('application routing', () => {
       status: url.endsWith('/qc') ? 404 : 200,
       data:
         url === 'ui/lookups'
-          ? { styles: [lotStyleOption] }
+          ? { styles: apiPage([lotStyleOption], undefined, 20) }
           : url === 'lots' || url.endsWith('/timeline')
-            ? []
+            ? apiPage([], undefined, 10)
             : url.endsWith('/qc')
               ? { code: 'NOT_FOUND' }
               : lotResponse,
@@ -221,7 +228,7 @@ describe('application routing', () => {
             detail: 'QC results are outside the granted desktop modules',
           }
         : url.endsWith('/timeline')
-          ? [lotEvent]
+          ? apiPage([lotEvent], undefined, 10)
           : lotResponse,
     }));
     await router.navigate('/lots/lot-id');
@@ -252,7 +259,10 @@ describe('application routing', () => {
     });
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'ui/lookups' ? { styles: [] } : [],
+      data:
+        url === 'ui/lookups'
+          ? { styles: apiPage([], undefined, 20) }
+          : apiPage([], undefined, 10),
     }));
     await router.navigate('/lots');
     renderWithProviders(<App />);
@@ -363,7 +373,8 @@ describe('application routing', () => {
   it('opens user details from the list and retains users navigation access', async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'users' ? usersResponse : userResponse,
+      data:
+        url === 'users' ? apiPage(usersResponse, undefined, 10) : userResponse,
     }));
     const user = userEvent.setup();
     await router.navigate('/users');
@@ -514,14 +525,18 @@ describe('application routing', () => {
       if (url === 'styles')
         return {
           status: 200,
-          data: [
-            {
-              ...styleResponse,
-              id: 'owned-style',
-              style_number: 'OWN-100',
-              created_by: 'user-7',
-            },
-          ],
+          data: apiPage(
+            [
+              {
+                ...styleResponse,
+                id: 'owned-style',
+                style_number: 'OWN-100',
+                created_by: 'user-7',
+              },
+            ],
+            config?.params,
+            10,
+          ),
         };
       if (url === 'styles/owned-style')
         return {
@@ -860,16 +875,20 @@ describe('application routing', () => {
           ? {
               status: 200,
               data: {
-                tags: [
-                  ...storageTags,
-                  {
-                    id: 'new-tag',
-                    name: 'New Factory Tag',
-                    uid: '04:AA:BB:CC',
-                    status: 'ACTIVE',
-                    assigned: false,
-                  },
-                ],
+                tags: apiPage(
+                  [
+                    ...storageTags,
+                    {
+                      id: 'new-tag',
+                      name: 'New Factory Tag',
+                      uid: '04:AA:BB:CC',
+                      status: 'ACTIVE',
+                      assigned: false,
+                    },
+                  ],
+                  config?.params,
+                  20,
+                ),
               },
             }
           : originalGet(url, config),

@@ -1,7 +1,8 @@
+import type { ApiPage } from '../../api/collections';
 export interface AccessRoleResponse {
   code: string;
   name: string;
-  description: string;
+  description: string | null;
   built_in: boolean;
   active: boolean;
   pc_access: boolean;
@@ -20,7 +21,7 @@ export interface AccessRoleOptionResponse {
   name: string;
 }
 
-export type AccessRoleOptionsResponse = AccessRoleOptionResponse[];
+export type AccessRoleOptionsResponse = ApiPage<AccessRoleOptionResponse>;
 
 export interface ModuleResponse {
   key: string;
@@ -29,7 +30,7 @@ export interface ModuleResponse {
   active: boolean;
 }
 
-export type ModulesResponse = ModuleResponse[];
+export type ModulesResponse = ApiPage<ModuleResponse>;
 
 // ProcessAssignmentService.View in the backend.
 export interface UserProcessAssignment {
@@ -49,6 +50,8 @@ export interface UserResponse {
   enabled: boolean;
   must_change_password: boolean;
   created_at: string;
+  status: UserStatus;
+  initial_password_expires_at: string | null;
   role: string | null;
   processAssignments: UserProcessAssignment[];
 }

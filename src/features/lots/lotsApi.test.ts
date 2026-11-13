@@ -1,4 +1,5 @@
-﻿import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { apiPage } from '../../test/apiPage';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CanceledError, type InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../api/client';
 import { loginResponse } from '../../test/auth';
@@ -126,7 +127,13 @@ it('creates a backend-numbered batch and permits an unspecified quantity', async
 it('accepts null lot quantities and completed styles in the owned-style lookup', async () => {
   respond({ ...lotResponse, quantity: null });
   await expect(getLot('lot-id')).resolves.toMatchObject({ quantity: null });
-  respond({ styles: [{ ...lotStyleOption, status: 'COMPLETED' }] });
+  respond({
+    styles: apiPage(
+      [{ ...lotStyleOption, status: 'COMPLETED' }],
+      undefined,
+      20,
+    ),
+  });
   await expect(getLotStyleOptions()).resolves.toEqual([
     { ...lotStyleOption, status: 'COMPLETED' },
   ]);
@@ -145,7 +152,7 @@ it('loads available trolleys through the lots-authorized endpoint and maps/unmap
     status: 'AVAILABLE',
     version: 0,
   };
-  respond([trolley]);
+  respond(apiPage([trolley], undefined, 100));
   await expect(getAvailableLotTrolleys()).resolves.toEqual([trolley]);
   expect(adapter.mock.calls[0][0]).toMatchObject({
     url: 'trolleys/available',
@@ -287,7 +294,7 @@ it('pages and searches lots and style-specific lots on the server', async () => 
     lotResponse.style_id,
   );
   expect(adapter.mock.calls[1][0].url).toBe('styles/style-id/lots');
-  respond([]);
+  respond(apiPage([], query));
   await expect(getLots(query)).resolves.toMatchObject({
     items: [],
     totalElements: 0,
@@ -342,7 +349,9 @@ it('loads released style options from lookups without requiring style management
   });
   await expect(getLotStyleOptions()).resolves.toEqual([lotStyleOption]);
   expect(adapter.mock.calls[0][0].url).toBe('ui/lookups');
-  respond({ styles: [{ ...lotStyleOption, status: 'DRAFT' }] });
+  respond({
+    styles: apiPage([{ ...lotStyleOption, status: 'DRAFT' }], undefined, 20),
+  });
   await expect(getLotStyleOptions()).rejects.toMatchObject({
     failure: { kind: 'invalidResponse' },
   });

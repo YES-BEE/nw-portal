@@ -1,9 +1,9 @@
 import type {
-  AccessRoleOptionsResponse,
+  AccessRoleOptionResponse,
   AccessRoleResponse,
 } from '../features/access/types';
 
-export const accessRoleOptionsResponse: AccessRoleOptionsResponse = [
+export const accessRoleOptionsResponse: AccessRoleOptionResponse[] = [
   { code: 'NW', name: 'NW' },
   { code: 'ADMIN_IT', name: 'IT Admin' },
 ];

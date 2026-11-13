@@ -1,4 +1,4 @@
-import type { ApiCollection } from '../../api/collections';
+import type { ApiPage } from '../../api/collections';
 export interface DeviceConfiguration {
   id: string;
   name: string;
@@ -110,8 +110,8 @@ export interface ProcessLookupResponse {
 }
 
 export interface ProcessFormLookupsResponse {
-  tags: ApiCollection<ProcessTagOptionResponse>;
-  processes: ApiCollection<ProcessLookupResponse>;
+  tags: ApiPage<ProcessTagOptionResponse>;
+  processes: ApiPage<ProcessLookupResponse>;
 }
 export type CreateProcessField =
   | keyof CreateProcessRequest

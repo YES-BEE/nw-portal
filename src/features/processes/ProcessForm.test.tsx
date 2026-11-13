@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import {
   sampleProcesses,
   seedTestData,
@@ -15,13 +16,17 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
     data: {
-      tags: defaultTags.map((tag) => ({
-        id: tag.id,
-        uid: tag.actual,
-        name: tag.name,
-        status: 'ACTIVE',
-        assigned: false,
-      })),
+      tags: apiPage(
+        defaultTags.map((tag) => ({
+          id: tag.id,
+          uid: tag.actual,
+          name: tag.name,
+          status: 'ACTIVE',
+          assigned: false,
+        })),
+        undefined,
+        20,
+      ),
     },
   });
 });

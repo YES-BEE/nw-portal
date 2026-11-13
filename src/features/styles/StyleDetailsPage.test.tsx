@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -16,11 +17,11 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { processes: styleProcessOptions }
+        ? { processes: apiPage(styleProcessOptions, undefined, 20) }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
           : url.endsWith('/revisions')
-            ? []
+            ? apiPage([], undefined, 10)
             : styleResponse,
   }));
 });
@@ -82,7 +83,7 @@ it('uses the process code if a route process is absent from current lookup choic
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { processes: [] }
+        ? { processes: apiPage([], undefined, 20) }
         : url.endsWith('/derived-route')
           ? styleRouteResponse
           : styleResponse,
@@ -96,7 +97,7 @@ it('shows an informative empty route message for a draft without selected proces
     status: url.endsWith('/derived-route') ? 409 : 200,
     data:
       url === 'ui/lookups'
-        ? { processes: [] }
+        ? { processes: apiPage([], undefined, 20) }
         : url.endsWith('/derived-route')
           ? {
               code: 'STYLE_PROCESS_REQUIRED',

@@ -15,6 +15,7 @@ import {
   setAuthenticatedSession,
   signIn,
   signOut,
+  logout,
 } from './session';
 import type { AuthSession } from './session';
 
@@ -56,6 +57,13 @@ afterEach(() => {
 });
 
 describe('backend session preparation', () => {
+  it('signs out locally when no refresh token exists rather than posting a null token', async () => {
+    setAuthenticatedSession(identity);
+    await logout();
+    expect(postMock).not.toHaveBeenCalled();
+    expect(readSession()).toBeNull();
+  });
+
   it('posts typed credentials through the shared client and starts a session', async () => {
     mockSuccessfulLogin();
     expect(await signIn(' admin ', ' exact password ')).toBeNull();
@@ -83,7 +91,17 @@ describe('backend session preparation', () => {
     vi.stubEnv('VITE_AUTH_CLIENT_TYPE', 'PAD');
     const response = {
       ...loginResponse,
-      processAssignments: [{ processId: 'backend-process' }],
+      processAssignments: [
+        {
+          processId: 'backend-process',
+          processName: 'Washing',
+          stationId: 'station-id',
+          stationNumber: '03',
+          activeOnShift: false,
+          processActive: true,
+          stationActive: true,
+        },
+      ],
       modules: [
         ...loginResponse.modules,
         ...loginResponse.modules,

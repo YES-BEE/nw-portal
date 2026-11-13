@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,7 +36,10 @@ beforeEach(() => {
   ]);
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'ui/lookups' ? { processes } : manager,
+    data:
+      url === 'ui/lookups'
+        ? { processes: apiPage(processes, undefined, 20) }
+        : manager,
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 200, data: manager });
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 200, data: manager });
@@ -191,7 +195,10 @@ describe('user process assignments', () => {
   it('supports removing assignments for processes that are no longer available', async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'ui/lookups' ? { processes: [] } : manager,
+      data:
+        url === 'ui/lookups'
+          ? { processes: apiPage([], undefined, 20) }
+          : manager,
     }));
     const user = userEvent.setup();
     renderWithProviders(

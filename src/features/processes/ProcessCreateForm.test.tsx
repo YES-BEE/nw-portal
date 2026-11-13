@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,7 +14,12 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
     data:
-      url === 'processes' ? [] : { tags: [createTagResponse], processes: [] },
+      url === 'processes'
+        ? apiPage([], undefined, 10)
+        : {
+            tags: apiPage([createTagResponse], undefined, 20),
+            processes: apiPage([], undefined, 20),
+          },
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
@@ -75,7 +81,11 @@ describe('backend process creation', () => {
     );
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [{ ...processResponse, name: 'QC Washing', quality: true }],
+      data: apiPage(
+        [{ ...processResponse, name: 'QC Washing', quality: true }],
+        undefined,
+        10,
+      ),
     });
     await user.click(screen.getByRole('button', { name: 'Save Process' }));
     expect(apiClient.post).toHaveBeenCalledWith(
@@ -227,7 +237,7 @@ describe('backend process creation', () => {
   it('keeps saving disabled when available tags cannot load', async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) =>
       url === 'processes'
-        ? { status: 200, data: [] }
+        ? { status: 200, data: apiPage([], undefined, 10) }
         : { status: 403, data: { detail: 'Missing module access: tags' } },
     );
     const user = userEvent.setup();

@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -8,7 +9,10 @@ import { StorageForm } from './StorageForm';
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'ui/lookups' ? { tags: storageTags } : area,
+    data:
+      url === 'ui/lookups'
+        ? { tags: apiPage(storageTags, undefined, 20) }
+        : area,
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 200, data: area });
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 200, data: area });
@@ -121,7 +125,7 @@ it('shows backend field errors without an HTTP code and retains the draft', asyn
 it('shows the empty-tag message and disables save without available tags', async () => {
   vi.mocked(apiClient.get).mockResolvedValue({
     status: 200,
-    data: { tags: [] },
+    data: { tags: apiPage([], undefined, 20) },
   });
   setup();
   expect(
@@ -137,7 +141,7 @@ it('blocks saving on a failed edit GET and offers reload for missing records', a
     status: url === 'ui/lookups' ? 200 : 404,
     data:
       url === 'ui/lookups'
-        ? { tags: storageTags }
+        ? { tags: apiPage(storageTags, undefined, 20) }
         : { code: 'NOT_FOUND', detail: 'Requested resource was not found' },
   }));
   const { user, onReload } = setup(area.id);

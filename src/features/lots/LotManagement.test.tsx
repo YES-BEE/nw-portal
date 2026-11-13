@@ -1,4 +1,5 @@
-﻿import { screen, waitFor, within } from '@testing-library/react';
+import { apiPage } from '../../test/apiPage';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -21,13 +22,13 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { styles: [lotStyleOption] }
+        ? { styles: apiPage([lotStyleOption], undefined, 20) }
         : url.endsWith('/qc')
           ? lotQcResponse
           : url.endsWith('/timeline')
-            ? [lotEvent]
+            ? apiPage([lotEvent], undefined, 10)
             : url === 'lots' || url.endsWith('/lots')
-              ? [lotResponse]
+              ? apiPage([lotResponse], undefined, 10)
               : lotResponse,
   }));
   vi.spyOn(apiClient, 'post').mockImplementation(async (url) => ({
@@ -52,7 +53,7 @@ it('shows the newest lot first within the loaded page and style number in the fi
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { styles: [lotStyleOption] }
+        ? { styles: apiPage([lotStyleOption], undefined, 20) }
         : {
             items: [
               lotResponse,
@@ -85,11 +86,11 @@ it.each(['list', 'details'])(
       status: 200,
       data:
         url === 'ui/lookups'
-          ? { styles: [lotStyleOption] }
+          ? { styles: apiPage([lotStyleOption], undefined, 20) }
           : url === 'lots'
-            ? [current]
+            ? apiPage([current], undefined, 10)
             : url.endsWith('/timeline')
-              ? [lotEvent]
+              ? apiPage([lotEvent], undefined, 10)
               : url.endsWith('/qc')
                 ? lotQcResponse
                 : current,
@@ -214,7 +215,10 @@ it('uses server search, page size and style filtering', async () => {
 it('handles an empty list and unavailable released styles without pagination', async () => {
   vi.mocked(apiClient.get).mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'ui/lookups' ? { styles: [] } : [],
+    data:
+      url === 'ui/lookups'
+        ? { styles: apiPage([], undefined, 20) }
+        : apiPage([], undefined, 10),
   }));
   renderList();
   expect(await screen.findByText('No lots found.')).toBeVisible();
@@ -318,8 +322,8 @@ it('refreshes the list after deletion and hides the cancelled lot', async () => 
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { styles: [lotStyleOption] }
-        : [{ ...lotResponse, status: 'CANCELLED' }],
+        ? { styles: apiPage([lotStyleOption], undefined, 20) }
+        : apiPage([{ ...lotResponse, status: 'CANCELLED' }], undefined, 10),
   }));
   await user.click(screen.getByRole('button', { name: 'Delete lot' }));
   expect(await screen.findByText('No lots found.')).toBeVisible();
@@ -335,7 +339,7 @@ it('hides cancelled lots on later pages and preserves navigation through empty p
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { styles: [lotStyleOption] }
+        ? { styles: apiPage([lotStyleOption], config?.params, 20) }
         : {
             items:
               (config?.params as { page?: number } | undefined)?.page === 1
@@ -443,7 +447,10 @@ it('returns to the list after creating a batch and displays unset quantities', a
   vi.mocked(apiClient.post).mockImplementation(async () => {
     vi.mocked(apiClient.get).mockImplementation(async (url) => ({
       status: 200,
-      data: url === 'ui/lookups' ? { styles: [lotStyleOption] } : items,
+      data:
+        url === 'ui/lookups'
+          ? { styles: apiPage([lotStyleOption], undefined, 20) }
+          : apiPage(items, undefined, 10),
     }));
     return { status: 200, data: { createdCount: 2, items } };
   });
@@ -470,8 +477,8 @@ it('does not offer trolley mapping for processing or terminal lots', async () =>
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { styles: [lotStyleOption] }
-        : [{ ...lotResponse, status: 'IN_PROCESS' }],
+        ? { styles: apiPage([lotStyleOption], undefined, 20) }
+        : apiPage([{ ...lotResponse, status: 'IN_PROCESS' }], undefined, 10),
   }));
   renderList();
   await screen.findByText('LOT-001');

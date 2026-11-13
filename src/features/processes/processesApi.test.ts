@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
@@ -33,7 +34,7 @@ const originalAdapter = apiClient.defaults.adapter;
 const response = (
   config: InternalAxiosRequestConfig,
   status = 200,
-  data: unknown = processesResponse,
+  data: unknown = apiPage(processesResponse, config?.params, 10),
 ) => ({ config, status, data, statusText: '', headers: {} });
 const adapter = vi.fn(async (config: InternalAxiosRequestConfig) =>
   response(config),
@@ -321,7 +322,10 @@ describe('processes API', () => {
       },
     ];
     adapter.mockImplementation(async (config) =>
-      response(config, 200, { tags, processes: [] }),
+      response(config, 200, {
+        tags: apiPage(tags, config?.params, 20),
+        processes: apiPage([], config?.params, 20),
+      }),
     );
     await expect(getProcessTags()).resolves.toEqual(tags);
     const config = adapter.mock.calls[0][0];
@@ -382,7 +386,9 @@ describe('processes API', () => {
         nfc_uid: null,
       },
     ];
-    adapter.mockImplementation(async (config) => response(config, 200, data));
+    adapter.mockImplementation(async (config) =>
+      response(config, 200, apiPage(data, config?.params, 10)),
+    );
     await expect(getProcesses()).resolves.toEqual(data);
   });
 
@@ -403,16 +409,28 @@ describe('processes API', () => {
   );
 
   it.each([
-    { data: [{ ...processResponse, device_count: '1' }] },
-    { data: [{ ...processResponse, active: 'true' }] },
-    { data: [{ ...processResponse, nfc_mode: 'INVALID' }] },
     {
-      data: [
-        {
-          ...processesResponse[1],
-          devices: [{ ...processesResponse[1].devices[0], processId: 12 }],
-        },
-      ],
+      data: apiPage([{ ...processResponse, device_count: '1' }], undefined, 10),
+    },
+    { data: apiPage([{ ...processResponse, active: 'true' }], undefined, 10) },
+    {
+      data: apiPage(
+        [{ ...processResponse, nfc_mode: 'INVALID' }],
+        undefined,
+        10,
+      ),
+    },
+    {
+      data: apiPage(
+        [
+          {
+            ...processesResponse[1],
+            devices: [{ ...processesResponse[1].devices[0], processId: 12 }],
+          },
+        ],
+        undefined,
+        10,
+      ),
     },
   ])(
     'rejects invalid fields in the full process response: %j',

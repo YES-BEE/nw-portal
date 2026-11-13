@@ -1,10 +1,14 @@
-import { useCallback, useEffect } from 'react';
+import { readSession } from '../auth/session';
+import {
+  readDashboardFilters,
+  saveDashboardFilters,
+} from './dashboardFilterStorage';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
   Chip,
   CircularProgress,
-  MenuItem,
   Paper,
   Stack,
   Table,
@@ -23,33 +27,56 @@ import { usePagedList } from '../../api/usePagedList';
 import { useDashboardLotLabels } from './useDashboardLotLabels';
 import { LotProgress } from '../lots/LotProgress';
 import { formatDateTime } from '../../utils/formatDateTime';
-import { dashboardFailure, getDashboardLots } from './dashboardApi';
+import {
+  dashboardFailure,
+  getDashboardLots,
+  getDashboardFilterOptions,
+} from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
 import type { StationWip } from './types';
+import { ProductionLotFilters } from '../lots/ProductionLotFilters';
+import {
+  productionFilterParams,
+  type ProductionFilterSelection,
+} from '../lots/productionFilterSelection';
 
 export function DashboardLotsTable({
-  status,
   statuses,
-  onStatus,
   stations,
   pollIntervalMs,
   onHealthChange,
 }: {
-  status: string;
   statuses: string[];
-  onStatus: (value: string) => void;
   stations: StationWip[];
   pollIntervalMs: number;
   onHealthChange: (health: 'loading' | 'healthy' | 'stale') => void;
 }) {
   const { t } = useTranslation('translation');
   const labels = useDashboardLotLabels();
+  const [saved] = useState(() => {
+    const userId = readSession()?.user.id;
+    return { userId, ...readDashboardFilters(userId) };
+  });
+  const [selection, setSelection] = useState(saved.selection);
+  const filters = useMemo(() => productionFilterParams(selection), [selection]);
+  const status = selection.status;
   const load = useCallback(
     (query: ListQuery, signal?: AbortSignal) =>
-      getDashboardLots(query, signal, status || undefined),
-    [status],
+      getDashboardLots({ ...query, ...filters }, signal),
+    [filters],
   );
-  const list = usePagedList(load, pollIntervalMs, true);
+  const list = usePagedList(load, pollIntervalMs, true, saved.query);
+  useEffect(() => {
+    const search = list.input.trim();
+    saveDashboardFilters(saved.userId, {
+      selection,
+      query: {
+        ...list.query,
+        search,
+        page: search === list.query.search ? list.query.page : 0,
+      },
+    });
+  }, [selection, list.query, list.input, saved.userId]);
   const tableError =
     list.state.status === 'error'
       ? list.state.error
@@ -122,23 +149,23 @@ export function DashboardLotsTable({
             slotProps={{ htmlInput: { maxLength: 200 } }}
             sx={{ width: '100%', minWidth: { sm: 180 }, maxWidth: 300 }}
           />
-          <TextField
-            select
-            size="small"
-            label={t('lots.status')}
-            value={status}
-            onChange={(event) => onStatus(event.target.value)}
-            sx={{ width: '100%', minWidth: { sm: 140 }, maxWidth: 200 }}
-          >
-            <MenuItem value="">{t('dashboard.allStatuses')}</MenuItem>
-            {statuses.map((value) => (
-              <MenuItem key={value} value={value}>
-                {labels.statusLabel(value)}
-              </MenuItem>
-            ))}
-          </TextField>
         </Stack>
       </Stack>
+      <Box sx={{ px: 2, pb: 2 }}>
+        <ProductionLotFilters
+          value={selection}
+          statuses={statuses}
+          onChange={(next: ProductionFilterSelection) => {
+            setSelection(next);
+            list.setPage(0);
+          }}
+          loadOptions={getDashboardFilterOptions}
+          failure={dashboardFailure}
+          stationNames={Object.fromEntries(
+            stations.map((station) => [station.id, station.name]),
+          )}
+        />
+      </Box>
       {!!tableError && (
         <Box sx={{ px: 3 }}>
           <DashboardFailureAlert
@@ -268,7 +295,7 @@ export function DashboardLotsTable({
                 </TableCell>
                 <TableCell>
                   {stations.find(
-                    (station) => station.code === lot.current_station,
+                    (station) => station.id === lot.current_station_id,
                   )?.name || t('common.notProvided')}
                 </TableCell>
                 <TableCell>

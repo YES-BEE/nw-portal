@@ -20,7 +20,7 @@ import type {
   AccessRoleDraft,
   AccessRoleField,
   AccessRolesFailure,
-  ModulesResponse,
+  ModuleResponse,
 } from './types';
 import { getModules } from './accessRolesApi';
 import { AccessRolesError } from './accessRolesFailure';
@@ -48,7 +48,7 @@ export function RoleForm({
   const [failure, setFailure] = useState<AccessRolesFailure | null>(null);
   const [modulesState, setModulesState] = useState<
     | { status: 'loading' }
-    | { status: 'ready'; modules: ModulesResponse }
+    | { status: 'ready'; modules: ModuleResponse[] }
     | { status: 'error'; failure: AccessRolesFailure }
   >({ status: 'loading' });
   const [modulesAttempt, setModulesAttempt] = useState(0);

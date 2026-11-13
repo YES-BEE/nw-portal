@@ -338,15 +338,6 @@ export async function getLotTimeline(
       params: query,
     }),
   );
-  if (Array.isArray(data)) {
-    if (!data.every(isEvent)) return invalid();
-    return {
-      items: data,
-      page: query.page,
-      size: query.size,
-      totalElements: data.length ? query.page * query.size + data.length : 0,
-    };
-  }
   if (!data || typeof data !== 'object') return invalid();
   const page = data as Record<string, unknown>;
   // Timeline entries have no IDs and identical projected events are valid.

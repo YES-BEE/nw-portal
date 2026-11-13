@@ -112,8 +112,6 @@ export async function getTrolleys(
   const data = await request(() =>
     apiClient.get<unknown>('trolleys', { ...options(signal), params: query }),
   );
-  if (Array.isArray(data) && data.length === 0)
-    return { items: [], page: query.page, size: query.size, totalElements: 0 };
   if (!data || typeof data !== 'object' || Array.isArray(data))
     return invalid();
   const page = data as Record<string, unknown>;

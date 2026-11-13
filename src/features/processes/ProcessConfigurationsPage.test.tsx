@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +18,10 @@ beforeEach(() => {
   localStorage.clear();
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'ui/lookups' ? { tags: processTags } : processesResponse,
+    data:
+      url === 'ui/lookups'
+        ? { tags: apiPage(processTags, undefined, 20) }
+        : apiPage(processesResponse, undefined, 10),
   }));
 });
 
@@ -77,12 +81,14 @@ describe('backend process listing', () => {
       screen.queryByText('No processes configured.'),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    await act(async () => resolve({ status: 200, data: processesResponse }));
+    await act(async () =>
+      resolve({ status: 200, data: apiPage(processesResponse, undefined, 10) }),
+    );
     expect(screen.getAllByRole('rowheader')).toHaveLength(1);
   });
 
   it.each([
-    { data: [] },
+    { data: apiPage([], undefined, 10) },
     { data: { items: [], page: 0, size: 10, totalElements: 0 } },
   ])(
     'shows an empty table when no active processes exist: %j',
@@ -213,9 +219,15 @@ describe('backend process listing', () => {
 
   it.each([
     { data: {} },
-    { data: [processResponse, processResponse] },
-    { data: [{ ...processResponse, nfcMode: 'INVALID' }] },
-    { data: [{ ...processResponse, devices: [{}] }] },
+    { data: apiPage([processResponse, processResponse], undefined, 10) },
+    {
+      data: apiPage(
+        [{ ...processResponse, nfcMode: 'INVALID' }],
+        undefined,
+        10,
+      ),
+    },
+    { data: apiPage([{ ...processResponse, devices: [{}] }], undefined, 10) },
   ])('rejects malformed process responses: %j', async ({ data }) => {
     vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });
     renderWithProviders(

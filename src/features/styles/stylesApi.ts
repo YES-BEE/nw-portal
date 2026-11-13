@@ -61,6 +61,12 @@ export function parseStylesFailure(
                 ? 'service'
                 : 'http';
   const fieldErrors: StylesFailure['fieldErrors'] = {};
+  if (
+    status === 409 &&
+    (code === 'INVALID_LOT_PREFIX' || code === 'LOT_PREFIX_IN_USE') &&
+    message
+  )
+    fieldErrors.styleNumber = message;
   const fields = problem?.fieldErrors;
   if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
     for (const field of [

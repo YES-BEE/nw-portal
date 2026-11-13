@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { renderWithProviders } from '../../test/render';
@@ -11,15 +12,19 @@ it('shows the resolved name without exposing the UID', async () => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
     data: {
-      tags: [
-        {
-          id: 'tag-id',
-          name: 'Washing Line',
-          uid: 'private-uid',
-          status: 'ACTIVE',
-          assigned: true,
-        },
-      ],
+      tags: apiPage(
+        [
+          {
+            id: 'tag-id',
+            name: 'Washing Line',
+            uid: 'private-uid',
+            status: 'ACTIVE',
+            assigned: true,
+          },
+        ],
+        undefined,
+        20,
+      ),
     },
   });
   renderWithProviders(<Display />);

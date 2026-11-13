@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -20,7 +21,7 @@ const assigned = {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: [trolley],
+    data: apiPage([trolley], undefined, 10),
   });
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 200, data: assigned });
   vi.spyOn(apiClient, 'delete').mockResolvedValue({
@@ -74,7 +75,10 @@ it('unassigns the current trolley without fetching the available list', async ()
   expect(onSaved).toHaveBeenCalledOnce();
 });
 it('handles no available trolleys without enabling assignment or offering a reload button', async () => {
-  vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+  vi.mocked(apiClient.get).mockResolvedValue({
+    status: 200,
+    data: apiPage([], undefined, 10),
+  });
   setup();
   expect(
     await screen.findByText(

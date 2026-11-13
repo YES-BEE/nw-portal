@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -20,9 +21,12 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'processes'
-        ? processesResponse
+        ? apiPage(processesResponse, undefined, 10)
         : url === 'ui/lookups'
-          ? { processes: [], tags: [readyTag] }
+          ? {
+              processes: apiPage([], undefined, 20),
+              tags: apiPage([readyTag], undefined, 20),
+            }
           : fresh,
   }));
   vi.spyOn(apiClient, 'put').mockResolvedValue({ status: 200, data: fresh });
@@ -63,7 +67,7 @@ describe('backend process editing', () => {
     vi.mocked(apiClient.put).mockResolvedValue({ status: 200, data: updated });
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [updated],
+      data: apiPage([updated], undefined, 10),
     });
     await user.click(screen.getByRole('button', { name: 'Save Process' }));
     expect(apiClient.put).toHaveBeenCalledWith(
@@ -99,9 +103,12 @@ describe('backend process editing', () => {
       status: 200,
       data:
         url === 'processes'
-          ? [processResponse, deviceProcess]
+          ? apiPage([processResponse, deviceProcess], undefined, 10)
           : url === 'ui/lookups'
-            ? { processes: [], tags: [readyTag] }
+            ? {
+                processes: apiPage([], undefined, 20),
+                tags: apiPage([readyTag], undefined, 20),
+              }
             : deviceProcess,
     }));
     vi.mocked(apiClient.put).mockResolvedValue({

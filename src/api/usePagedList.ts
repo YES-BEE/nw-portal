@@ -8,13 +8,10 @@ export function usePagedList<T>(
   load: (query: ListQuery, signal?: AbortSignal) => Promise<ApiPage<T>>,
   pollIntervalMs = 0,
   retainDataOnError = false,
+  initialQuery: ListQuery = { page: 0, size: 10, search: '' },
 ) {
-  const [query, setQuery] = useState<ListQuery>({
-    page: 0,
-    size: 10,
-    search: '',
-  });
-  const [input, setInput] = useState('');
+  const [query, setQuery] = useState<ListQuery>(initialQuery);
+  const [input, setInput] = useState(initialQuery.search);
   const [attempt, setAttempt] = useState(0);
   const refreshRef = useRef<() => void>(() => {});
   const [result, setResult] = useState<{

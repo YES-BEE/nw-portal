@@ -1,3 +1,4 @@
+import { isUserProcessAssignment } from '../access/userAssignments';
 import { apiClient } from '../../api/client';
 import type { LoginRequest, LoginResponse, LoginUiError } from './types';
 import { parseLoginFailure } from './loginFailure';
@@ -28,6 +29,7 @@ export function isLoginResponse(value: unknown): value is LoginResponse {
     Array.isArray(record.roles) &&
     record.roles.every((role) => typeof role === 'string') &&
     Array.isArray(record.processAssignments) &&
+    record.processAssignments.every(isUserProcessAssignment) &&
     Array.isArray(record.modules) &&
     record.modules.every((module: unknown) => {
       if (!module || typeof module !== 'object') return false;

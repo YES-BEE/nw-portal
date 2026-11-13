@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -56,7 +57,10 @@ it('sends search, page and size changes to the revision endpoint', async () => {
   );
 });
 it('handles an empty successful response without pagination', async () => {
-  vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data: [] });
+  vi.mocked(apiClient.get).mockResolvedValue({
+    status: 200,
+    data: apiPage([], undefined, 10),
+  });
   renderWithProviders(<StyleRevisionHistory styleId="style-id" />);
   expect(await screen.findByText('No revisions recorded.')).toBeVisible();
   expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();

@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -38,9 +39,9 @@ beforeEach(() => {
     status: 200,
     data:
       url === 'ui/lookups'
-        ? { tags: processTags }
+        ? { tags: apiPage(processTags, undefined, 20) }
         : url === 'processes'
-          ? processesResponse
+          ? apiPage(processesResponse, undefined, 10)
           : (processesResponse.find(
               (process) => 'processes/' + process.id === url,
             ) ?? processResponse),
@@ -54,9 +55,9 @@ describe('backend process details', () => {
       status: 200,
       data:
         url === 'ui/lookups'
-          ? { tags: processTags }
+          ? { tags: apiPage(processTags, undefined, 20) }
           : url === 'processes'
-            ? processesResponse
+            ? apiPage(processesResponse, undefined, 10)
             : detail,
     }));
     const { user } = setup('/configurations/processes');
@@ -154,7 +155,7 @@ describe('backend process details', () => {
       ).not.toBeInTheDocument();
       vi.mocked(apiClient.get).mockResolvedValue({
         status: 200,
-        data: processesResponse,
+        data: apiPage(processesResponse, undefined, 10),
       });
       await user.click(screen.getByRole('link', { name: 'Back to Processes' }));
       await screen.findByRole('rowheader', { name: /Washing/ });

@@ -18,6 +18,7 @@ export const createTagResponse: CreateTagResponse = {
 
 export const tagsResponse: TagResponse[] = [
   {
+    ...createTagResponse,
     id: '11111111-1111-4111-8111-111111111111',
     name: 'Washing Tag',
     uid: '04:AA:BB',
@@ -26,6 +27,7 @@ export const tagsResponse: TagResponse[] = [
     asset_type: 'PROCESS',
   },
   {
+    ...createTagResponse,
     id: '22222222-2222-4222-8222-222222222222',
     name: 'Available Tag',
     uid: '04:CC:DD',
@@ -34,6 +36,7 @@ export const tagsResponse: TagResponse[] = [
     asset_type: null,
   },
   {
+    ...createTagResponse,
     id: '33333333-3333-4333-8333-333333333333',
     name: 'Deleted Tag',
     uid: '04:EE:FF',

@@ -1,3 +1,5 @@
+import type { UserProcessAssignment, UserStatus } from '../access/types';
+
 export type LoginClientType = 'PC' | 'PAD';
 
 export interface LoginRequest {
@@ -36,16 +38,13 @@ export interface LoginModule {
   built_in: boolean;
 }
 
-// Success contract supplied separately from the failure-only handoff.
 export interface LoginSuccessResponse {
   accessToken: string;
   tokenType: 'Bearer';
   expiresIn: number;
   username: string;
   roles: string[];
-  // The supplied contract only shows an empty array; preserve entries until
-  // the backend supplies the schema for an individual process assignment.
-  processAssignments: unknown[];
+  processAssignments: UserProcessAssignment[];
   modules: LoginModule[];
 }
 
@@ -68,12 +67,13 @@ export interface MeResponse {
   username: string;
   display_name: string;
   enabled: boolean;
+  status: UserStatus;
   must_change_password: boolean;
-  initial_password_expires_at?: string | null;
+  initial_password_expires_at: string | null;
   role: string;
   clientType: LoginClientType;
   permissions: string[];
-  processAssignments: unknown[];
+  processAssignments: UserProcessAssignment[];
   modules: LoginModule[];
 }
 

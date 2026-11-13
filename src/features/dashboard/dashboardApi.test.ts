@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CanceledError } from 'axios';
 import { apiClient } from '../../api/client';
@@ -145,15 +146,17 @@ it('sends server paging, search and optional status and validates live lot field
   const get = vi
     .spyOn(apiClient, 'get')
     .mockResolvedValue({ status: 200, data: page });
-  expect(await getDashboardLots(query, undefined, 'IN_PROCESS')).toEqual(page);
+  expect(await getDashboardLots({ ...query, status: 'IN_PROCESS' })).toEqual(
+    page,
+  );
   expect(get).toHaveBeenCalledWith(
     'dashboard/lots',
     expect.objectContaining({ params: { ...query, status: 'IN_PROCESS' } }),
   );
   await expect(
-    getDashboardLots(query, undefined, 'COMPLETED'),
+    getDashboardLots({ ...query, status: 'COMPLETED' }),
   ).rejects.toMatchObject({ failure: { kind: 'invalidResponse' } });
-  get.mockResolvedValue({ status: 200, data: [] });
+  get.mockResolvedValue({ status: 200, data: apiPage([], query) });
   expect((await getDashboardLots(query)).totalElements).toBe(0);
   expect(get).toHaveBeenLastCalledWith(
     'dashboard/lots',
@@ -161,7 +164,7 @@ it('sends server paging, search and optional status and validates live lot field
   );
   get.mockResolvedValue({
     status: 200,
-    data: [{ ...dashboardLot, current_process: 123 }],
+    data: apiPage([{ ...dashboardLot, current_process: 123 }], undefined, 10),
   });
   await expect(getDashboardLots(query)).rejects.toMatchObject({
     failure: { kind: 'invalidResponse' },
@@ -202,7 +205,7 @@ it('handles role changes, network failures, and cancellation', async () => {
 it('accepts lots whose garment quantities are not yet specified', async () => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: [{ ...dashboardLot, quantity: null }],
+    data: apiPage([{ ...dashboardLot, quantity: null }], undefined, 10),
   });
   await expect(
     getDashboardLots({ page: 0, size: 10, search: '' }),

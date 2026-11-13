@@ -30,7 +30,6 @@ export function DashboardPage() {
   const { t } = useTranslation('translation');
   const [state, setState] = useState<State>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [lotStatus, setLotStatus] = useState('');
   usePageMetadata(t('dashboard.pageTitle'), t('dashboard.description'));
   const data = state.status === 'ready' ? state.data : null;
   const pollIntervalMs = data ? data.refreshIntervalSeconds * 1000 : 0;
@@ -90,7 +89,6 @@ export function DashboardPage() {
     ...new Set([
       ...knownStatuses,
       ...(data?.lots.map((row) => row.status) || []),
-      ...(lotStatus ? [lotStatus] : []),
     ]),
   ];
   return (
@@ -181,10 +179,7 @@ export function DashboardPage() {
         )}
         {data && <DashboardProductionTrend trend={data.productionTrend} />}
         <DashboardLotsTable
-          key={lotStatus}
-          status={lotStatus}
           statuses={statuses}
-          onStatus={setLotStatus}
           stations={data?.stations || []}
           pollIntervalMs={pollIntervalMs}
           onHealthChange={setLotHealth}

@@ -1,6 +1,12 @@
 import axios, { type AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
 import {
+  readFilterOptions,
+  type FilterOptionMap,
+  type FilterOptionType,
+  type ProductionLotsQuery,
+} from '../../api/productionFilters';
+import {
   readApiPage,
   type ApiPage,
   type ListQuery,
@@ -129,7 +135,7 @@ export async function getStyleProgress(
   );
 }
 export async function getLotProgress(
-  query: ListQuery,
+  query: ProductionLotsQuery,
   signal?: AbortSignal,
 ): Promise<ApiPage<LotProgressResponse>> {
   return readApiPage(
@@ -142,6 +148,23 @@ export async function getLotProgress(
     query,
     isDashboardLot,
     (lot) => lot.id,
+    invalid,
+  );
+}
+export async function getReportFilterOptions<K extends FilterOptionType>(
+  kind: K,
+  query: ProductionLotsQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<FilterOptionMap[K]>> {
+  return readFilterOptions(
+    kind,
+    await request(() =>
+      apiClient.get<unknown>(`reports/filter-options/${kind}`, {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
     invalid,
   );
 }

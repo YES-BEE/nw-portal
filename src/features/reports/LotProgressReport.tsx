@@ -1,3 +1,10 @@
+import { useCallback, useState, useMemo } from 'react';
+import type { ListQuery } from '../../api/collections';
+import { ProductionLotFilters } from '../lots/ProductionLotFilters';
+import {
+  emptyProductionFilters,
+  productionFilterParams,
+} from '../lots/productionFilterSelection';
 import {
   Box,
   Chip,
@@ -18,13 +25,24 @@ import { usePagedList } from '../../api/usePagedList';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { LotProgress } from '../lots/LotProgress';
 import { useDashboardLotLabels } from '../dashboard/useDashboardLotLabels';
-import { getLotProgress, reportsFailure } from './reportsApi';
+import {
+  getLotProgress,
+  reportsFailure,
+  getReportFilterOptions,
+} from './reportsApi';
 import { ReportFailureAlert } from './ReportFailureAlert';
 
 export function LotProgressReport() {
   const { t } = useTranslation('translation');
   const labels = useDashboardLotLabels();
-  const report = usePagedList(getLotProgress);
+  const [selection, setSelection] = useState(emptyProductionFilters);
+  const filters = useMemo(() => productionFilterParams(selection), [selection]);
+  const load = useCallback(
+    (query: ListQuery, signal?: AbortSignal) =>
+      getLotProgress({ ...query, ...filters }, signal),
+    [filters],
+  );
+  const report = usePagedList(load);
   const headings = [
     t('lots.style'),
     t('lots.number'),
@@ -60,6 +78,17 @@ export function LotProgressReport() {
           slotProps={{ htmlInput: { maxLength: 200 } }}
           sx={{ width: { xs: '100%', sm: 340 } }}
         />
+        <Box sx={{ mt: 2 }}>
+          <ProductionLotFilters
+            value={selection}
+            onChange={(next) => {
+              setSelection(next);
+              report.setPage(0);
+            }}
+            loadOptions={getReportFilterOptions}
+            failure={reportsFailure}
+          />
+        </Box>
       </Box>
       {report.state.status === 'error' && (
         <Box sx={{ px: 2.5, pb: 2 }}>
@@ -138,7 +167,7 @@ export function LotProgressReport() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={headings.length}>
+                  <TableCell colSpan={headings.length} align="center">
                     {t('reports.noLots')}
                   </TableCell>
                 </TableRow>

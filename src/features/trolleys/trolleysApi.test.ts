@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CanceledError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
@@ -187,13 +188,13 @@ describe('backend trolley API', () => {
       });
     },
   );
-  it('treats a successful bare empty array as an empty page', async () => {
+  it('treats a successful empty page as an empty page', async () => {
     adapter.mockImplementation(async (config) => ({
       config,
       status: 200,
       statusText: '',
       headers: {},
-      data: [],
+      data: apiPage([], config?.params, 10),
     }));
     await expect(
       getTrolleys({ page: 0, size: 10, search: '' }),

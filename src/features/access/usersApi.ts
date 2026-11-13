@@ -1,3 +1,4 @@
+import { isUserProcessAssignment } from './userAssignments';
 import { readApiPage } from '../../api/collections';
 import type { ApiPage, ListQuery } from '../../api/collections';
 import { collectApiItems } from '../../api/collections';
@@ -5,7 +6,6 @@ import axios from 'axios';
 import type { AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
 import type {
-  UserProcessAssignment,
   UserResponse,
   UsersOperation,
   CreateUserRequest,
@@ -13,19 +13,6 @@ import type {
 } from './types';
 import type { ProcessLookupResponse } from '../processes/types';
 import { parseUsersFailure, UsersError } from './usersFailure';
-
-function isAssignment(value: unknown): value is UserProcessAssignment {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const assignment = value as Record<string, unknown>;
-  return (
-    ['processId', 'processName', 'stationId', 'stationNumber'].every(
-      (key) => typeof assignment[key] === 'string',
-    ) &&
-    ['activeOnShift', 'processActive', 'stationActive'].every(
-      (key) => typeof assignment[key] === 'boolean',
-    )
-  );
-}
 
 function isUser(value: unknown): value is UserResponse {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -36,13 +23,17 @@ function isUser(value: unknown): value is UserResponse {
     typeof user.username === 'string' &&
     !!user.username.trim() &&
     typeof user.display_name === 'string' &&
+    (user.status === 'ACTIVE' || user.status === 'INACTIVE') &&
+    (user.initial_password_expires_at === null ||
+      (typeof user.initial_password_expires_at === 'string' &&
+        Number.isFinite(Date.parse(user.initial_password_expires_at)))) &&
     typeof user.enabled === 'boolean' &&
     typeof user.must_change_password === 'boolean' &&
     typeof user.created_at === 'string' &&
     Number.isFinite(Date.parse(user.created_at)) &&
     (user.role === null || typeof user.role === 'string') &&
     Array.isArray(user.processAssignments) &&
-    user.processAssignments.every(isAssignment)
+    user.processAssignments.every(isUserProcessAssignment)
   );
 }
 
@@ -95,7 +86,7 @@ export async function createUser(
   body: CreateUserRequest,
   signal?: AbortSignal,
 ): Promise<UserResponse> {
-  return requestUsers(
+  const data = await requestUsers(
     () =>
       apiClient.post<UserResponse>(
         'users',
@@ -111,13 +102,16 @@ export async function createUser(
       ),
     'create',
   );
+  if (!isUser(data))
+    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
 }
 
 export async function deleteUser(
   userId: string,
   signal?: AbortSignal,
 ): Promise<UserResponse> {
-  return requestUsers(
+  const data = await requestUsers(
     () =>
       apiClient.delete<UserResponse>(`users/${encodeURIComponent(userId)}`, {
         signal,
@@ -126,6 +120,13 @@ export async function deleteUser(
       }),
     'delete',
   );
+  if (
+    !isUser(data) ||
+    data.id.toLowerCase() !== userId.toLowerCase() ||
+    data.enabled !== false
+  )
+    throw new UsersError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
 }
 
 export async function updateUser(

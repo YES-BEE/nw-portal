@@ -1,6 +1,5 @@
 import { readApiPage } from '../../api/collections';
 import type { ApiPage, ListQuery } from '../../api/collections';
-import type { ApiCollection } from '../../api/collections';
 import { collectApiItems } from '../../api/collections';
 import { apiClient } from '../../api/client';
 import axios from 'axios';
@@ -29,7 +28,7 @@ function isRole(value: unknown): value is AccessRoleResponse {
     !!role.code.trim() &&
     typeof role.name === 'string' &&
     !!role.name.trim() &&
-    typeof role.description === 'string' &&
+    (role.description === null || typeof role.description === 'string') &&
     ['built_in', 'active', 'pc_access', 'pad_access'].every(
       (key) => typeof role[key] === 'boolean',
     ) &&
@@ -71,7 +70,7 @@ async function request<T = unknown>(
 
 export async function getAccessRoleOptions(
   signal?: AbortSignal,
-): Promise<AccessRoleOptionsResponse> {
+): Promise<AccessRoleOptionResponse[]> {
   const isOption = (value: unknown): value is AccessRoleOptionResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -86,7 +85,7 @@ export async function getAccessRoleOptions(
   return collectApiItems(
     (params) =>
       request(() =>
-        apiClient.get<unknown>('access-roles/options', {
+        apiClient.get<AccessRoleOptionsResponse>('access-roles/options', {
           ...(params ? { params } : {}),
           signal,
           timeout: 10000,
@@ -102,7 +101,7 @@ export async function getAccessRoleOptions(
 }
 export async function getModules(
   signal?: AbortSignal,
-): Promise<ModulesResponse> {
+): Promise<ModuleResponse[]> {
   const isModule = (value: unknown): value is ModuleResponse => {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return false;
@@ -119,7 +118,7 @@ export async function getModules(
   return collectApiItems(
     (params) =>
       request(() =>
-        apiClient.get<unknown>('modules', {
+        apiClient.get<ModulesResponse>('modules', {
           ...(params ? { params } : {}),
           signal,
           timeout: 10000,
@@ -137,10 +136,10 @@ export async function saveAccessRole(
   roleCode: string,
   body: SaveAccessRoleRequest,
   signal?: AbortSignal,
-): Promise<ApiCollection<AccessRoleResponse>> {
-  return request(
+): Promise<ApiPage<AccessRoleResponse>> {
+  const data = await request(
     () =>
-      apiClient.put<ApiCollection<AccessRoleResponse>>(
+      apiClient.put<ApiPage<AccessRoleResponse>>(
         `access-roles/${encodeURIComponent(roleCode)}`,
         {
           modules: body.modules,
@@ -151,13 +150,22 @@ export async function saveAccessRole(
       ),
     'update',
   );
+  return readApiPage(
+    data,
+    { page: 0, size: 20, search: '' },
+    isRole,
+    (role) => role.code,
+    () => {
+      throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+    },
+  );
 }
 
 export async function deleteAccessRole(
   roleCode: string,
   signal?: AbortSignal,
 ): Promise<DeleteAccessRoleResponse> {
-  return request(
+  const data = await request(
     () =>
       apiClient.delete<DeleteAccessRoleResponse>(
         `access-roles/${encodeURIComponent(roleCode)}`,
@@ -165,13 +173,16 @@ export async function deleteAccessRole(
       ),
     'delete',
   );
+  if (!data || data.code !== roleCode || data.active !== false)
+    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
 }
 
 export async function createAccessRole(
   body: CreateAccessRoleRequest,
   signal?: AbortSignal,
 ): Promise<AccessRoleResponse> {
-  return request(
+  const data = await request(
     () =>
       apiClient.post<AccessRoleResponse>(
         'access-roles',
@@ -185,6 +196,9 @@ export async function createAccessRole(
       ),
     'create',
   );
+  if (!isRole(data))
+    throw new AccessRolesError({ kind: 'invalidResponse', action: 'retry' });
+  return data;
 }
 
 export async function getAccessRolesPage(

@@ -5,6 +5,8 @@ export const userResponse: UserResponse = {
   username: 'admin',
   display_name: 'Bootstrap NW',
   enabled: true,
+  status: 'ACTIVE',
+  initial_password_expires_at: null,
   must_change_password: true,
   created_at: '2026-11-08T09:30:12.513Z',
   role: 'NW',
@@ -19,6 +21,7 @@ export const usersResponse: UserResponse[] = [
     username: 'operator',
     display_name: 'Factory Operator',
     enabled: false,
+    status: 'INACTIVE',
     must_change_password: false,
     role: null,
     processAssignments: [

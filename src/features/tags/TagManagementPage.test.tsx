@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,7 +17,7 @@ beforeEach(() => {
   localStorage.clear();
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
-    data: tagsResponse.slice(0, 2),
+    data: apiPage(tagsResponse.slice(0, 2), undefined, 10),
   });
 });
 
@@ -37,15 +38,19 @@ describe('backend tag listing', () => {
     );
     vi.mocked(apiClient.get).mockResolvedValue({
       status: 200,
-      data: [
-        ...tagsResponse.slice(0, 2),
-        {
-          ...tagsResponse[1],
-          id: 'new-tag',
-          name: 'New Factory Tag',
-          uid: '04:AA:EE',
-        },
-      ],
+      data: apiPage(
+        [
+          ...tagsResponse.slice(0, 2),
+          {
+            ...tagsResponse[1],
+            id: 'new-tag',
+            name: 'New Factory Tag',
+            uid: '04:AA:EE',
+          },
+        ],
+        undefined,
+        10,
+      ),
     });
     await user.click(screen.getByRole('button', { name: 'Save Tag' }));
     expect(apiClient.post).toHaveBeenCalledWith(
@@ -123,12 +128,15 @@ describe('backend tag listing', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await act(async () =>
-      resolve({ status: 200, data: tagsResponse.slice(0, 2) }),
+      resolve({
+        status: 200,
+        data: apiPage(tagsResponse.slice(0, 2), undefined, 10),
+      }),
     );
     expect(screen.getAllByRole('rowheader')).toHaveLength(2);
   });
 
-  it.each([{ data: [] }])(
+  it.each([{ data: apiPage([], undefined, 10) }])(
     'shows an empty list when no active tags exist: %j',
     async ({ data }) => {
       vi.mocked(apiClient.get).mockResolvedValue({ status: 200, data });

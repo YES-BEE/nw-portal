@@ -4,7 +4,6 @@ import { orderedNavigationItems } from '../../app/navigation';
 import { isLoginResponse, login, LoginError } from './loginApi';
 import type { LoginErrorCode } from './loginApi';
 import type { LoginClientType, LoginResponse, LoginUiError } from './types';
-import { clearDemoStorage } from './browserStorage';
 import { apiClient, setAccessTokenProvider } from '../../api/client';
 import {
   exchangeRefreshToken,
@@ -141,7 +140,6 @@ export function initializeSession(): Promise<void> {
 }
 
 async function restoreSession() {
-  clearDemoStorage();
   try {
     const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return;
@@ -334,9 +332,13 @@ export function logout(): Promise<void> {
   const attempt = ++authAttempt;
   authSessionVersion++;
   clearTimeout(expiryTimer);
-  const refreshToken = currentSession?.refreshToken ?? null;
+  const refreshToken = currentSession?.refreshToken;
+  if (!refreshToken) {
+    signOut();
+    return Promise.resolve();
+  }
   logoutRequest = apiClient
-    .post('auth/logout', { refreshToken }, { timeout: 10_000 })
+    .post<void>('auth/logout', { refreshToken }, { timeout: 10_000 })
     .then(() => undefined)
     .finally(() => {
       logoutRequest = null;

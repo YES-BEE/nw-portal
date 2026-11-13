@@ -40,7 +40,7 @@ export function useLotLabels() {
 }
 export function timelineNote(detail: JsonValue): string | undefined {
   let value = detail;
-  // JDBC deployments may serialize a JSONB value as a JSON string or PGobject.
+  // Current JDBC JSONB values may arrive as a JSON string or PGobject.
   if (
     value &&
     typeof value === 'object' &&

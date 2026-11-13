@@ -59,6 +59,7 @@ export interface DashboardLot extends Omit<
   'version' | 'trolley_id' | 'trolley_code'
 > {
   current_station: string | null;
+  current_station_id: string | null;
   current_process: string | null;
   current_process_id: string | null;
   current_process_status: string | null;

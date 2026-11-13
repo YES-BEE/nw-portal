@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -31,7 +32,7 @@ const detail = {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
-    data: url === 'users' ? usersResponse : detail,
+    data: url === 'users' ? apiPage(usersResponse, undefined, 10) : detail,
   }));
 });
 function setup(path = `/users/${userResponse.id}`) {
@@ -149,7 +150,7 @@ describe('backend user details', () => {
     async (status) => {
       vi.mocked(apiClient.get).mockImplementation(async (url) =>
         url === 'users'
-          ? { status: 200, data: usersResponse }
+          ? { status: 200, data: apiPage(usersResponse, undefined, 10) }
           : { status, data: { detail: 'Requested resource was not found' } },
       );
       const { user } = setup();

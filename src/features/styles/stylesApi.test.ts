@@ -1,3 +1,4 @@
+import { apiPage } from '../../test/apiPage';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import {
@@ -21,6 +22,21 @@ import {
 } from '../../test/styles';
 import { CanceledError } from 'axios';
 beforeEach(() => vi.restoreAllMocks());
+it.each(['INVALID_LOT_PREFIX', 'LOT_PREFIX_IN_USE'])(
+  'maps %s to the Style Number field',
+  (code) => {
+    expect(
+      parseStylesFailure(
+        { code, detail: 'Choose a different style number' },
+        409,
+      ),
+    ).toMatchObject({
+      kind: 'conflict',
+      code,
+      fieldErrors: { styleNumber: 'Choose a different style number' },
+    });
+  },
+);
 it('rejects style responses missing the required lot planning fields', async () => {
   vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
@@ -65,7 +81,7 @@ it('updates draft processes as an ordered JSON array and validates the returned 
     },
   });
 });
-it('loads typed revision pages using backend paging/search and accepts empty arrays', async () => {
+it('loads typed revision pages using backend paging/search and accepts empty pages', async () => {
   const query = { page: 1, size: 10, search: 'process' };
   const page = { items: [styleHistoryItem], ...query, totalElements: 11 };
   const get = vi
@@ -81,17 +97,21 @@ it('loads typed revision pages using backend paging/search and accepts empty arr
     'styles/id%2Fwith%20space/revisions',
     expect.objectContaining({ params: query }),
   );
-  get.mockResolvedValue({ status: 200, data: [] });
+  get.mockResolvedValue({ status: 200, data: apiPage([], query) });
   expect((await getStyleRevisions(style.id, query)).items).toEqual([]);
   get.mockResolvedValue({
     status: 200,
-    data: [{ ...styleHistoryItem, affected_lot_count: '2' }],
+    data: apiPage(
+      [{ ...styleHistoryItem, affected_lot_count: '2' }],
+      undefined,
+      10,
+    ),
   });
   await expect(getStyleRevisions(style.id, query)).rejects.toMatchObject({
     failure: { kind: 'invalidResponse' },
   });
 });
-it('uses backend paging and search and accepts empty pages and empty arrays', async () => {
+it('uses backend paging and search and accepts empty pages', async () => {
   const query = { page: 1, size: 10, search: 'Denim' };
   const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
     status: 200,
@@ -102,7 +122,7 @@ it('uses backend paging and search and accepts empty pages and empty arrays', as
     'styles',
     expect.objectContaining({ params: query }),
   );
-  get.mockResolvedValue({ status: 200, data: [] });
+  get.mockResolvedValue({ status: 200, data: apiPage([], query) });
   expect((await getStyles(query)).items).toEqual([]);
 });
 it('validates style responses and their requested identity', async () => {
@@ -140,12 +160,16 @@ it('validates the derived station route and treats a draft without a route as em
   expect(await getStyleRoute(style.id)).toEqual(route);
   get.mockResolvedValue({
     status: 200,
-    data: [
-      {
-        ...route[0],
-        processes: [{ ...route[0].processes[0], stationId: 'wrong' }],
-      },
-    ],
+    data: apiPage(
+      [
+        {
+          ...route[0],
+          processes: [{ ...route[0].processes[0], stationId: 'wrong' }],
+        },
+      ],
+      undefined,
+      10,
+    ),
   });
   await expect(getStyleRoute(style.id)).rejects.toMatchObject({
     failure: { kind: 'invalidResponse' },
