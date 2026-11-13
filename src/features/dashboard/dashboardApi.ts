@@ -17,6 +17,7 @@ import type {
   StatusCount,
   DashboardMetricsResponse,
   StationWorkload,
+  ProductionTrend,
 } from './types';
 
 export class DashboardError extends Error {
@@ -97,8 +98,6 @@ const count = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const date = (value: unknown): value is string =>
   text(value) && Number.isFinite(Date.parse(value));
-const nullableText = (value: unknown) =>
-  value === null || typeof value === 'string';
 function invalid(): never {
   throw new DashboardError({ kind: 'invalidResponse', action: 'retry' });
 }
@@ -159,6 +158,51 @@ function isMetrics(value: unknown): value is DashboardMetricsResponse {
       isWorkload(row.highestStationWorkload))
   );
 }
+function isProductionTrend(
+  value: unknown,
+  snapshotAt: string,
+): value is ProductionTrend {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  if (
+    typeof row.date !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(row.date) ||
+    !text(row.timezone) ||
+    row.interval !== 'HOUR' ||
+    !Array.isArray(row.points) ||
+    !row.points.length
+  )
+    return false;
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: row.timezone });
+  } catch {
+    return false;
+  }
+  let previousEnd: number | undefined;
+  for (const point of row.points) {
+    if (!point || typeof point !== 'object' || Array.isArray(point))
+      return false;
+    const item = point as Record<string, unknown>;
+    if (
+      !date(item.bucket_start) ||
+      !date(item.bucket_end) ||
+      !count(item.completed) ||
+      !count(item.in_progress)
+    )
+      return false;
+    const start = Date.parse(item.bucket_start),
+      end = Date.parse(item.bucket_end);
+    if (
+      end < start ||
+      end - start > 3600000 ||
+      end > Date.parse(snapshotAt) ||
+      (previousEnd !== undefined && start !== previousEnd)
+    )
+      return false;
+    previousEnd = end;
+  }
+  return previousEnd === Date.parse(snapshotAt);
+}
 async function summaryPage(
   query: PageQuery,
   signal?: AbortSignal,
@@ -178,7 +222,8 @@ async function summaryPage(
     !isMetrics(row.metrics) ||
     !isCounts(row.lots) ||
     !count(row.storageOccupancies) ||
-    !count(row.availableTrolleys)
+    !count(row.availableTrolleys) ||
+    !isProductionTrend(row.productionTrend, row.snapshotAt)
   )
     return invalid();
   const stations = readApiPage(
@@ -197,6 +242,7 @@ async function summaryPage(
     storageOccupancies: row.storageOccupancies,
     availableTrolleys: row.availableTrolleys,
     stations,
+    productionTrend: row.productionTrend,
   };
 }
 export async function getDashboard(
@@ -212,13 +258,17 @@ export async function getDashboard(
   );
   return { ...first, stations };
 }
-function isDashboardLot(value: unknown): value is DashboardLot {
+export function isDashboardLot(value: unknown): value is DashboardLot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
     ['id', 'lot_number', 'status', 'style_id', 'style_number'].every((key) =>
       text(row[key]),
     ) &&
+    percent(row.progress_percent) &&
+    count(row.completed_processes) &&
+    count(row.total_processes) &&
+    row.completed_processes <= row.total_processes &&
     (row.quantity === null || (count(row.quantity) && row.quantity > 0)) &&
     (row.current_route_sequence === null ||
       count(row.current_route_sequence)) &&
@@ -230,7 +280,7 @@ function isDashboardLot(value: unknown): value is DashboardLot {
       'current_process_id',
       'current_process_status',
       'location_label',
-    ].every((key) => nullableText(row[key])) &&
+    ].every((key) => row[key] === null || typeof row[key] === 'string') &&
     date(row.created_at) &&
     (row.completed_at === null || date(row.completed_at))
   );

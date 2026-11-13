@@ -5,7 +5,7 @@ import { dashboardResponse } from '../../test/dashboard';
 import { DashboardMetrics } from './DashboardMetrics';
 import type { DashboardMetricsResponse } from './types';
 
-it('displays selected backend metrics without descriptions or removed cards', () => {
+it('displays selected backend metrics and the peak station name without removed cards', () => {
   const values = [
     ['totalLots', 'Total Lots', 101],
     ['openLots', 'Open Lots', 102],
@@ -15,7 +15,7 @@ it('displays selected backend metrics without descriptions or removed cards', ()
     ['availableTrolleys', 'Available Trolleys', 106],
     ['inTransitLots', 'In Progress', 107],
     ['readyToStartLots', 'Ready to start', 108],
-    ['highestStationWorkloadCount', 'Highest station workload', 110],
+    ['highestStationWorkloadCount', 'Peak Station Workload', 110],
   ] as const;
   const metrics: DashboardMetricsResponse = {
     ...dashboardResponse.metrics,
@@ -38,5 +38,9 @@ it('displays selected backend metrics without descriptions or removed cards', ()
   expect(
     screen.queryByRole('region', { name: 'Total station lot visits' }),
   ).not.toBeInTheDocument();
-  expect(screen.queryByText('Washing')).not.toBeInTheDocument();
+  expect(
+    within(
+      screen.getByRole('region', { name: 'Peak Station Workload' }),
+    ).getByText('Washing'),
+  ).toBeVisible();
 });

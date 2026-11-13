@@ -141,6 +141,15 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
               >
                 <AnimatedCount value={value} />
               </Typography>
+              {key === 'busiestStation' && (
+                <Typography
+                  color="text.secondary"
+                  sx={{ fontSize: 11, overflowWrap: 'anywhere' }}
+                >
+                  {data.metrics.highestStationWorkload?.name ||
+                    t('common.notProvided')}
+                </Typography>
+              )}
             </Box>
           </Stack>
         </Paper>

@@ -21,6 +21,7 @@ import type { ListQuery } from '../../api/collections';
 import { ListPagination } from '../../api/ListPagination';
 import { usePagedList } from '../../api/usePagedList';
 import { useDashboardLotLabels } from './useDashboardLotLabels';
+import { LotProgress } from '../lots/LotProgress';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { dashboardFailure, getDashboardLots } from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
@@ -65,7 +66,7 @@ export function DashboardLotsTable({
     );
   }, [list.state.status, tableError, onHealthChange]);
   const items = list.state.status === 'ready' ? list.state.data.items : [];
-  const columns = 9;
+  const columns = 10;
   return (
     <Paper
       component="section"
@@ -171,6 +172,7 @@ export function DashboardLotsTable({
                   <TableCell key={key}>{t(`lots.${key}`)}</TableCell>
                 ),
               )}
+              <TableCell>{t('lots.progress')}</TableCell>
               <TableCell>{t('dashboard.station')}</TableCell>
               <TableCell>{t('dashboard.process')}</TableCell>
               <TableCell>{t('lots.routeSequence')}</TableCell>
@@ -255,6 +257,13 @@ export function DashboardLotsTable({
                       fontWeight: 600,
                     }}
                     label={labels.statusLabel(lot.status)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <LotProgress
+                    percent={lot.progress_percent}
+                    completed={lot.completed_processes}
+                    total={lot.total_processes}
                   />
                 </TableCell>
                 <TableCell>

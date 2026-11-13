@@ -5,6 +5,24 @@ import type {
 export const dashboardResponse: DashboardResponse = {
   snapshotAt: '2026-11-13T08:00:00Z',
   refreshIntervalSeconds: 5,
+  productionTrend: {
+    date: '2026-11-13',
+    timezone: 'Asia/Kolkata',
+    interval: 'HOUR',
+    points: Array.from({ length: 14 }, (_, hour) => ({
+      bucket_start: new Date(
+        Date.parse('2026-11-13T00:00:00+05:30') + hour * 3600000,
+      ).toISOString(),
+      bucket_end: new Date(
+        Math.min(
+          Date.parse('2026-11-13T00:00:00+05:30') + (hour + 1) * 3600000,
+          Date.parse('2026-11-13T08:00:00Z'),
+        ),
+      ).toISOString(),
+      completed: hour === 8 ? 2 : 0,
+      in_progress: hour,
+    })),
+  },
   metrics: {
     totalLots: 9,
     openLots: 6,
@@ -71,6 +89,9 @@ export const dashboardLot: DashboardLot = {
   current_route_sequence: 1,
   current_location_type: 'PROCESS_AREA',
   current_location_id: 'station-03',
+  progress_percent: 33.33,
+  completed_processes: 1,
+  total_processes: 3,
   current_station: '03',
   current_process: 'Washing',
   current_process_id: 'process-id',
@@ -80,6 +101,14 @@ export const dashboardLot: DashboardLot = {
   completed_at: null,
 };
 export const emptyDashboard: DashboardResponse = {
+  productionTrend: {
+    ...dashboardResponse.productionTrend,
+    points: dashboardResponse.productionTrend.points.map((point) => ({
+      ...point,
+      completed: 0,
+      in_progress: 0,
+    })),
+  },
   snapshotAt: dashboardResponse.snapshotAt,
   refreshIntervalSeconds: 5,
   metrics: {

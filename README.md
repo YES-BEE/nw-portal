@@ -36,7 +36,7 @@ src/
     auth/             # Login page, styling, decorative chart
     configurations/   # Shared NFC registry, details header, and summary components
     dashboard/        # Live production metrics and lot status
-    reports/          # Lot movement history
+    reports/          # Paginated style and lot progress reports
     processes/        # Process list, editor, validation, local records
     storages/         # Storage list, editor, validation, local records
     styles/           # Shared style list, editor, ordered process route, and details
@@ -72,12 +72,13 @@ The login form sends `POST {VITE_API_BASE_URL}/api/{VITE_API_VERSION}/auth/login
 VITE_API_BASE_URL=http://192.168.0.106
 VITE_API_VERSION=v1
 VITE_AUTH_CLIENT_TYPE=PC
-VITE_FACTORY_TIME_ZONE=Asia/Kolkata
 ```
 
-The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in `VITE_FACTORY_TIME_ZONE` (default Asia/Kolkata). Failed refreshes retain the last values and timestamp and show a stale indicator.
+The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in the backend's `productionTrend.timezone`. Failed refreshes retain the last values and timestamp and show a stale indicator.
 
-The Reports screen requires the `reports` module and uses `GET /reports/lot-history?lotId={id}`, with backend search and pagination. The lot selector searches the management API only when the Lots module is granted. Reports-only users can enter a lot UUID directly because the backend does not provide Reports-only lookup endpoints. Backend ownership and assignment restrictions still apply. History displays location and user IDs because its response does not include their names. The current backend requires a lot ID; an all-lots history report needs backend support.
+The Reports screen requires the `reports` module and provides Lot Progress (`GET /reports/lot-progress`) and Style Progress (`GET /reports/style-progress`) tabs. Both endpoints load accessible records without IDs or management-module access, using backend search and pagination. Only the active tab loads data; switching tabs aborts pending requests and resets that report's search/page. Style Progress includes styles with no lots, total/completed lot counts, server-calculated average progress, and creation/release dates. Its percentage is the unweighted mean progress of visible lots, not the completed-lot ratio. Ownership and station restrictions remain enforced by the backend. The removed `/reports/lot-history` and `/styles/{id}/progress` endpoints are no longer called. Detailed event history remains in Lot Management through `/lots/{id}/timeline`.
+
+Dashboard and report lot rows display the server's `progress_percent`, `completed_processes`, and `total_processes`. Completed and intentionally skipped processes count toward progress; superseded processes are excluded by the backend. Progress is never inferred from quantities or status counts. The dashboard also plots today's hourly `productionTrend` using React ECharts: completions per hour and work in progress at each bucket end, formatted in the response's factory timezone. Zero-count and elapsed-hour buckets are preserved, and the last successful trend remains visible during failed refreshes.
 
 Restart Vite after changing environment values. Vite exposes these variables to the browser; they contain public configuration. `LoginRequest`, `LoginResponse`, and `LoginModule` are defined in `src/features/auth/types.ts`. Process assignments are retained as `unknown[]` because the provided response only specifies an empty array, without an item schema.
 

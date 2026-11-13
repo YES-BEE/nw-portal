@@ -92,13 +92,14 @@ it('shows backend snapshot time without location columns or dashboard lot action
   seedTestData();
   signIn('nw.admin');
   setAuthenticatedSession({ ...readSession()!, modules: ['dashboard'] });
-  vi.stubEnv('VITE_FACTORY_TIME_ZONE', 'Asia/Kolkata');
   setup();
   expect(await screen.findByText('Updated 13/11/2026, 13:30:00')).toBeVisible();
   const table = screen.getByRole('table', { name: 'Production Lots' });
   expect(within(table).queryByText('In progress')).not.toBeInTheDocument();
   expect(within(table).getAllByText('Washing')).toHaveLength(2);
-  expect(within(table).queryByRole('columnheader', { name: 'Location' })).not.toBeInTheDocument();
+  expect(
+    within(table).queryByRole('columnheader', { name: 'Location' }),
+  ).not.toBeInTheDocument();
   expect(
     within(table).queryByRole('button', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
@@ -216,7 +217,9 @@ it('handles empty successful data with zero metrics and no table pagination', as
     within(screen.getByRole('region', { name: 'Total Lots' })).getByText('0'),
   ).toBeVisible();
   expect(
-    await within(screen.getByRole('table')).findByText('No lots found.'),
+    await within(
+      screen.getByRole('table', { name: 'Production Lots' }),
+    ).findByText('No lots found.'),
   ).toBeVisible();
   expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
   expect(

@@ -36,6 +36,19 @@ export interface DashboardResponse {
   stations: ApiPage<StationWip>;
   storageOccupancies: number;
   availableTrolleys: number;
+  productionTrend: ProductionTrend;
+}
+export interface ProductionTrendPoint {
+  bucket_start: string;
+  bucket_end: string;
+  completed: number;
+  in_progress: number;
+}
+export interface ProductionTrend {
+  date: string;
+  timezone: string;
+  interval: 'HOUR';
+  points: ProductionTrendPoint[];
 }
 export interface DashboardSummary extends Omit<DashboardResponse, 'stations'> {
   stations: StationWip[];
@@ -50,6 +63,9 @@ export interface DashboardLot extends Omit<
   current_process_id: string | null;
   current_process_status: string | null;
   location_label: string | null;
+  progress_percent: number;
+  completed_processes: number;
+  total_processes: number;
 }
 export interface DashboardFailure {
   kind:

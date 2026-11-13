@@ -8,9 +8,9 @@ import { DashboardFailureAlert } from './DashboardFailureAlert';
 import { DashboardLotsTable } from './DashboardLotsTable';
 import { StationWipBreakdown, StationStatusTable } from './DashboardBreakdowns';
 import { DashboardMetrics } from './DashboardMetrics';
+import { DashboardProductionTrend } from './DashboardProductionTrend';
 import CircleIcon from '@mui/icons-material/Circle';
 import type { DashboardFailure, DashboardSummary } from './types';
-import { getFactoryTimeZone } from './dashboardConfig';
 
 const knownStatuses = [
   'READY',
@@ -141,7 +141,7 @@ export function DashboardPage() {
             <Typography color="text.secondary" sx={{ fontSize: 11 }}>
               {t('dashboard.updated', {
                 date: formatDateTime(state.data.snapshotAt, {
-                  timeZone: getFactoryTimeZone(),
+                  timeZone: state.data.productionTrend.timezone,
                 }),
               })}
             </Typography>
@@ -179,6 +179,7 @@ export function DashboardPage() {
             <StationStatusTable stations={data.stations} />
           </Box>
         )}
+        {data && <DashboardProductionTrend trend={data.productionTrend} />}
         <DashboardLotsTable
           key={lotStatus}
           status={lotStatus}

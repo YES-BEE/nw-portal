@@ -13,6 +13,33 @@ import {
 } from './dashboardApi';
 beforeEach(() => vi.restoreAllMocks());
 it.each([
+  undefined,
+  { ...dashboardResponse.productionTrend, timezone: 'Invalid/Zone' },
+  { ...dashboardResponse.productionTrend, interval: 'DAY' },
+  { ...dashboardResponse.productionTrend, points: [] },
+  {
+    ...dashboardResponse.productionTrend,
+    points: [{ ...dashboardResponse.productionTrend.points[0], completed: -1 }],
+  },
+  {
+    ...dashboardResponse.productionTrend,
+    points: [
+      {
+        ...dashboardResponse.productionTrend.points[0],
+        bucket_end: '2027-01-01T00:00:00Z',
+      },
+    ],
+  },
+])('rejects malformed production trend responses', async (productionTrend) => {
+  vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: { ...dashboardResponse, productionTrend },
+  });
+  await expect(getDashboard()).rejects.toMatchObject({
+    failure: { kind: 'invalidResponse' },
+  });
+});
+it.each([
   { ...dashboardResponse, snapshotAt: undefined },
   { ...dashboardResponse, refreshIntervalSeconds: 0 },
   { ...dashboardResponse, metrics: undefined },

@@ -26,7 +26,7 @@ export function ReportFailureAlert({
         ) : undefined
       }
     >
-      {failure.message || t(`dashboard.failures.${failure.kind}`)}
+      {failure.message || t(`reports.failures.${failure.kind}`)}
     </Alert>
   );
 }

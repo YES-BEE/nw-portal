@@ -1,9 +1,17 @@
 import axios, { type AxiosResponse } from 'axios';
 import { apiClient } from '../../api/client';
-import { readApiPage, type ApiPage } from '../../api/collections';
+import {
+  readApiPage,
+  type ApiPage,
+  type ListQuery,
+} from '../../api/collections';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
-import type { JsonValue } from '../lots/types';
-import type { LotHistoryEvent, LotHistoryQuery, ReportsFailure } from './types';
+import { isDashboardLot } from '../dashboard/dashboardApi';
+import type {
+  LotProgressResponse,
+  ReportsFailure,
+  StyleProgressResponse,
+} from './types';
 
 export class ReportsError extends Error {
   readonly failure: ReportsFailure;
@@ -81,44 +89,59 @@ const text = (value: unknown): value is string =>
   typeof value === 'string' && !!value.trim();
 const date = (value: unknown): value is string =>
   text(value) && Number.isFinite(Date.parse(value));
-function isJson(value: unknown): value is JsonValue {
-  return (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean' ||
-    (typeof value === 'number' && Number.isFinite(value)) ||
-    (Array.isArray(value)
-      ? value.every(isJson)
-      : typeof value === 'object' && Object.values(value).every(isJson))
-  );
-}
-function isEvent(value: unknown): value is LotHistoryEvent {
+const count = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+function isStyleProgress(value: unknown): value is StyleProgressResponse {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
     text(row.id) &&
-    text(row.location_type) &&
-    date(row.occurred_at) &&
-    (row.location_id === null || text(row.location_id)) &&
-    (row.actor_id === null || text(row.actor_id)) &&
-    isJson(row.detail)
+    text(row.style_number) &&
+    typeof row.status === 'string' &&
+    ['DRAFT', 'RELEASED', 'IN_PRODUCTION', 'COMPLETED'].includes(row.status) &&
+    date(row.created_at) &&
+    (row.released_at === null || date(row.released_at)) &&
+    count(row.lot_count) &&
+    count(row.completed_lots) &&
+    row.completed_lots <= row.lot_count &&
+    typeof row.progress_percent === 'number' &&
+    Number.isFinite(row.progress_percent) &&
+    row.progress_percent >= 0 &&
+    row.progress_percent <= 100 &&
+    (row.lot_count !== 0 || row.progress_percent === 0)
   );
 }
-export async function getLotHistory(
-  query: LotHistoryQuery,
+export async function getStyleProgress(
+  query: ListQuery,
   signal?: AbortSignal,
-): Promise<ApiPage<LotHistoryEvent>> {
-  const { lotId, ...page } = query;
+): Promise<ApiPage<StyleProgressResponse>> {
   return readApiPage(
     await request(() =>
-      apiClient.get<unknown>('reports/lot-history', {
+      apiClient.get<unknown>('reports/style-progress', {
         ...options(signal),
-        params: { ...page, lotId },
+        params: query,
       }),
     ),
-    page,
-    isEvent,
-    (event) => event.id,
+    query,
+    isStyleProgress,
+    (style) => style.id,
+    invalid,
+  );
+}
+export async function getLotProgress(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<LotProgressResponse>> {
+  return readApiPage(
+    await request(() =>
+      apiClient.get<unknown>('reports/lot-progress', {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
+    isDashboardLot,
+    (lot) => lot.id,
     invalid,
   );
 }
