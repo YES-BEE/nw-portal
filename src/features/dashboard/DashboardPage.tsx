@@ -3,15 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { Box, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { formatDateTime } from '../../utils/formatDateTime';
-import { useLotLabels } from '../lots/lotDisplay';
 import { dashboardFailure, getDashboard } from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
 import { DashboardLotsTable } from './DashboardLotsTable';
-import {
-  StatusBreakdown,
-  StationWipBreakdown,
-  StationStatusTable,
-} from './DashboardBreakdowns';
+import { StationWipBreakdown, StationStatusTable } from './DashboardBreakdowns';
 import { DashboardMetrics } from './DashboardMetrics';
 import CircleIcon from '@mui/icons-material/Circle';
 import type { DashboardFailure, DashboardSummary } from './types';
@@ -33,7 +28,6 @@ type State =
   | { status: 'error'; failure: DashboardFailure };
 export function DashboardPage() {
   const { t } = useTranslation('translation');
-  const labels = useLotLabels();
   const [state, setState] = useState<State>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [lotStatus, setLotStatus] = useState('');
@@ -99,16 +93,6 @@ export function DashboardPage() {
       ...(lotStatus ? [lotStatus] : []),
     ]),
   ];
-  const styleLabel = (status: string) => {
-    if (
-      status === 'DRAFT' ||
-      status === 'RELEASED' ||
-      status === 'IN_PRODUCTION' ||
-      status === 'COMPLETED'
-    )
-      return t(`styles.statusValues.${status}`);
-    return status;
-  };
   return (
     <>
       <Stack
@@ -162,13 +146,6 @@ export function DashboardPage() {
               })}
             </Typography>
           )}
-          {data && (
-            <Typography color="text.secondary" sx={{ fontSize: 11 }}>
-              {t('dashboard.refreshCadence', {
-                seconds: data.refreshIntervalSeconds,
-              })}
-            </Typography>
-          )}
         </Stack>
       </Stack>
       {state.status === 'loading' && (
@@ -183,54 +160,24 @@ export function DashboardPage() {
       {data && <DashboardMetrics data={data} />}
       <Stack spacing={2}>
         {data && (
-          <>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: 'minmax(0, 1fr)',
-                  lg: 'repeat(2, minmax(0, 1fr))',
-                  xl: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-                },
-                gap: 2,
-                alignItems: 'stretch',
-              }}
-            >
-              <StationWipBreakdown
-                stations={data.stations}
-                totalVisits={data.metrics.totalStationLotVisits}
-              />
-              <StationStatusTable stations={data.stations} />
-            </Box>
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: 'minmax(0, 1fr)',
-                  lg: 'repeat(2, minmax(0, 1fr))',
-                },
-                gap: 2,
-                alignItems: 'stretch',
-              }}
-            >
-              <StatusBreakdown
-                title={t('dashboard.lotStatuses')}
-                rows={data.lots}
-                label={labels.statusLabel}
-                empty={t('lots.empty')}
-                selected={lotStatus}
-                onSelect={setLotStatus}
-                hint={t('dashboard.statusHint')}
-              />
-              <StatusBreakdown
-                title={t('dashboard.styleStatuses')}
-                rows={data.styles}
-                label={styleLabel}
-                empty={t('dashboard.noStyles')}
-                hint={t('dashboard.stylesHint')}
-              />
-            </Box>
-          </>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                lg: 'repeat(2, minmax(0, 1fr))',
+                xl: 'minmax(0, 1.2fr) minmax(0, 1fr)',
+              },
+              gap: 2,
+              alignItems: 'stretch',
+            }}
+          >
+            <StationWipBreakdown
+              stations={data.stations}
+              totalVisits={data.metrics.totalStationLotVisits}
+            />
+            <StationStatusTable stations={data.stations} />
+          </Box>
         )}
         <DashboardLotsTable
           key={lotStatus}

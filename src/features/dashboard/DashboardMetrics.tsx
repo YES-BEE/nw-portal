@@ -5,9 +5,7 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import StyleOutlinedIcon from '@mui/icons-material/StyleOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import PercentOutlinedIcon from '@mui/icons-material/PercentOutlined';
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
-import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined';
 import { useTranslation } from 'react-i18next';
 import { AnimatedCount } from './AnimatedCount';
@@ -22,8 +20,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: Inventory2OutlinedIcon,
       color: '#0957f7',
       tint: '#edf4ff',
-      hint: t('dashboard.totalHint'),
-      suffix: '',
     },
     {
       key: 'openLots',
@@ -31,8 +27,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: PlayCircleOutlinedIcon,
       color: '#07946d',
       tint: '#eaf8f2',
-      hint: t('dashboard.openHint'),
-      suffix: '',
     },
     {
       key: 'completedLots',
@@ -40,8 +34,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: CheckCircleOutlinedIcon,
       color: '#15803d',
       tint: '#edf9ef',
-      hint: t('dashboard.completedHint'),
-      suffix: '',
     },
     {
       key: 'stylesWithLots',
@@ -49,8 +41,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: StyleOutlinedIcon,
       color: '#7c3aed',
       tint: '#f4efff',
-      hint: t('dashboard.stylesMetricHint'),
-      suffix: '',
     },
     {
       key: 'storageOccupancies',
@@ -58,8 +48,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: WarehouseOutlinedIcon,
       color: '#b77912',
       tint: '#fff7e7',
-      hint: t('dashboard.storageHint'),
-      suffix: '',
     },
     {
       key: 'availableTrolleys',
@@ -67,17 +55,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: LocalShippingOutlinedIcon,
       color: '#0891b2',
       tint: '#eaf8fc',
-      hint: t('dashboard.trolleysHint'),
-      suffix: '',
-    },
-    {
-      key: 'completionShare',
-      value: data.metrics.completedSharePercent,
-      icon: PercentOutlinedIcon,
-      color: '#15803d',
-      tint: '#edf9ef',
-      hint: t('dashboard.completionHint'),
-      suffix: '%',
     },
     {
       key: 'inTransit',
@@ -85,8 +62,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: LocalShippingOutlinedIcon,
       color: '#0957f7',
       tint: '#edf4ff',
-      hint: t('dashboard.transitHint'),
-      suffix: '',
     },
     {
       key: 'readyLots',
@@ -94,17 +69,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: ScheduleOutlinedIcon,
       color: '#b77912',
       tint: '#fff7e7',
-      hint: t('dashboard.readyHint'),
-      suffix: '',
-    },
-    {
-      key: 'totalStationVisits',
-      value: data.metrics.totalStationLotVisits,
-      icon: FactCheckOutlinedIcon,
-      color: '#0891b2',
-      tint: '#eaf8fc',
-      hint: t('dashboard.stationVisitsHint'),
-      suffix: '',
     },
     {
       key: 'busiestStation',
@@ -112,10 +76,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
       icon: HubOutlinedIcon,
       color: '#7c3aed',
       tint: '#f4efff',
-      hint: data.metrics.highestStationWorkload
-        ? data.metrics.highestStationWorkload.name || t('common.notProvided')
-        : t('dashboard.noActiveWorkload'),
-      suffix: '',
     },
   ] as const;
   return (
@@ -131,7 +91,7 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
         mb: 2.5,
       }}
     >
-      {metrics.map(({ key, value, icon: Icon, color, tint, hint, suffix }) => (
+      {metrics.map(({ key, value, icon: Icon, color, tint }) => (
         <Paper
           key={key}
           component="section"
@@ -180,10 +140,6 @@ export function DashboardMetrics({ data }: { data: DashboardSummary }) {
                 }}
               >
                 <AnimatedCount value={value} />
-                {suffix}
-              </Typography>
-              <Typography color="text.secondary" sx={{ fontSize: 11 }}>
-                {hint}
               </Typography>
             </Box>
           </Stack>

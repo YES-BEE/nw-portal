@@ -48,14 +48,14 @@ function setup() {
     ),
   };
 }
-it('renders server summary metrics, status charts, station WIP, and live lot data', async () => {
+it('renders server summary metrics, station WIP, and live lot data', async () => {
   setup();
   await screen.findByRole('region', { name: 'Total Lots' });
   for (const [label, value] of [
     ['Total Lots', '9'],
     ['Open Lots', '6'],
     ['Completed Lots', '2'],
-    ['Styles with Lots', '3'],
+    ['Styles', '3'],
     ['Stored Lots', '1'],
     ['Available Trolleys', '5'],
   ]) {
@@ -63,7 +63,12 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
       within(screen.getByRole('region', { name: label })).getByText(value),
     ).toBeVisible();
   }
-  expect(screen.getByRole('region', { name: 'Lots by Status' })).toBeVisible();
+  expect(
+    screen.queryByRole('region', { name: 'Lots by Status' }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('region', { name: 'Styles by Status' }),
+  ).not.toBeInTheDocument();
   expect(
     within(
       screen.getByRole('region', { name: 'Station Work in Progress' }),
@@ -74,7 +79,7 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
   expect(
     await within(table).findByRole('rowheader', { name: 'LOT-001' }),
   ).toBeVisible();
-  expect(within(table).getAllByText('Washing')).toHaveLength(3);
+  expect(within(table).getAllByText('Washing')).toHaveLength(2);
   expect(within(table).queryByText('03')).not.toBeInTheDocument();
   expect(within(table).getByText(/12\/11\/2026/)).toBeVisible();
   expect(screen.queryByText('lot-id')).not.toBeInTheDocument();
@@ -83,7 +88,7 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
     screen.queryByRole('link', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
 });
-it('shows backend snapshot time and readable locations without dashboard lot actions', async () => {
+it('shows backend snapshot time without location columns or dashboard lot actions', async () => {
   seedTestData();
   signIn('nw.admin');
   setAuthenticatedSession({ ...readSession()!, modules: ['dashboard'] });
@@ -92,7 +97,8 @@ it('shows backend snapshot time and readable locations without dashboard lot act
   expect(await screen.findByText('Updated 13/11/2026, 13:30:00')).toBeVisible();
   const table = screen.getByRole('table', { name: 'Production Lots' });
   expect(within(table).queryByText('In progress')).not.toBeInTheDocument();
-  expect(within(table).getAllByText('Washing')).toHaveLength(3);
+  expect(within(table).getAllByText('Washing')).toHaveLength(2);
+  expect(within(table).queryByRole('columnheader', { name: 'Location' })).not.toBeInTheDocument();
   expect(
     within(table).queryByRole('button', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
@@ -135,11 +141,10 @@ it.each(['summary', 'lots'])(
     unmount();
   },
 );
-it('filters lots through clickable status counts and the backend status query', async () => {
+it('filters lots through the status dropdown and the backend status query', async () => {
   const { user } = setup();
-  await user.click(
-    await screen.findByRole('button', { name: 'In Process: 1' }),
-  );
+  await user.click(await screen.findByRole('combobox', { name: 'Status' }));
+  await user.click(screen.getByRole('option', { name: 'In Process' }));
   await waitFor(() =>
     expect(apiClient.get).toHaveBeenCalledWith(
       'dashboard/lots',
@@ -148,11 +153,8 @@ it('filters lots through clickable status counts and the backend status query', 
       }),
     ),
   );
-  expect(screen.getByRole('button', { name: 'In Process: 1' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await user.click(screen.getByRole('button', { name: 'In Process: 1' }));
+  await user.click(screen.getByRole('combobox', { name: 'Status' }));
+  await user.click(screen.getByRole('option', { name: 'All statuses' }));
   await waitFor(() =>
     expect(apiClient.get).toHaveBeenLastCalledWith(
       'dashboard/lots',
@@ -348,7 +350,9 @@ it('reschedules summary and lot polling when the response interval changes', asy
     await vi.advanceTimersByTimeAsync(5000);
   });
   expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
-  expect(screen.getByText('Updates every 2 seconds')).toBeVisible();
+  expect(
+    screen.queryByText(/Updates every \d+ seconds/),
+  ).not.toBeInTheDocument();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1999);
   });

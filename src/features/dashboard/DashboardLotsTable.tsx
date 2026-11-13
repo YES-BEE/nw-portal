@@ -20,7 +20,7 @@ import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
 import type { ListQuery } from '../../api/collections';
 import { ListPagination } from '../../api/ListPagination';
 import { usePagedList } from '../../api/usePagedList';
-import { useLotLabels } from '../lots/lotDisplay';
+import { useDashboardLotLabels } from './useDashboardLotLabels';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { dashboardFailure, getDashboardLots } from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
@@ -42,7 +42,7 @@ export function DashboardLotsTable({
   onHealthChange: (health: 'loading' | 'healthy' | 'stale') => void;
 }) {
   const { t } = useTranslation('translation');
-  const labels = useLotLabels();
+  const labels = useDashboardLotLabels();
   const load = useCallback(
     (query: ListQuery, signal?: AbortSignal) =>
       getDashboardLots(query, signal, status || undefined),
@@ -65,7 +65,7 @@ export function DashboardLotsTable({
     );
   }, [list.state.status, tableError, onHealthChange]);
   const items = list.state.status === 'ready' ? list.state.data.items : [];
-  const columns = 10;
+  const columns = 9;
   return (
     <Paper
       component="section"
@@ -174,7 +174,6 @@ export function DashboardLotsTable({
               <TableCell>{t('dashboard.station')}</TableCell>
               <TableCell>{t('dashboard.process')}</TableCell>
               <TableCell>{t('lots.routeSequence')}</TableCell>
-              <TableCell>{t('dashboard.currentLocation')}</TableCell>
               <TableCell>{t('lots.created')}</TableCell>
               <TableCell>{t('lots.completedAt')}</TableCell>
             </TableRow>
@@ -267,7 +266,6 @@ export function DashboardLotsTable({
                   {lot.current_process || t('common.notProvided')}
                 </TableCell>
                 <TableCell>{lot.current_route_sequence ?? '—'}</TableCell>
-                <TableCell>{lot.location_label || '—'}</TableCell>
                 <TableCell>{formatDateTime(lot.created_at)}</TableCell>
                 <TableCell>
                   {lot.completed_at ? formatDateTime(lot.completed_at) : '—'}

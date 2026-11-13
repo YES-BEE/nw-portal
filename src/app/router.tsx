@@ -95,9 +95,9 @@ export const router = createBrowserRouter([
             path: '/reports',
             handle: { requiredModule: 'reports' },
             lazy: async () => {
-              const { ComingSoonPage } =
-                await import('../features/overview/ComingSoonPage');
-              return { element: <ComingSoonPage module="reports" /> };
+              const { ReportsPage } =
+                await import('../features/reports/ReportsPage');
+              return { Component: ReportsPage };
             },
           },
           {

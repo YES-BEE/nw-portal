@@ -35,7 +35,8 @@ src/
     access/           # User and role records, module permissions, management forms
     auth/             # Login page, styling, decorative chart
     configurations/   # Shared NFC registry, details header, and summary components
-    overview/         # Dashboard and Reports/Analysis coming-soon pages
+    dashboard/        # Live production metrics and lot status
+    reports/          # Lot movement history
     processes/        # Process list, editor, validation, local records
     storages/         # Storage list, editor, validation, local records
     styles/           # Shared style list, editor, ordered process route, and details
@@ -75,6 +76,8 @@ VITE_FACTORY_TIME_ZONE=Asia/Kolkata
 ```
 
 The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in `VITE_FACTORY_TIME_ZONE` (default Asia/Kolkata). Failed refreshes retain the last values and timestamp and show a stale indicator.
+
+The Reports screen requires the `reports` module and uses `GET /reports/lot-history?lotId={id}`, with backend search and pagination. The lot selector searches the management API only when the Lots module is granted. Reports-only users can enter a lot UUID directly because the backend does not provide Reports-only lookup endpoints. Backend ownership and assignment restrictions still apply. History displays location and user IDs because its response does not include their names. The current backend requires a lot ID; an all-lots history report needs backend support.
 
 Restart Vite after changing environment values. Vite exposes these variables to the browser; they contain public configuration. `LoginRequest`, `LoginResponse`, and `LoginModule` are defined in `src/features/auth/types.ts`. Process assignments are retained as `unknown[]` because the provided response only specifies an empty array, without an item schema.
 

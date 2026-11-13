@@ -212,7 +212,7 @@ export async function getDashboard(
   );
   return { ...first, stations };
 }
-function isLot(value: unknown): value is DashboardLot {
+function isDashboardLot(value: unknown): value is DashboardLot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
@@ -248,7 +248,7 @@ export async function getDashboardLots(
       }),
     ),
     query,
-    isLot,
+    isDashboardLot,
     (row) => row.id,
     invalid,
   );

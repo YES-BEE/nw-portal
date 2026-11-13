@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Button,
   Paper,
   Stack,
   Typography,
@@ -16,19 +15,10 @@ import {
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import { useTranslation } from 'react-i18next';
-import type { StationWip, StatusCount } from './types';
+import type { StationWip } from './types';
 import { useCallback } from 'react';
 import { AnimatedCount } from './AnimatedCount';
 
-const colors: Record<string, string> = {
-  COMPLETED: '#15803d',
-  CANCELLED: '#64748b',
-  IN_PROCESS: '#0957f7',
-  DISPATCHED: '#9333ea',
-  IN_STORAGE: '#b45309',
-  DRAFT: '#64748b',
-  RELEASED: '#0891b2',
-};
 function Bar({
   label,
   value,
@@ -73,77 +63,6 @@ function Bar({
         }}
       />
     </Box>
-  );
-}
-export function StatusBreakdown({
-  title,
-  rows,
-  label,
-  empty,
-  hint,
-  selected,
-  onSelect,
-}: {
-  title: string;
-  rows: StatusCount[];
-  label: (status: string) => string;
-  empty: string;
-  hint: string;
-  selected?: string;
-  onSelect?: (status: string) => void;
-}) {
-  const total = rows.reduce((sum, row) => sum + row.count, 0);
-  return (
-    <Paper
-      component="section"
-      aria-label={title}
-      variant="outlined"
-      sx={{ p: 2, borderRadius: 2, minWidth: 0, borderColor: '#e7edf5' }}
-    >
-      <Typography component="h2" sx={{ fontSize: 15, fontWeight: 700, mb: 1 }}>
-        {title}
-      </Typography>
-      <Typography color="text.secondary" sx={{ mb: 2, fontSize: 11 }}>
-        {hint}
-      </Typography>
-      {rows.length ? (
-        <Stack spacing={1.5}>
-          {rows.map((row) =>
-            onSelect ? (
-              <Button
-                key={row.status}
-                size="small"
-                variant={selected === row.status ? 'outlined' : 'text'}
-                color="inherit"
-                aria-pressed={selected === row.status}
-                aria-label={`${label(row.status)}: ${row.count}`}
-                onClick={() =>
-                  onSelect(selected === row.status ? '' : row.status)
-                }
-                sx={{ textTransform: 'none', justifyContent: 'stretch', p: 1 }}
-              >
-                <Bar
-                  label={label(row.status)}
-                  value={row.count}
-                  max={total}
-                  color={colors[row.status] || '#0957f7'}
-                />
-              </Button>
-            ) : (
-              <Bar
-                key={row.status}
-                label={label(row.status)}
-                value={row.count}
-                max={total}
-                color={colors[row.status] || '#0957f7'}
-              />
-            ),
-          )}
-        </Stack>
-      ) : (
-        <Alert severity="info">{empty}</Alert>
-      )}
-    </Paper>
   );
 }
 export function StationWipBreakdown({
