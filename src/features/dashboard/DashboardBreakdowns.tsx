@@ -1,4 +1,20 @@
-import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Paper,
+  Stack,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  LinearProgress,
+} from '@mui/material';
+import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import { useTranslation } from 'react-i18next';
 import type { StationWip, StatusCount } from './types';
 import { useCallback } from 'react';
@@ -82,16 +98,16 @@ export function StatusBreakdown({
       component="section"
       aria-label={title}
       variant="outlined"
-      sx={{ p: 3, borderRadius: 2, minWidth: 0 }}
+      sx={{ p: 2, borderRadius: 2, minWidth: 0, borderColor: '#e7edf5' }}
     >
-      <Typography component="h2" sx={{ fontSize: 17, fontWeight: 600, mb: 1 }}>
+      <Typography component="h2" sx={{ fontSize: 15, fontWeight: 700, mb: 1 }}>
         {title}
       </Typography>
-      <Typography color="text.secondary" sx={{ mb: 2 }}>
+      <Typography color="text.secondary" sx={{ mb: 2, fontSize: 11 }}>
         {hint}
       </Typography>
       {rows.length ? (
-        <Stack spacing={2}>
+        <Stack spacing={1.5}>
           {rows.map((row) =>
             onSelect ? (
               <Button
@@ -142,34 +158,168 @@ export function StationWipBreakdown({ stations }: { stations: StationWip[] }) {
       component="section"
       aria-labelledby="station-wip-title"
       variant="outlined"
-      sx={{ p: 3, borderRadius: 2 }}
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        borderColor: '#e7edf5',
+        minWidth: 0,
+        height: '100%',
+      }}
     >
-      <Typography
-        component="h2"
-        id="station-wip-title"
-        sx={{ fontSize: 17, fontWeight: 600, mb: 1 }}
-      >
-        {t('dashboard.stationWip')}
-      </Typography>
-      <Typography color="text.secondary" sx={{ mb: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+        <HubOutlinedIcon color="primary" fontSize="small" />
+        <Typography
+          component="h2"
+          id="station-wip-title"
+          sx={{ fontSize: 15, fontWeight: 700 }}
+        >
+          {t('dashboard.stationWip')}
+        </Typography>
+      </Stack>
+      <Typography color="text.secondary" sx={{ mb: 2, fontSize: 11 }}>
         {t('dashboard.stationHint')}
       </Typography>
       {stations.length ? (
-        <Stack spacing={2} sx={{ maxHeight: 360, overflowY: 'auto', pr: 1 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 1.25,
+            maxHeight: 260,
+            overflowY: 'auto',
+          }}
+        >
           {stations.map((station) => (
-            <Bar
+            <Box
               key={station.id}
-              label={station.name || t('common.notProvided')}
-              value={station.wip}
-              formatValue={formatVisits}
-              max={maximum}
-              color="#0957f7"
-            />
+              sx={{
+                p: 1.5,
+                border: 1,
+                borderColor: '#e1edf8',
+                borderRadius: 1.5,
+                background: 'linear-gradient(145deg, #f0f8ff, #fbfdff)',
+              }}
+            >
+              <Bar
+                label={station.name || t('common.notProvided')}
+                value={station.wip}
+                formatValue={formatVisits}
+                max={maximum}
+                color="#0957f7"
+              />
+            </Box>
           ))}
-        </Stack>
+        </Box>
       ) : (
         <Alert severity="info">{t('dashboard.noStations')}</Alert>
       )}
+    </Paper>
+  );
+}
+
+export function StationStatusTable({ stations }: { stations: StationWip[] }) {
+  const { t } = useTranslation('translation');
+  const total = stations.reduce((sum, station) => sum + station.wip, 0);
+  return (
+    <Paper
+      component="section"
+      aria-labelledby="station-status-title"
+      variant="outlined"
+      sx={{
+        borderRadius: 2,
+        borderColor: '#e7edf5',
+        minWidth: 0,
+        overflow: 'hidden',
+        height: '100%',
+      }}
+    >
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', p: 2 }}>
+        <FactCheckOutlinedIcon color="primary" fontSize="small" />
+        <Typography
+          component="h2"
+          id="station-status-title"
+          sx={{ fontSize: 15, fontWeight: 700 }}
+        >
+          {t('dashboard.stationStatus')}
+        </Typography>
+      </Stack>
+      {stations.length ? (
+        <TableContainer sx={{ maxHeight: 280 }}>
+          <Table
+            size="small"
+            stickyHeader
+            aria-labelledby="station-status-title"
+            sx={{ '& .MuiTableCell-root': { px: 1.5, py: 1.25 } }}
+          >
+            <TableHead>
+              <TableRow>
+                <TableCell>{t('dashboard.stationName')}</TableCell>
+                <TableCell align="right">{t('dashboard.visits')}</TableCell>
+                <TableCell>{t('dashboard.workloadShare')}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {stations.map((station) => {
+                const share = total
+                  ? Math.round((station.wip / total) * 100)
+                  : 0;
+                return (
+                  <TableRow key={station.id}>
+                    <TableCell sx={{ fontWeight: 600 }}>
+                      {station.name || t('common.notProvided')}
+                    </TableCell>
+                    <TableCell align="right">
+                      <AnimatedCount value={station.wip} />
+                    </TableCell>
+                    <TableCell>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ alignItems: 'center', minWidth: 85 }}
+                      >
+                        <LinearProgress
+                          variant="determinate"
+                          value={share}
+                          sx={{
+                            flex: 1,
+                            height: 6,
+                            borderRadius: 3,
+                            bgcolor: '#e8f4ee',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: '#16a365',
+                              borderRadius: 3,
+                              transition: 'transform 650ms ease-out',
+                              '@media (prefers-reduced-motion: reduce)': {
+                                transition: 'none',
+                              },
+                            },
+                          }}
+                        />
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            color: 'text.secondary',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <AnimatedCount value={share} />%
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ p: 2 }}>
+          <Alert severity="info">{t('dashboard.noStationStatus')}</Alert>
+        </Box>
+      )}
+      <Typography color="text.secondary" sx={{ p: 1.5, fontSize: 11 }}>
+        {t('dashboard.workloadShareHint')}
+      </Typography>
     </Paper>
   );
 }

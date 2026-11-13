@@ -20,6 +20,7 @@ import {
   Typography,
 } from '@mui/material';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import ViewListOutlinedIcon from '@mui/icons-material/ViewListOutlined';
 import type { ListQuery } from '../../api/collections';
 import { ListPagination } from '../../api/ListPagination';
 import { usePagedList } from '../../api/usePagedList';
@@ -53,38 +54,59 @@ export function DashboardLotsTable({
   );
   const list = usePagedList(load, getDashboardPollIntervalMs());
   const items = list.state.status === 'ready' ? list.state.data.items : [];
-  const columns = canViewLot ? 8 : 7;
+  const columns = canViewLot ? 11 : 10;
   return (
     <Paper
       component="section"
       variant="outlined"
       aria-labelledby="dashboard-lots-title"
-      sx={{ mt: 3, borderRadius: 2, overflow: 'hidden' }}
+      sx={{ borderRadius: 2, overflow: 'hidden', borderColor: '#e7edf5' }}
     >
-      <Stack sx={{ p: 3, gap: 2 }}>
-        <Typography
-          component="h2"
-          id="dashboard-lots-title"
-          sx={{ fontSize: 17, fontWeight: 600 }}
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        sx={{
+          p: 2,
+          gap: 2,
+          justifyContent: 'space-between',
+          alignItems: { lg: 'center' },
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', flexShrink: 0 }}
         >
-          {t('dashboard.lotsTitle')}
-        </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <ViewListOutlinedIcon color="primary" fontSize="small" />
+          <Typography
+            component="h2"
+            id="dashboard-lots-title"
+            sx={{ fontSize: 15, fontWeight: 700 }}
+          >
+            {t('dashboard.lotsTitle')}
+          </Typography>
+        </Stack>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1.5}
+          sx={{ minWidth: 0 }}
+        >
           <TextField
             type="search"
+            size="small"
             label={t('lots.search')}
             placeholder={t('dashboard.searchPlaceholder')}
             value={list.input}
             onChange={(event) => list.setInput(event.target.value)}
             slotProps={{ htmlInput: { maxLength: 200 } }}
-            sx={{ width: '100%', maxWidth: 420 }}
+            sx={{ width: '100%', minWidth: { sm: 180 }, maxWidth: 300 }}
           />
           <TextField
             select
+            size="small"
             label={t('lots.status')}
             value={status}
             onChange={(event) => onStatus(event.target.value)}
-            sx={{ width: '100%', maxWidth: 240 }}
+            sx={{ width: '100%', minWidth: { sm: 140 }, maxWidth: 200 }}
           >
             <MenuItem value="">{t('dashboard.allStatuses')}</MenuItem>
             {statuses.map((value) => (
@@ -107,7 +129,14 @@ export function DashboardLotsTable({
         <Table
           aria-labelledby="dashboard-lots-title"
           aria-busy={list.state.status === 'loading'}
-          sx={{ minWidth: 850 }}
+          size="small"
+          sx={{
+            minWidth: 1100,
+            '& .MuiTableCell-root': { whiteSpace: 'nowrap', px: 1.5, py: 1.5 },
+            '& .MuiTableRow-root:last-child .MuiTableCell-root': {
+              borderBottom: 0,
+            },
+          }}
         >
           <TableHead>
             <TableRow>
@@ -118,7 +147,10 @@ export function DashboardLotsTable({
               )}
               <TableCell>{t('dashboard.station')}</TableCell>
               <TableCell>{t('dashboard.process')}</TableCell>
+              <TableCell>{t('lots.routeSequence')}</TableCell>
+              <TableCell>{t('dashboard.currentLocation')}</TableCell>
               <TableCell>{t('lots.created')}</TableCell>
+              <TableCell>{t('lots.completedAt')}</TableCell>
               {canViewLot && <TableCell>{t('lots.actions')}</TableCell>}
             </TableRow>
           </TableHead>
@@ -134,7 +166,7 @@ export function DashboardLotsTable({
               </TableRow>
             )}
             {items.map((lot) => (
-              <TableRow key={lot.id}>
+              <TableRow key={lot.id} hover>
                 <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>
                   {lot.lot_number}
                 </TableCell>
@@ -143,7 +175,55 @@ export function DashboardLotsTable({
                 <TableCell>
                   <Chip
                     size="small"
-                    variant="outlined"
+                    variant="filled"
+                    color={
+                      lot.status === 'COMPLETED'
+                        ? 'success'
+                        : lot.status === 'IN_PROCESS'
+                          ? 'primary'
+                          : lot.status === 'DISPATCHED'
+                            ? 'secondary'
+                            : [
+                                  'READY',
+                                  'AT_STATION',
+                                  'READY_FOR_DISPATCH',
+                                ].includes(lot.status)
+                              ? 'warning'
+                              : 'default'
+                    }
+                    sx={{
+                      borderRadius: 1,
+                      height: 23,
+                      bgcolor:
+                        lot.status === 'COMPLETED'
+                          ? '#eaf8ef'
+                          : lot.status === 'IN_PROCESS'
+                            ? '#eaf2ff'
+                            : lot.status === 'DISPATCHED'
+                              ? '#f2edff'
+                              : [
+                                    'READY',
+                                    'AT_STATION',
+                                    'READY_FOR_DISPATCH',
+                                  ].includes(lot.status)
+                                ? '#fff6df'
+                                : '#f1f4f8',
+                      color:
+                        lot.status === 'COMPLETED'
+                          ? '#15803d'
+                          : lot.status === 'IN_PROCESS'
+                            ? '#0957f7'
+                            : lot.status === 'DISPATCHED'
+                              ? '#7c3aed'
+                              : [
+                                    'READY',
+                                    'AT_STATION',
+                                    'READY_FOR_DISPATCH',
+                                  ].includes(lot.status)
+                                ? '#946200'
+                                : '#52647c',
+                      fontWeight: 600,
+                    }}
                     label={labels.statusLabel(lot.status)}
                   />
                 </TableCell>
@@ -155,7 +235,14 @@ export function DashboardLotsTable({
                 <TableCell>
                   {lot.current_process || t('common.notProvided')}
                 </TableCell>
+                <TableCell>{lot.current_route_sequence ?? '—'}</TableCell>
+                <TableCell>
+                  {labels.locationLabel(lot.current_location_type)}
+                </TableCell>
                 <TableCell>{formatDateTime(lot.created_at)}</TableCell>
+                <TableCell>
+                  {lot.completed_at ? formatDateTime(lot.completed_at) : '—'}
+                </TableCell>
                 {canViewLot && (
                   <TableCell>
                     <Tooltip title={t('common.view')}>

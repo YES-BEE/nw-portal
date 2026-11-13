@@ -1,16 +1,22 @@
 ﻿import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Box, CircularProgress, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, CircularProgress, Stack, Typography } from '@mui/material';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { useLotLabels } from '../lots/lotDisplay';
 import { dashboardFailure, getDashboard } from './dashboardApi';
 import { DashboardFailureAlert } from './DashboardFailureAlert';
 import { DashboardLotsTable } from './DashboardLotsTable';
-import { StatusBreakdown, StationWipBreakdown } from './DashboardBreakdowns';
-import type { DashboardFailure, DashboardSummary, StatusCount } from './types';
+import {
+  StatusBreakdown,
+  StationWipBreakdown,
+  StationStatusTable,
+} from './DashboardBreakdowns';
+import { DashboardMetrics } from './DashboardMetrics';
+import { DashboardInsights } from './DashboardInsights';
+import CircleIcon from '@mui/icons-material/Circle';
+import type { DashboardFailure, DashboardSummary } from './types';
 import { getDashboardPollIntervalMs } from './dashboardConfig';
-import { AnimatedCount } from './AnimatedCount';
 
 const knownStatuses = [
   'READY',
@@ -71,10 +77,6 @@ export function DashboardPage() {
     setAttempt((value) => value + 1);
   }
   const data = state.status === 'ready' ? state.data : null;
-  const total = (rows: StatusCount[]) =>
-    rows.reduce((sum, row) => sum + row.count, 0);
-  const statusCount = (value: string) =>
-    data?.lots.find((row) => row.status === value)?.count || 0;
   const statuses = [
     ...new Set([
       ...knownStatuses,
@@ -110,12 +112,28 @@ export function DashboardPage() {
           <Typography color="text.secondary" sx={{ mt: 0.5 }}>
             {t('dashboard.description')}
           </Typography>
+        </Box>
+        <Stack
+          spacing={0.75}
+          sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' } }}
+        >
+          <Chip
+            icon={<CircleIcon sx={{ fontSize: '9px !important' }} />}
+            label={t('dashboard.liveUpdates')}
+            size="small"
+            sx={{
+              bgcolor: '#eaf8f1',
+              color: '#15803d',
+              fontWeight: 600,
+              '& .MuiChip-icon': { color: '#16a365' },
+            }}
+          />
           {state.status === 'ready' && (
-            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+            <Typography color="text.secondary" sx={{ fontSize: 11 }}>
               {t('dashboard.updated', { date: formatDateTime(state.loadedAt) })}
             </Typography>
           )}
-        </Box>
+        </Stack>
       </Stack>
       {state.status === 'loading' && (
         <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -125,79 +143,45 @@ export function DashboardPage() {
       {state.status === 'error' && (
         <DashboardFailureAlert failure={state.failure} onRetry={refresh} />
       )}
-      {data && (
-        <>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr 1fr',
-                md: 'repeat(3, 1fr)',
-                xl: 'repeat(6, 1fr)',
-              },
-              gap: 2,
-              mb: 3,
-            }}
-          >
-            {[
-              { label: t('dashboard.totalLots'), value: total(data.lots) },
-              {
-                label: t('dashboard.openLots'),
-                value: total(
-                  data.lots.filter(
-                    (row) => !['COMPLETED', 'CANCELLED'].includes(row.status),
-                  ),
-                ),
-              },
-              {
-                label: t('dashboard.completedLots'),
-                value: statusCount('COMPLETED'),
-              },
-              {
-                label: t('dashboard.stylesWithLots'),
-                value: total(data.styles),
-              },
-              {
-                label: t('dashboard.storageOccupancies'),
-                value: data.storageOccupancies,
-              },
-              {
-                label: t('dashboard.availableTrolleys'),
-                value: data.availableTrolleys,
-              },
-            ].map((metric) => (
-              <Paper
-                component="section"
-                variant="outlined"
-                key={metric.label}
-                aria-label={metric.label}
-                sx={{ p: 2.5, borderRadius: 2 }}
-              >
-                <Typography
-                  component="h2"
-                  sx={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                    mb: 1,
-                  }}
-                >
-                  {metric.label}
-                </Typography>
-                <Typography sx={{ fontSize: 17, fontWeight: 700 }}>
-                  <AnimatedCount value={metric.value} />
-                </Typography>
-              </Paper>
-            ))}
-          </Box>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-              gap: 3,
-              mb: 3,
-            }}
-          >
+      {data && <DashboardMetrics data={data} />}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'minmax(0, 1fr)',
+            xl: data ? 'minmax(0, 1fr) 290px' : 'minmax(0, 1fr)',
+          },
+          gap: 2,
+        }}
+      >
+        <Stack spacing={2} sx={{ minWidth: 0 }}>
+          {data && (
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'minmax(0, 1fr)',
+                  lg: 'minmax(0, 1.25fr) minmax(0, 1fr)',
+                },
+                gap: 2,
+                alignItems: 'stretch',
+              }}
+            >
+              <StationWipBreakdown stations={data.stations} />
+              <StationStatusTable stations={data.stations} />
+            </Box>
+          )}
+          <DashboardLotsTable
+            key={lotStatus}
+            status={lotStatus}
+            statuses={statuses}
+            onStatus={setLotStatus}
+            stations={data?.stations || []}
+          />
+        </Stack>
+        {data && (
+          <Stack component="aside" spacing={2} sx={{ minWidth: 0 }}>
+            <DashboardInsights data={data} />
             <StatusBreakdown
               title={t('dashboard.lotStatuses')}
               rows={data.lots}
@@ -214,17 +198,9 @@ export function DashboardPage() {
               empty={t('dashboard.noStyles')}
               hint={t('dashboard.stylesHint')}
             />
-          </Box>
-          <StationWipBreakdown stations={data.stations} />
-        </>
-      )}
-      <DashboardLotsTable
-        key={lotStatus}
-        status={lotStatus}
-        statuses={statuses}
-        onStatus={setLotStatus}
-        stations={data?.stations || []}
-      />
+          </Stack>
+        )}
+      </Box>
     </>
   );
 }
