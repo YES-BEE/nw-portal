@@ -22,8 +22,6 @@ afterEach(() => {
 beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
     if (url === 'dashboard') return { status: 200, data: dashboardResponse };
-    if (url.startsWith('dashboard/lots/'))
-      return { status: 200, data: dashboardLot };
     const query = config?.params as ListQuery & { status?: string };
     return {
       status: 200,
@@ -85,30 +83,22 @@ it('renders server summary metrics, status charts, station WIP, and live lot dat
     screen.queryByRole('link', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
 });
-it('shows backend snapshot time and readable locations and permits dashboard-only lot viewing', async () => {
+it('shows backend snapshot time and readable locations without dashboard lot actions', async () => {
   seedTestData();
   signIn('nw.admin');
   setAuthenticatedSession({ ...readSession()!, modules: ['dashboard'] });
   vi.stubEnv('VITE_FACTORY_TIME_ZONE', 'Asia/Kolkata');
-  const { user } = setup();
+  setup();
   expect(await screen.findByText('Updated 13/11/2026, 13:30:00')).toBeVisible();
   const table = screen.getByRole('table', { name: 'Production Lots' });
   expect(within(table).queryByText('In progress')).not.toBeInTheDocument();
   expect(within(table).getAllByText('Washing')).toHaveLength(3);
-  await user.click(
-    within(table).getByRole('button', { name: 'View lot LOT-001' }),
-  );
-  const dialog = await screen.findByRole('dialog');
-  expect(await within(dialog).findByText('LOT-001')).toBeVisible();
-  expect(apiClient.get).toHaveBeenCalledWith(
-    'dashboard/lots/lot-id',
-    expect.anything(),
-  );
-  expect(within(dialog).queryByText('process-id')).not.toBeInTheDocument();
   expect(
-    within(dialog).queryByRole('button', { name: /Delete|Change Quantity/ }),
+    within(table).queryByRole('button', { name: 'View lot LOT-001' }),
   ).not.toBeInTheDocument();
-  await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+  expect(
+    within(table).queryByRole('columnheader', { name: 'Actions' }),
+  ).not.toBeInTheDocument();
 });
 it.each(['summary', 'lots'])(
   'retains previous values and timestamp and marks live updates stale after a %s refresh failure',
@@ -270,7 +260,7 @@ it('keeps summary metrics visible when the lot request is forbidden', async () =
     await screen.findByRole('region', { name: 'Total Lots' }),
   ).toBeVisible();
 });
-it('allows read-only lot viewing and polls both APIs using only the backend interval', async () => {
+it('polls both APIs using only the backend interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
   seedTestData();
   signIn('nw.admin');
@@ -280,7 +270,7 @@ it('allows read-only lot viewing and polls both APIs using only the backend inte
   });
   const { unmount } = setup();
   expect(
-    await screen.findByRole('button', { name: 'View lot LOT-001' }),
+    await screen.findByRole('rowheader', { name: 'LOT-001' }),
   ).toBeVisible();
   await screen.findByRole('region', { name: 'Total Lots' });
   const before = vi.mocked(apiClient.get).mock.calls.length;

@@ -74,7 +74,7 @@ VITE_AUTH_CLIENT_TYPE=PC
 VITE_FACTORY_TIME_ZONE=Asia/Kolkata
 ```
 
-The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in `VITE_FACTORY_TIME_ZONE` (default Asia/Kolkata). Failed refreshes retain the last values and timestamp and show a stale indicator. Dashboard readers can view read-only lot details through `GET /dashboard/lots/{id}` without Lot Management access.
+The dashboard loads immediately, then polls summary and the current lot page using only the backend's `refreshIntervalSeconds`. Polling starts after a successful summary response and adjusts when the backend changes the interval. Filters and pagination are preserved. The Updated timestamp uses the backend's `snapshotAt` in `VITE_FACTORY_TIME_ZONE` (default Asia/Kolkata). Failed refreshes retain the last values and timestamp and show a stale indicator.
 
 Restart Vite after changing environment values. Vite exposes these variables to the browser; they contain public configuration. `LoginRequest`, `LoginResponse`, and `LoginModule` are defined in `src/features/auth/types.ts`. Process assignments are retained as `unknown[]` because the provided response only specifies an empty array, without an item schema.
 

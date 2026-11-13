@@ -235,20 +235,6 @@ function isLot(value: unknown): value is DashboardLot {
     (row.completed_at === null || date(row.completed_at))
   );
 }
-export async function getDashboardLot(
-  id: string,
-  signal?: AbortSignal,
-): Promise<DashboardLot> {
-  const data = await request(() =>
-    apiClient.get<unknown>(
-      `dashboard/lots/${encodeURIComponent(id)}`,
-      options(signal),
-    ),
-  );
-  if (!isLot(data) || data.id.toLowerCase() !== id.toLowerCase())
-    return invalid();
-  return data;
-}
 export async function getDashboardLots(
   query: ListQuery,
   signal?: AbortSignal,

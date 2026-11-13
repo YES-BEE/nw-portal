@@ -894,13 +894,6 @@
     "totalStationVisits": "Total station lot visits",
     "stationVisitsHint": "Combined visits across all visible stations",
     "refreshCadence": "Updates every {{seconds}} seconds",
-    "processStatus": "Process Status",
-    "processStatusValues": {
-      "PENDING": "Pending",
-      "IN_PROGRESS": "In progress",
-      "PAUSED": "Paused",
-      "BLOCKED": "Blocked"
-    },
     "totalHint": "All visible production lots",
     "openHint": "Excludes completed and deleted lots",
     "completedHint": "Finished production",

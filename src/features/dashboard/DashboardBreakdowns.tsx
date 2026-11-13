@@ -257,7 +257,7 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
             aria-labelledby="station-status-title"
             sx={{
               width: '100%',
-              tableLayout: 'fixed',
+              tableLayout: 'auto',
               '& .MuiTableCell-root': {
                 px: 1.5,
                 py: 1.25,
@@ -268,7 +268,12 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
             <TableHead>
               <TableRow>
                 <TableCell>{t('dashboard.stationName')}</TableCell>
-                <TableCell align="right">{t('dashboard.visits')}</TableCell>
+                <TableCell
+                  align="right"
+                  sx={{ width: '1%', whiteSpace: 'nowrap' }}
+                >
+                  {t('dashboard.visits')}
+                </TableCell>
                 <TableCell>{t('dashboard.workloadShare')}</TableCell>
               </TableRow>
             </TableHead>
@@ -280,7 +285,7 @@ export function StationStatusTable({ stations }: { stations: StationWip[] }) {
                     <TableCell sx={{ fontWeight: 600 }}>
                       {station.name || t('common.notProvided')}
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       <AnimatedCount value={station.wip} />
                     </TableCell>
                     <TableCell>
