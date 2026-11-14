@@ -14,12 +14,10 @@ const lot = dashboardLot;
 beforeEach(() => vi.restoreAllMocks());
 it('loads style progress with backend paging and search, preserving the server average', async () => {
   const params = { page: 1, size: 25, search: 'STYLE' };
-  const get = vi
-    .spyOn(apiClient, 'get')
-    .mockResolvedValue({
-      status: 200,
-      data: { items: [styleProgress], page: 1, size: 25, totalElements: 26 },
-    });
+  const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: { items: [styleProgress], page: 1, size: 25, totalElements: 26 },
+  });
   const signal = new AbortController().signal;
   expect((await getStyleProgress(params, signal)).items).toEqual([
     styleProgress,
@@ -38,12 +36,10 @@ it('accepts styles with no lots and empty style pages', async () => {
     completed_lots: 0,
     progress_percent: 0,
   };
-  const get = vi
-    .spyOn(apiClient, 'get')
-    .mockResolvedValue({
-      status: 200,
-      data: { items: [emptyStyle], page: 0, size: 10, totalElements: 1 },
-    });
+  const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: { items: [emptyStyle], page: 0, size: 10, totalElements: 1 },
+  });
   expect((await getStyleProgress(query)).items).toEqual([emptyStyle]);
   get.mockResolvedValue({
     status: 200,

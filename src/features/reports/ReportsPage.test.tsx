@@ -90,16 +90,14 @@ it('searches and paginates style reports through the backend', async () => {
   );
 });
 it('handles empty style reports and server errors with retry', async () => {
-  const get = vi
-    .spyOn(apiClient, 'get')
-    .mockImplementation(async (url) =>
-      url === 'reports/style-progress'
-        ? { status: 503, data: { detail: 'Reports unavailable' } }
-        : {
-            status: 200,
-            data: { items: [], page: 0, size: 10, totalElements: 0 },
-          },
-    );
+  const get = vi.spyOn(apiClient, 'get').mockImplementation(async (url) =>
+    url === 'reports/style-progress'
+      ? { status: 503, data: { detail: 'Reports unavailable' } }
+      : {
+          status: 200,
+          data: { items: [], page: 0, size: 10, totalElements: 0 },
+        },
+  );
   const user = userEvent.setup();
   renderWithProviders(<ReportsPage />);
   await user.click(screen.getByRole('tab', { name: 'Style Progress' }));

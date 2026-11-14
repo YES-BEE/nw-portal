@@ -60,17 +60,15 @@ it.each(['dashboard', 'reports'] as const)(
   },
 );
 it('validates the extra ANY-route option fields and accepts empty option pages', async () => {
-  const get = vi
-    .spyOn(apiClient, 'get')
-    .mockResolvedValue({
-      status: 200,
-      data: {
-        items: [{ id: 's1', code: 'S1', name: 'Washing' }],
-        page: 0,
-        size: 100,
-        totalElements: 1,
-      },
-    });
+  const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+    status: 200,
+    data: {
+      items: [{ id: 's1', code: 'S1', name: 'Washing' }],
+      page: 0,
+      size: 100,
+      totalElements: 1,
+    },
+  });
   expect(
     (
       await getDashboardFilterOptions('stations', {
