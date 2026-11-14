@@ -108,9 +108,19 @@ describe('common API bearer interceptor', () => {
     await apiClient.get('users');
     expect(adapter.mock.calls[0][0].headers.get('Authorization')).toBeNull();
   });
-  it('rejects an invalid API URL before sending credentials', async () => {
+  it('uses the current origin when no API base URL is configured', async () => {
     authenticate();
     vi.stubEnv('VITE_API_BASE_URL', '');
+    await apiClient.get('users');
+    const config = adapter.mock.calls[0][0];
+    expect(apiClient.getUri(config)).toBe('http://localhost:3000/api/v2/users');
+    expect(config.headers.get('Authorization')).toBe(
+      'Bearer test-access-token',
+    );
+  });
+  it('rejects an invalid configured API URL before sending credentials', async () => {
+    authenticate();
+    vi.stubEnv('VITE_API_BASE_URL', 'not a URL');
     await expect(apiClient.get('users')).rejects.toThrow();
     expect(adapter).not.toHaveBeenCalled();
   });

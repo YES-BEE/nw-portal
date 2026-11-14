@@ -88,6 +88,8 @@ describe('server-driven management lists', () => {
           },
         };
       });
+      const listRequests = () =>
+        vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === path);
       const user = userEvent.setup();
       renderWithProviders(
         <MemoryRouter>
@@ -97,23 +99,21 @@ describe('server-driven management lists', () => {
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(10),
       );
-      expect(
-        vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === path),
-      ).toHaveLength(1);
-      expect(apiClient.get).toHaveBeenCalledWith(
+      expect(listRequests()).toHaveLength(1);
+      expect(listRequests().at(-1)).toEqual([
         path,
         expect.objectContaining({
           params: expect.objectContaining({ page: 0, size: 10, search: '' }),
         }),
-      );
+      ]);
       await user.click(screen.getByRole('button', { name: 'Go to next page' }));
       await waitFor(() =>
-        expect(apiClient.get).toHaveBeenCalledWith(
+        expect(listRequests().at(-1)).toEqual([
           path,
           expect.objectContaining({
             params: expect.objectContaining({ page: 1, size: 10, search: '' }),
           }),
-        ),
+        ]),
       );
       await screen.findByRole('rowheader', {
         name: new RegExp(
@@ -125,19 +125,19 @@ describe('server-driven management lists', () => {
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(23),
       );
-      expect(apiClient.get).toHaveBeenCalledWith(
+      expect(listRequests().at(-1)).toEqual([
         path,
         expect.objectContaining({
           params: expect.objectContaining({ page: 0, size: 25, search: '' }),
         }),
-      );
+      ]);
       fireEvent.change(screen.getByRole('searchbox'), {
         target: { value: '  Not A Local Match  ' },
       });
       await waitFor(() =>
         expect(screen.getAllByRole('rowheader')).toHaveLength(1),
       );
-      expect(apiClient.get).toHaveBeenCalledWith(
+      expect(listRequests().at(-1)).toEqual([
         path,
         expect.objectContaining({
           params: expect.objectContaining({
@@ -146,10 +146,8 @@ describe('server-driven management lists', () => {
             search: 'Not A Local Match',
           }),
         }),
-      );
-      expect(
-        vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === path),
-      ).toHaveLength(4);
+      ]);
+      expect(listRequests()).toHaveLength(4);
       if (path === 'nfc-tags')
         expect(
           vi

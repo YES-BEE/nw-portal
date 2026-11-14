@@ -266,12 +266,10 @@ it.each([true, false])(
       status: 200,
       data: { ...userResponse, enabled },
     });
-    const put = vi
-      .spyOn(apiClient, 'put')
-      .mockResolvedValue({
-        status: 200,
-        data: { ...userResponse, enabled: !enabled },
-      });
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({
+      status: 200,
+      data: { ...userResponse, enabled: !enabled },
+    });
     const user = userEvent.setup();
     renderWithProviders(
       <UserEditor

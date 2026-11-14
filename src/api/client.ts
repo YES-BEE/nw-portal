@@ -26,10 +26,10 @@ export function setAccessTokenProvider(
 }
 
 function getApiBaseUrl() {
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') ?? '';
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  const baseUrl = configuredBaseUrl || window.location.origin;
   const version = import.meta.env.VITE_API_VERSION?.trim() ?? '';
-  return new URL(`${baseUrl}/api/${version}/`).toString();
+  return new URL(`/api/${version}/`, baseUrl).toString();
 }
 
 export const apiClient = axios.create({

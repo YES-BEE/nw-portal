@@ -29,25 +29,23 @@ describe('create tag form', () => {
 
   it('shows backend validation fields and keeps values so they can be corrected', async () => {
     const user = userEvent.setup();
-    const onCreate = vi
-      .fn()
-      .mockRejectedValue(
-        new TagsError(
-          parseTagsFailure(
-            {
-              code: 'VALIDATION_FAILED',
-              detail: 'Request validation failed',
-              fieldErrors: {
-                name: 'Invalid tag name',
-                uid: 'Invalid NFC UID',
-                extra: 'Ignored',
-              },
+    const onCreate = vi.fn().mockRejectedValue(
+      new TagsError(
+        parseTagsFailure(
+          {
+            code: 'VALIDATION_FAILED',
+            detail: 'Request validation failed',
+            fieldErrors: {
+              name: 'Invalid tag name',
+              uid: 'Invalid NFC UID',
+              extra: 'Ignored',
             },
-            400,
-            'create',
-          ),
+          },
+          400,
+          'create',
         ),
-      );
+      ),
+    );
     renderWithProviders(<TagForm onCreate={onCreate} onClose={vi.fn()} />);
     const name = screen.getByRole('textbox', { name: /Tag Name/ });
     const uid = screen.getByRole('textbox', { name: /Actual NFC Tag ID/ });
