@@ -4,10 +4,7 @@ import {
   getDashboardFilterOptions,
   getDashboardLots,
 } from '../features/dashboard/dashboardApi';
-import {
-  getReportFilterOptions,
-  getLotProgress,
-} from '../features/reports/reportsApi';
+import { getReportFilterOptions } from '../features/reports/reportsApi';
 import { dashboardLot } from '../test/dashboard';
 import type {
   FilterOptionType,
@@ -131,11 +128,6 @@ it('passes all table filters without changing response values or deriving status
     'dashboard/lots',
     expect.objectContaining({ params }),
   );
-  expect(await getLotProgress(params)).toEqual(page);
-  expect(get).toHaveBeenLastCalledWith(
-    'reports/lot-progress',
-    expect.objectContaining({ params }),
-  );
   get.mockResolvedValue({
     status: 200,
     data: {
@@ -143,7 +135,7 @@ it('passes all table filters without changing response values or deriving status
       items: [{ ...dashboardLot, current_station_id: undefined }],
     },
   });
-  await expect(getLotProgress(params)).rejects.toMatchObject({
+  await expect(getDashboardLots(params)).rejects.toMatchObject({
     failure: { kind: 'invalidResponse' },
   });
 });

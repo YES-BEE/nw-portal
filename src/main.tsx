@@ -1,6 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import 'dayjs/locale/en-gb';
 import '@fontsource-variable/inter';
 import App from './App';
 import { theme } from './app/theme';
@@ -14,12 +17,14 @@ void initializeSession();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <StartupGate>
-        <CurrentUserProvider>
-          <App />
-        </CurrentUserProvider>
-      </StartupGate>
+      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+        <CssBaseline />
+        <StartupGate>
+          <CurrentUserProvider>
+            <App />
+          </CurrentUserProvider>
+        </StartupGate>
+      </LocalizationProvider>
     </ThemeProvider>
   </StrictMode>,
 );

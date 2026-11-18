@@ -115,7 +115,7 @@ it('offers only create and view actions in New Style mode', async () => {
   await screen.findByRole('rowheader', { name: 'STY-1001' });
   expect(screen.getByRole('button', { name: 'New Style' })).toBeEnabled();
   expect(
-    screen.queryByRole('button', { name: 'Edit STY-1001' }),
+    screen.queryByRole('button', { name: 'Edit STY-1001', hidden: true }),
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole('button', { name: 'Release style STY-1001' }),
@@ -125,7 +125,7 @@ it('offers only create and view actions in New Style mode', async () => {
     `/new-style/${styleResponse.id}`,
   );
 });
-it('allows configurators to release only their own drafts without enabling style editing', async () => {
+it('allows configurators to edit and release only their own drafts', async () => {
   seedTestData();
   signIn('style.configurator');
   const session = readSession()!;
@@ -165,7 +165,13 @@ it('allows configurators to release only their own drafts without enabling style
     screen.queryByRole('button', { name: 'Release style RELEASED' }),
   ).not.toBeInTheDocument();
   expect(
-    screen.queryByRole('button', { name: 'Edit STY-1001' }),
+    screen.queryByRole('button', { name: 'Edit STY-1001', hidden: true }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Edit OUTSIDE', hidden: true }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Edit RELEASED', hidden: true }),
   ).not.toBeInTheDocument();
   await user.click(
     within(screen.getByRole('dialog')).getByRole('button', {
