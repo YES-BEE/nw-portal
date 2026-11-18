@@ -4,6 +4,7 @@ import {
   collectApiItems,
   readApiPage,
   type ApiPage,
+  type ListQuery,
 } from '../../api/collections';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
 import type {
@@ -373,18 +374,39 @@ export async function getLotStyleOptions(
         return invalid();
       return (data as Record<string, unknown>).styles;
     },
-    (value): value is LotStyleOption => {
-      if (!value || typeof value !== 'object') return false;
-      const row = value as Record<string, unknown>;
-      return (
-        text(row.id) &&
-        text(row.style_number) &&
-        (row.description === null || typeof row.description === 'string') &&
-        (row.status === 'RELEASED' ||
-          row.status === 'IN_PRODUCTION' ||
-          row.status === 'COMPLETED')
-      );
-    },
+    isLotStyleOption,
+    (row) => row.id,
+    invalid,
+  );
+}
+function isLotStyleOption(value: unknown): value is LotStyleOption {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return (
+    text(row.id) &&
+    text(row.style_number) &&
+    (row.description === null || typeof row.description === 'string') &&
+    (row.status === 'RELEASED' ||
+      row.status === 'IN_PRODUCTION' ||
+      row.status === 'COMPLETED')
+  );
+}
+export async function getLotStyleOptionsPage(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<LotStyleOption>> {
+  const data = await request(() =>
+    apiClient.get<LotLookupsResponse>('ui/lookups', {
+      ...options(signal),
+      params: query,
+    }),
+  );
+  if (!data || typeof data !== 'object' || Array.isArray(data))
+    return invalid();
+  return readApiPage(
+    (data as Record<string, unknown>).styles,
+    query,
+    isLotStyleOption,
     (row) => row.id,
     invalid,
   );

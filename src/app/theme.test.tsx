@@ -1,8 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MenuItem, TextField, ThemeProvider } from '@mui/material';
+import {
+  Autocomplete,
+  MenuItem,
+  TextField,
+  ThemeProvider,
+} from '@mui/material';
 import { describe, expect, it } from 'vitest';
 import { configurationTheme, theme } from './theme';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
 
 describe.each([
   { name: 'application', currentTheme: theme },
@@ -58,7 +69,25 @@ describe.each([
     const { container } = render(
       <ThemeProvider theme={currentTheme}>
         <TextField label="Count" type="number" size="small" defaultValue="2" />
-        <TextField label="Delivery" type="date" defaultValue="2026-11-30" />
+        <TextField select size="small" label="Status" defaultValue="ready">
+          <MenuItem value="ready">Ready</MenuItem>
+        </TextField>
+        <Autocomplete
+          size="small"
+          options={['Style 1']}
+          renderInput={(params) => <TextField {...params} label="Style" />}
+        />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DatePicker label="Delivery" defaultValue={dayjs('2026-11-30')} />
+          <TimePicker
+            label="Shift starts"
+            defaultValue={dayjs('2026-11-30T14:30')}
+          />
+          <DateTimePicker
+            label="Scheduled at"
+            defaultValue={dayjs('2026-11-30T14:30')}
+          />
+        </LocalizationProvider>
         <TextField
           label="Description"
           multiline
@@ -81,8 +110,20 @@ describe.each([
         transform: 'none',
         transition: 'none',
       });
+    for (const control of Array.from(
+      container.querySelectorAll(
+        '.MuiOutlinedInput-root:not(.MuiInputBase-multiline), .MuiPickersOutlinedInput-root',
+      ),
+    )) {
+      expect(control).toHaveStyle({ height: '47px' });
+    }
+    expect(container.querySelector('.MuiInputBase-multiline')).toHaveStyle({
+      height: 'auto',
+    });
     for (const legend of Array.from(
-      container.querySelectorAll('.MuiOutlinedInput-notchedOutline legend'),
+      container.querySelectorAll(
+        '.MuiOutlinedInput-notchedOutline legend, .MuiPickersOutlinedInput-notchedOutline legend',
+      ),
     ))
       expect(legend).toHaveStyle({ display: 'none' });
     expect(

@@ -35,7 +35,12 @@ import { usePagedList } from '../../api/usePagedList';
 import { ListPagination } from '../../api/ListPagination';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { formatDateTime } from '../../utils/formatDateTime';
-import { getLots, getLotStyleOptions, lotsFailure } from './lotsApi';
+import {
+  getLots,
+  getLotStyleOptions,
+  getLotStyleOptionsPage,
+  lotsFailure,
+} from './lotsApi';
 import { LotFailureAlert } from './LotFailureAlert';
 import { LotForm } from './LotForm';
 import { LotCancelDialog } from './LotCancelDialog';
@@ -73,6 +78,12 @@ function LotWorkspace({
   const list = usePagedList(load);
   const [lookup, setLookup] = useState<LookupState>({ status: 'loading' });
   const [lookupAttempt, setLookupAttempt] = useState(0);
+  const [stylePage, setStylePage] = useState(0);
+  const [styleTotal, setStyleTotal] = useState(0);
+  const [loadingStyles, setLoadingStyles] = useState(true);
+  const [styleError, setStyleError] = useState<LotsFailure | null>(null);
+  const [formStyles, setFormStyles] = useState<LotStyleOption[]>([]);
+  const [preparingForm, setPreparingForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [cancelling, setCancelling] = useState<LotResponse | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -80,23 +91,55 @@ function LotWorkspace({
   const [mapping, setMapping] = useState<LotResponse | null>(null);
   const [editing, setEditing] = useState<LotResponse | null>(null);
   const [quantitySaved, setQuantitySaved] = useState(false);
-  const busy = creating || !!cancelling || !!mapping || !!editing;
+  const busy =
+    preparingForm || creating || !!cancelling || !!mapping || !!editing;
   usePageMetadata(t('lots.pageTitle'), t('lots.description'));
   useEffect(() => {
     const controller = new AbortController();
-    void getLotStyleOptions(controller.signal).then(
-      (styles) => {
-        if (!controller.signal.aborted) setLookup({ status: 'ready', styles });
+    void getLotStyleOptionsPage(
+      { page: stylePage, size: 20, search: '' },
+      controller.signal,
+    ).then(
+      (response) => {
+        if (controller.signal.aborted) return;
+        setLookup((previous) => ({
+          status: 'ready',
+          styles:
+            stylePage > 0 && previous.status === 'ready'
+              ? [
+                  ...new Map(
+                    [...previous.styles, ...response.items].map((style) => [
+                      style.id,
+                      style,
+                    ]),
+                  ).values(),
+                ]
+              : response.items,
+        }));
+        setStyleTotal(response.totalElements);
+        setLoadingStyles(false);
       },
       (error) => {
-        if (!controller.signal.aborted)
-          setLookup({ status: 'error', failure: lotsFailure(error) });
+        if (!controller.signal.aborted) {
+          if (stylePage === 0)
+            setLookup({ status: 'error', failure: lotsFailure(error) });
+          else setStyleError(lotsFailure(error));
+          setLoadingStyles(false);
+        }
       },
     );
     return () => controller.abort();
-  }, [lookupAttempt]);
+  }, [lookupAttempt, stylePage]);
   function retryStyles() {
+    setLoadingStyles(true);
+    setStyleError(null);
     setLookup({ status: 'loading' });
+    setStylePage(0);
+    setLookupAttempt((value) => value + 1);
+  }
+  function retryStylePage() {
+    setLoadingStyles(true);
+    setStyleError(null);
     setLookupAttempt((value) => value + 1);
   }
   function reload() {
@@ -136,7 +179,17 @@ function LotWorkspace({
           variant="contained"
           startIcon={<AddIcon />}
           disabled={busy || lookup.status !== 'ready' || !styles.length}
-          onClick={() => setCreating(true)}
+          onClick={async () => {
+            setPreparingForm(true);
+            try {
+              setFormStyles(await getLotStyleOptions());
+              setCreating(true);
+            } catch (error) {
+              setStyleError(lotsFailure(error));
+            } finally {
+              setPreparingForm(false);
+            }
+          }}
         >
           {t('lots.add')}
         </Button>
@@ -147,6 +200,13 @@ function LotWorkspace({
           failure={lookup.failure}
           onReload={retryStyles}
           onRetry={retryStyles}
+        />
+      )}
+      {styleError && (
+        <LotFailureAlert
+          failure={styleError}
+          onReload={retryStylePage}
+          onRetry={retryStylePage}
         />
       )}
       {lookup.status === 'ready' && !styles.length && (
@@ -204,6 +264,26 @@ function LotWorkspace({
                 {style.style_number}
               </MenuItem>
             ))}
+            {styles.length < styleTotal && (
+              <Box component="li" role="presentation" sx={{ p: 1 }}>
+                <Button
+                  fullWidth
+                  disabled={loadingStyles || !!styleError}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setLoadingStyles(true);
+                    setStylePage((page) => page + 1);
+                  }}
+                >
+                  {t(
+                    loadingStyles
+                      ? 'productionFilters.loading'
+                      : 'productionFilters.loadMore',
+                  )}
+                </Button>
+              </Box>
+            )}
           </TextField>
         </Stack>
         <TableContainer>
@@ -374,7 +454,7 @@ function LotWorkspace({
       </Paper>
       {creating && (
         <LotForm
-          styles={styles}
+          styles={formStyles}
           initialStyleId={filter.id}
           onClose={() => setCreating(false)}
           onReload={() => {

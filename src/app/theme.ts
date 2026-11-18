@@ -1,4 +1,5 @@
 import { createTheme } from '@mui/material/styles';
+import type {} from '@mui/x-date-pickers/themeAugmentation';
 
 export const theme = createTheme({
   palette: {
@@ -14,6 +15,72 @@ export const theme = createTheme({
   },
   shape: { borderRadius: 5 },
   components: {
+    MuiDatePicker: { defaultProps: { format: 'DD/MM/YYYY' } },
+    MuiTimePicker: { defaultProps: { ampm: false } },
+    MuiDateTimePicker: {
+      defaultProps: { format: 'DD/MM/YYYY HH:mm', ampm: false },
+    },
+    MuiPickersTextField: {
+      defaultProps: { variant: 'outlined' },
+      styleOverrides: {
+        root: {
+          '& .MuiInputLabel-root': {
+            position: 'static',
+            transform: 'none',
+            marginBottom: 10,
+          },
+          '& .MuiPickersOutlinedInput-notchedOutline': {
+            top: 0,
+            '& legend': { display: 'none' },
+          },
+        },
+      },
+    },
+    MuiPickersOutlinedInput: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          height: 47,
+          minHeight: 47,
+          fontSize: 13,
+          borderRadius: theme.shape.borderRadius,
+          '& .MuiPickersOutlinedInput-notchedOutline': {
+            borderColor: '#d9dfe9',
+          },
+          '&.Mui-focused': { boxShadow: '0 0 0 3px #1461f51c' },
+          '& .MuiIconButton-root': { color: theme.palette.primary.main },
+        }),
+      },
+    },
+    MuiPickersLayout: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          color: theme.palette.text.primary,
+          backgroundColor: theme.palette.background.paper,
+          border: '1px solid #e1e7f0',
+          borderRadius: 10,
+          fontFamily: theme.typography.fontFamily,
+          '& .MuiPickersCalendarHeader-label': {
+            fontSize: 14,
+            fontWeight: 700,
+          },
+          '& .MuiPickersDay-root, & .MuiPickerDay-root': { fontSize: 13 },
+          '& .MuiPickersDay-root.Mui-selected, & .MuiPickerDay-root.Mui-selected':
+            {
+              backgroundColor: theme.palette.primary.main,
+              color: theme.palette.primary.contrastText,
+            },
+          '& .MuiPickersToolbar-root': {
+            backgroundColor: '#edf4ff',
+            color: theme.palette.text.primary,
+          },
+          '& .MuiPickersActionBar-root': {
+            borderTop: '1px solid #e1e7f0',
+            padding: 12,
+          },
+          '& .MuiPickersActionBar-root .MuiButton-root': { minHeight: 36 },
+        }),
+      },
+    },
     MuiAlertTitle: {
       styleOverrides: { root: { fontSize: 16 } },
     },
@@ -22,6 +89,24 @@ export const theme = createTheme({
     },
     MuiInputBase: {
       styleOverrides: { root: { fontSize: 13 } },
+    },
+    MuiAutocomplete: {
+      styleOverrides: {
+        inputRoot: {
+          minHeight: 47,
+          '&.MuiOutlinedInput-root': { paddingTop: 0, paddingBottom: 0 },
+          '&.MuiAutocomplete-inputRoot[class*="MuiOutlinedInput-root"] .MuiAutocomplete-input':
+            {
+              paddingTop: 0,
+              paddingBottom: 0,
+            },
+        },
+        root: {
+          '& .MuiAutocomplete-inputRoot:has(.MuiAutocomplete-tag)': {
+            height: 'auto',
+          },
+        },
+      },
     },
     MuiDialogContent: {
       styleOverrides: {
@@ -130,7 +215,8 @@ export const theme = createTheme({
         },
         root: {
           height: 47,
-          '&.MuiInputBase-sizeSmall': { height: 'auto' },
+          '&.MuiInputBase-sizeSmall': { height: 47 },
+          '&.MuiInputBase-multiline': { height: 'auto' },
           fontSize: 13,
           '& .MuiOutlinedInput-notchedOutline': { borderColor: '#d9dfe9' },
           '&.Mui-focused': { boxShadow: '0 0 0 3px #1461f51c' },
@@ -148,10 +234,5 @@ export const configurationTheme = createTheme(theme, {
   },
   components: {
     MuiButton: { styleOverrides: { root: { minHeight: 40 } } },
-    MuiOutlinedInput: {
-      styleOverrides: {
-        root: { '&.MuiInputBase-multiline': { height: 'auto' } },
-      },
-    },
   },
 });

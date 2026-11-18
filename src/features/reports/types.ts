@@ -1,16 +1,38 @@
-import type { DashboardFailure, DashboardLot } from '../dashboard/types';
-import type { StyleResponse } from '../styles/types';
+import type { DashboardFailure } from '../dashboard/types';
 
-// DashboardController.LOT_VIEW is shared by dashboard and lot progress reports.
-export type LotProgressResponse = DashboardLot;
 export type ReportsFailure = DashboardFailure;
 
-// DashboardController.styleProgress: unweighted mean progress of visible lots.
-export interface StyleProgressResponse extends Pick<
-  StyleResponse,
-  'id' | 'style_number' | 'status' | 'created_at' | 'released_at'
+export type ReportFormat = 'csv' | 'xlsx' | 'pdf';
+export type ReportKey =
+  | 'style-lot-production'
+  | 'station-processing-time'
+  | 'delay-bottleneck'
+  | 'lot-movement-traceability'
+  | 'storage-waiting-time'
+  | 'trolley-utilization'
+  | 'operator-activity'
+  | 'daily-production-summary';
+export type ReportFilter =
+  'styleId' | 'lotId' | 'stationId' | 'processId' | 'operatorId' | 'status';
+export interface ReportCategory {
+  id: string;
+  key: ReportKey;
+  name: string;
+  description: string | null;
+  displayOrder: number;
+  formats: ReportFormat[];
+  filters: ReportFilter[];
+  requiredParameters: ('from' | 'to' | 'format')[];
+}
+export interface ReportExportResponse {
+  blob: Blob;
+  filename: string;
+  exportId?: string;
+}
+export interface ReportExportRequest extends Partial<
+  Record<ReportFilter, string>
 > {
-  lot_count: number;
-  completed_lots: number;
-  progress_percent: number;
+  format: ReportFormat;
+  from: string;
+  to: string;
 }

@@ -183,7 +183,10 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                             <VisibilityOutlinedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {!own && !configurator && (
+                        {((!own && !configurator) ||
+                          (configurator &&
+                            record.status === 'DRAFT' &&
+                            record.created_by === session?.user.id)) && (
                           <Tooltip title={t('access.edit')}>
                             <Box component="span">
                               <IconButton

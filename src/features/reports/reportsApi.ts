@@ -6,17 +6,20 @@ import {
   type FilterOptionType,
   type ProductionLotsQuery,
 } from '../../api/productionFilters';
-import {
-  readApiPage,
-  type ApiPage,
-  type ListQuery,
-} from '../../api/collections';
+import { type ApiPage } from '../../api/collections';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
-import { isDashboardLot } from '../dashboard/dashboardApi';
+
+import {
+  isReportCategory,
+  isUuid,
+  reportContentTypes,
+  reportRequest,
+} from './reportContract';
 import type {
-  LotProgressResponse,
   ReportsFailure,
-  StyleProgressResponse,
+  ReportCategory,
+  ReportExportRequest,
+  ReportExportResponse,
 } from './types';
 
 export class ReportsError extends Error {
@@ -72,6 +75,7 @@ async function request(
   try {
     response = await send();
   } catch (error: unknown) {
+    if (error instanceof ReportsError) throw error;
     if (axios.isCancel(error)) throw error;
     if (axios.isAxiosError(error) && error.response)
       throw new ReportsError(
@@ -91,65 +95,110 @@ const options = (signal?: AbortSignal) => ({
   timeout: 10000,
   validateStatus: () => true,
 });
-const text = (value: unknown): value is string =>
-  typeof value === 'string' && !!value.trim();
-const date = (value: unknown): value is string =>
-  text(value) && Number.isFinite(Date.parse(value));
-const count = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-function isStyleProgress(value: unknown): value is StyleProgressResponse {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const row = value as Record<string, unknown>;
-  return (
-    text(row.id) &&
-    text(row.style_number) &&
-    typeof row.status === 'string' &&
-    ['DRAFT', 'RELEASED', 'IN_PRODUCTION', 'COMPLETED'].includes(row.status) &&
-    date(row.created_at) &&
-    (row.released_at === null || date(row.released_at)) &&
-    count(row.lot_count) &&
-    count(row.completed_lots) &&
-    row.completed_lots <= row.lot_count &&
-    typeof row.progress_percent === 'number' &&
-    Number.isFinite(row.progress_percent) &&
-    row.progress_percent >= 0 &&
-    row.progress_percent <= 100 &&
-    (row.lot_count !== 0 || row.progress_percent === 0)
-  );
-}
-export async function getStyleProgress(
-  query: ListQuery,
+export async function getReportCatalog(
   signal?: AbortSignal,
-): Promise<ApiPage<StyleProgressResponse>> {
-  return readApiPage(
-    await request(() =>
-      apiClient.get<unknown>('reports/style-progress', {
-        ...options(signal),
-        params: query,
-      }),
-    ),
-    query,
-    isStyleProgress,
-    (style) => style.id,
-    invalid,
+): Promise<ReportCategory[]> {
+  const data = await request(() =>
+    apiClient.get<unknown>('reports/catalog', options(signal)),
   );
+  if (
+    !Array.isArray(data) ||
+    !data.every(isReportCategory) ||
+    new Set(data.map((row) => row.id.toLowerCase())).size !== data.length ||
+    new Set(data.map((row) => row.key)).size !== data.length
+  )
+    return invalid();
+  return [...data].sort((a, b) => a.displayOrder - b.displayOrder);
 }
-export async function getLotProgress(
-  query: ProductionLotsQuery,
+export async function exportReport(
+  report: ReportCategory,
+  query: ReportExportRequest,
   signal?: AbortSignal,
-): Promise<ApiPage<LotProgressResponse>> {
-  return readApiPage(
-    await request(() =>
-      apiClient.get<unknown>('reports/lot-progress', {
-        ...options(signal),
-        params: query,
-      }),
-    ),
-    query,
-    isDashboardLot,
-    (lot) => lot.id,
-    invalid,
-  );
+): Promise<ReportExportResponse> {
+  try {
+    query = reportRequest(report, query);
+  } catch (error) {
+    throw new ReportsError({
+      kind: 'invalidRequest',
+      action: 'none',
+      message:
+        error instanceof Error ? error.message : 'Invalid report request.',
+    });
+  }
+  let exportId: string | undefined;
+  let filename = `nw-track_${report.key}_${query.from}_to_${query.to}.${query.format}`;
+  const data = await request(async () => {
+    let response: AxiosResponse<unknown>;
+    try {
+      response = await apiClient.get<Blob>(
+        `reports/${encodeURIComponent(report.id)}/export`,
+        {
+          signal,
+          params: query,
+          responseType: 'blob',
+          timeout: 120000,
+          headers: {
+            Accept:
+              'application/pdf, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/problem+json',
+          },
+          validateStatus: () => true,
+        },
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response)
+        response = error.response;
+      else throw error;
+    }
+    if (
+      response.data instanceof Blob &&
+      (response.status < 200 || response.status >= 300)
+    ) {
+      let problem: unknown;
+      try {
+        problem = JSON.parse(await response.data.text());
+      } catch {
+        problem = undefined;
+      }
+      throw new ReportsError(parseReportsFailure(problem, response.status));
+    }
+    if (
+      response.status !== 200 &&
+      response.status >= 200 &&
+      response.status < 300
+    )
+      return invalid();
+    if (response.status === 200) {
+      const contentType = String(
+        response.headers?.['content-type'] ||
+          (response.data instanceof Blob ? response.data.type : ''),
+      )
+        .split(';')[0]
+        .trim()
+        .toLowerCase();
+      if (contentType !== reportContentTypes[query.format]) return invalid();
+      const headerId = response.headers?.['x-report-export-id'];
+      if (headerId !== undefined) {
+        if (!isUuid(headerId)) return invalid();
+        exportId = headerId;
+      }
+    }
+    const disposition = String(response.headers?.['content-disposition'] || '');
+    const supplied = /filename="([^"\r\n]+)"/i.exec(disposition)?.[1];
+    if (supplied && supplied.toLowerCase().endsWith(`.${query.format}`))
+      filename = Array.from(supplied, (character) =>
+        character.charCodeAt(0) < 32 || character === '/' || character === '\\'
+          ? '_'
+          : character,
+      ).join('');
+    return response;
+  });
+  if (
+    !(data instanceof Blob) ||
+    !data.size ||
+    /json|text\/html/i.test(data.type)
+  )
+    return invalid();
+  return { blob: data, filename, ...(exportId ? { exportId } : {}) };
 }
 export async function getReportFilterOptions<K extends FilterOptionType>(
   kind: K,
