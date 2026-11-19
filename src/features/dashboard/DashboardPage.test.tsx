@@ -61,7 +61,7 @@ it('keeps table filters during polling without applying them to dashboard summar
             data: {
               items: [{ id: 'style-id', style_number: 'FILTER-STYLE' }],
               page: 0,
-              size: 100,
+              size: 20,
               totalElements: 1,
             },
           }
