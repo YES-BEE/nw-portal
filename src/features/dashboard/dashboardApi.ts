@@ -211,9 +211,10 @@ function isProductionTrend(
 async function summaryPage(
   query: PageQuery,
   signal?: AbortSignal,
+  path = 'dashboard',
 ): Promise<DashboardResponse> {
   const data = await request(() =>
-    apiClient.get<unknown>('dashboard', { ...options(signal), params: query }),
+    apiClient.get<unknown>(path, { ...options(signal), params: query }),
   );
   if (!data || typeof data !== 'object' || Array.isArray(data))
     return invalid();
@@ -289,6 +290,43 @@ export function isDashboardLot(value: unknown): value is DashboardLot {
     ].every((key) => row[key] === null || typeof row[key] === 'string') &&
     date(row.created_at) &&
     (row.completed_at === null || date(row.completed_at))
+  );
+}
+export async function getFactoryDisplay(
+  signal?: AbortSignal,
+): Promise<DashboardSummary> {
+  const first = await summaryPage(
+    { page: 0, size: 100 },
+    signal,
+    'displays/factory-summary',
+  );
+  const stations = await collectApiItems(
+    async (query) =>
+      query
+        ? (await summaryPage(query, signal, 'displays/factory-summary'))
+            .stations
+        : first.stations,
+    isStation,
+    (station) => station.id,
+    invalid,
+  );
+  return { ...first, stations };
+}
+export async function getDisplayLots(
+  query: ProductionLotsQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<DashboardLot>> {
+  return readApiPage(
+    await request(() =>
+      apiClient.get<unknown>('displays/lots', {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
+    isDashboardLot,
+    (lot) => lot.id,
+    invalid,
   );
 }
 export async function getDashboardLots(

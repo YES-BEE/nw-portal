@@ -1,6 +1,15 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Box, Chip, CircularProgress, Stack, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Stack,
+  Typography,
+} from '@mui/material';
+import TvOutlinedIcon from '@mui/icons-material/TvOutlined';
+import { FactoryTvView } from './FactoryTvView';
 import { usePageMetadata } from '../../app/usePageMetadata';
 import { formatDateTime } from '../../utils/formatDateTime';
 import { dashboardFailure, getDashboard } from './dashboardApi';
@@ -27,6 +36,14 @@ type State =
   | { status: 'ready'; data: DashboardSummary; failure?: DashboardFailure }
   | { status: 'error'; failure: DashboardFailure };
 export function DashboardPage() {
+  const [tv, setTv] = useState(false);
+  return tv ? (
+    <FactoryTvView onExit={() => setTv(false)} />
+  ) : (
+    <DashboardContent onTv={() => setTv(true)} />
+  );
+}
+function DashboardContent({ onTv }: { onTv: () => void }) {
   const { t } = useTranslation('translation');
   const [state, setState] = useState<State>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -114,6 +131,13 @@ export function DashboardPage() {
           spacing={0.75}
           sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' } }}
         >
+          <Button
+            variant="outlined"
+            startIcon={<TvOutlinedIcon />}
+            onClick={onTv}
+          >
+            TV view
+          </Button>
           <Chip
             icon={<CircleIcon sx={{ fontSize: '9px !important' }} />}
             label={t(
