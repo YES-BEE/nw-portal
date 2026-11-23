@@ -25,6 +25,14 @@ const choice = (value: unknown): value is Choice | null => {
     typeof row.label === 'string'
   );
 };
+function choices(value: unknown): Choice[] | undefined {
+  const items = Array.isArray(value) ? value : value === null ? [] : [value];
+  return items.length <= 100 &&
+    items.every((item): item is Choice => item !== null && choice(item)) &&
+    new Set(items.map((item) => item.id)).size === items.length
+    ? items
+    : undefined;
+}
 export function readDashboardFilters(userId?: string): SavedDashboardFilters {
   if (!userId) return defaults();
   try {
@@ -33,12 +41,14 @@ export function readDashboardFilters(userId?: string): SavedDashboardFilters {
     );
     const selection = saved?.selection;
     const query = saved?.query;
+    const lots = choices(selection?.lots);
+    const styles = choices(selection?.styles);
     if (
       !selection ||
       !query ||
-      !['lots', 'styles', 'stations', 'processes'].every((key) =>
-        choice(selection[key]),
-      ) ||
+      !lots ||
+      !styles ||
+      !['stations', 'processes'].every((key) => choice(selection[key])) ||
       typeof selection.status !== 'string' ||
       selection.status.length > 200 ||
       !Number.isSafeInteger(query.page) ||
@@ -52,8 +62,8 @@ export function readDashboardFilters(userId?: string): SavedDashboardFilters {
       return defaults();
     return {
       selection: {
-        lots: selection.lots,
-        styles: selection.styles,
+        lots,
+        styles,
         stations: selection.stations,
         processes: selection.processes,
         status: selection.status,

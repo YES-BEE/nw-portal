@@ -144,14 +144,15 @@ it('sends server paging, search and optional status and validates live lot field
   const query = { page: 2, size: 25, search: 'Washing' };
   const page = { items: [dashboardLot], page: 2, size: 25, totalElements: 51 };
   const get = vi
-    .spyOn(apiClient, 'get')
+    .spyOn(apiClient, 'post')
     .mockResolvedValue({ status: 200, data: page });
   expect(await getDashboardLots({ ...query, status: 'IN_PROCESS' })).toEqual(
     page,
   );
   expect(get).toHaveBeenCalledWith(
     'dashboard/lots',
-    expect.objectContaining({ params: { ...query, status: 'IN_PROCESS' } }),
+    { ...query, status: 'IN_PROCESS' },
+    expect.anything(),
   );
   await expect(
     getDashboardLots({ ...query, status: 'COMPLETED' }),
@@ -160,7 +161,8 @@ it('sends server paging, search and optional status and validates live lot field
   expect((await getDashboardLots(query)).totalElements).toBe(0);
   expect(get).toHaveBeenLastCalledWith(
     'dashboard/lots',
-    expect.objectContaining({ params: query }),
+    query,
+    expect.anything(),
   );
   get.mockResolvedValue({
     status: 200,
@@ -203,7 +205,7 @@ it('handles role changes, network failures, and cancellation', async () => {
   await expect(getDashboard()).rejects.toBe(cancelled);
 });
 it('accepts lots whose garment quantities are not yet specified', async () => {
-  vi.spyOn(apiClient, 'get').mockResolvedValue({
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
     data: apiPage([{ ...dashboardLot, quantity: null }], undefined, 10),
   });

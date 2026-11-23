@@ -40,8 +40,8 @@ function today() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 const pickerFilters = {
-  styles: 'styleId',
-  lots: 'lotId',
+  styles: 'styleIds',
+  lots: 'lotIds',
   stations: 'stationId',
   processes: 'processId',
 } as const;
@@ -108,7 +108,12 @@ export function ReportGenerator() {
     const [reportId, supportedFilters, current] = JSON.parse(
       autoSelectionKey,
     ) as [string | undefined, string[] | undefined, ProductionFilterSelection];
-    if (!reportId || !supportedFilters || !current.styles || !current.lots)
+    if (
+      !reportId ||
+      !supportedFilters ||
+      !current.styles.length ||
+      !current.lots.length
+    )
       return;
     const controller = new AbortController();
     void (async () => {
@@ -161,6 +166,10 @@ export function ReportGenerator() {
     setDownloaded(false);
     const query: ReportExportRequest = { from, to, format };
     for (const key of report.filters) {
+      if (key === 'styleIds' || key === 'lotIds') {
+        if (filters[key]?.length) query[key] = filters[key];
+        continue;
+      }
       const value =
         key === 'status'
           ? status.trim()
@@ -335,17 +344,26 @@ export function ReportGenerator() {
                         <FilterPicker
                           key={`${report.id}-${kind}`}
                           kind={kind}
-                          value={selection[kind]}
+                          value={
+                            kind === 'styles' || kind === 'lots'
+                              ? selection[kind]
+                              : selection[kind]
+                                ? [selection[kind]]
+                                : []
+                          }
                           filters={filters}
                           loadOptions={getReportFilterOptions}
                           failure={reportsFailure}
                           onChange={(choice) => {
                             setSelection((previous) => ({
                               ...previous,
-                              [kind]: choice,
+                              [kind]:
+                                kind === 'styles' || kind === 'lots'
+                                  ? choice
+                                  : (choice[0] ?? null),
                               ...(kind === 'styles'
                                 ? {
-                                    lots: null,
+                                    lots: [],
                                     stations: null,
                                     processes: null,
                                   }

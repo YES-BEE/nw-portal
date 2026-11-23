@@ -13,11 +13,20 @@ export interface StyleResponse {
   lot_count: number;
   lot_quantity: number | null;
 }
+export interface StyleDetailsResponse extends StyleResponse {
+  total_quantity: number;
+}
 export interface CreateStyleRequest {
   styleNumber: string;
   description?: string | null;
   processIds?: string[] | null;
   lotCount?: number | null;
+  quantity?: number | null;
+}
+export interface UpdateDraftStyleRequest {
+  description?: string | null;
+  processIds: string[];
+  lotCount: number;
   quantity?: number | null;
 }
 export interface StyleRouteProcess {

@@ -10,6 +10,7 @@ import {
   Autocomplete,
   Box,
   Button,
+  Chip,
   CircularProgress,
   MenuItem,
   Paper,
@@ -18,7 +19,7 @@ import {
   TextField,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { collectApiItems } from '../../api/collections';
+import { readApiPage } from '../../api/collections';
 import {
   isFilterOption,
   type FilterOptionsLoader,
@@ -51,8 +52,8 @@ function FilterDropdownPaper({ children, ...props }: PaperProps) {
 }
 
 const parameters = {
-  lots: 'lotId',
-  styles: 'styleId',
+  lots: 'lotIds',
+  styles: 'styleIds',
   stations: 'stationId',
   processes: 'processId',
 } as const;
@@ -79,102 +80,128 @@ export function FilterPicker({
   stationNames,
 }: {
   kind: FilterOptionType;
-  value: Choice | null;
+  value: Choice[];
   filters: Filters;
   loadOptions: FilterOptionsLoader;
   failure: (error: unknown) => DashboardFailure;
-  onChange: (choice: Choice | null) => void;
+  onChange: (choices: Choice[]) => void;
   stationNames?: Record<string, string>;
 }) {
   const { t } = useTranslation('translation');
+  const multiple = kind === 'styles' || kind === 'lots';
+  const configuredSize = Number(import.meta.env.VITE_FILTER_OPTIONS_PAGE_SIZE);
+  const pageSize =
+    Number.isInteger(configuredSize) &&
+    configuredSize >= 1 &&
+    configuredSize <= 100
+      ? configuredSize
+      : 10;
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [attempt, setAttempt] = useState(0);
-  const [requestedPage, setRequestedPage] = useState({ key: '', page: 0 });
-  const pagePending = useRef(false);
+  const [pageRequest, setPageRequest] = useState<{
+    key: string;
+    page: number;
+    attempt: number;
+  } | null>(null);
   const ownFilters = { ...filters };
   delete ownFilters[parameters[kind]];
+  if (kind === 'styles') delete ownFilters.lotIds;
+  if (kind === 'styles' || kind === 'lots') {
+    delete ownFilters.stationId;
+    delete ownFilters.processId;
+  }
   const filterKey = JSON.stringify(ownFilters);
-  const key = JSON.stringify([filterKey, input.trim(), attempt]);
-  const paginated = kind === 'styles' || kind === 'lots';
-  const page = paginated && requestedPage.key === key ? requestedPage.page : 0;
+  const key = JSON.stringify([filterKey, input.trim(), pageSize]);
+  if (pageRequest && pageRequest.key !== key) setPageRequest(null);
+  const page = pageRequest?.key === key ? pageRequest.page : 0;
+  const attempt = pageRequest?.key === key ? pageRequest.attempt : 0;
+  const requestKey = JSON.stringify([key, page, attempt]);
   const [result, setResult] = useState<{
     key: string;
+    requestKey: string;
     items: ProductionFilterOption[];
+    nextPage: number;
+    totalElements: number;
     error?: unknown;
-    page?: number;
-    totalElements?: number;
   } | null>(null);
+  const current = result?.key === key ? result : null;
+  const completedRequestKey = current?.requestKey;
+  const noSelection = value.length === 0;
+  const loading = open && completedRequestKey !== requestKey;
+  const error = !loading && current?.error ? failure(current.error) : null;
   useEffect(() => {
-    if (!open) return;
+    if (!open || completedRequestKey === requestKey) return;
     const controller = new AbortController();
     const queryFilters = JSON.parse(filterKey) as Filters;
-    pagePending.current = true;
-    const timer = setTimeout(() => {
-      if (paginated) {
-        void loadOptions(
-          kind,
-          { ...queryFilters, page, size: 20, search: input.trim() },
-          controller.signal,
-        ).then(
-          (response) => {
-            if (controller.signal.aborted) return;
-            setResult((previous) => {
-              const items =
-                page > 0 && previous?.key === key
-                  ? [...previous.items, ...response.items]
-                  : response.items;
-              return {
-                key,
-                items: [
-                  ...new Map(items.map((item) => [item.id, item])).values(),
-                ],
-                page,
-                totalElements: response.items.length
-                  ? response.totalElements
-                  : items.length,
-              };
-            });
-            pagePending.current = false;
-          },
-          (error: unknown) => {
-            if (controller.signal.aborted) return;
-            setResult((previous) => ({
-              ...(previous?.key === key ? previous : { key, items: [] }),
-              error,
-            }));
-            pagePending.current = false;
-          },
-        );
-        return;
-      }
-      void collectApiItems(
-        (page) =>
-          loadOptions(
-            kind,
-            {
-              ...queryFilters,
-              page: page?.page ?? 0,
-              size: page?.size ?? 100,
-              search: input.trim(),
+    const query = {
+      ...queryFilters,
+      page,
+      size: pageSize,
+      search: input.trim(),
+    };
+    const timer = setTimeout(
+      () => {
+        void loadOptions(kind, query, controller.signal)
+          .then((data) =>
+            readApiPage(
+              data,
+              query,
+              (item): item is ProductionFilterOption =>
+                isFilterOption(
+                  kind,
+                  queryFilters.routeScope ?? 'CURRENT',
+                  item,
+                ),
+              (item) => item.id,
+              () => {
+                throw new Error('Invalid filter options');
+              },
+            ),
+          )
+          .then(
+            (data) => {
+              if (controller.signal.aborted) return;
+              if (
+                page === 0 &&
+                !data.items.length &&
+                noSelection &&
+                !input.trim()
+              )
+                setOpen(false);
+              setResult((previous) => {
+                const items =
+                  page > 0 && previous?.key === key ? previous.items : [];
+                return {
+                  key,
+                  requestKey,
+                  nextPage: page + 1,
+                  totalElements: data.totalElements,
+                  items: [
+                    ...new Map(
+                      [...items, ...data.items].map((item) => [item.id, item]),
+                    ).values(),
+                  ],
+                };
+              });
             },
-            controller.signal,
-          ),
-        (item): item is ProductionFilterOption =>
-          isFilterOption(kind, queryFilters.routeScope ?? 'CURRENT', item),
-        (item) => item.id,
-        () => {
-          throw new Error('Invalid filter options');
-        },
-      ).then(
-        (items) => {
-          if (!controller.signal.aborted) setResult({ key, items });
-        },
-        (error: unknown) => {
-          if (!controller.signal.aborted) setResult({ key, items: [], error });
-        },
-      );
-    }, 300);
+            (error: unknown) => {
+              if (controller.signal.aborted) return;
+              setResult((previous) => ({
+                key,
+                requestKey,
+                nextPage: page,
+                error,
+                items: page > 0 && previous?.key === key ? previous.items : [],
+                totalElements:
+                  page > 0 && previous?.key === key
+                    ? previous.totalElements
+                    : 0,
+              }));
+            },
+          );
+      },
+      page === 0 ? 300 : 0,
+    );
     return () => {
       clearTimeout(timer);
       controller.abort();
@@ -184,41 +211,37 @@ export function FilterPicker({
     kind,
     filterKey,
     input,
-    attempt,
-    key,
-    loadOptions,
     page,
-    paginated,
+    requestKey,
+    completedRequestKey,
+    key,
+    pageSize,
+    loadOptions,
+    noSelection,
   ]);
-  const current = result?.key === key ? result : null;
-  const loading =
-    open &&
-    (!current || (paginated && !current.error && current.page !== page));
-  const error = current?.error ? failure(current.error) : null;
   const choices =
     current?.items.map((item) => ({
       id: item.id,
       label: optionLabel(item, stationNames),
     })) || [];
-  const empty = !!current && !error && !choices.length;
+  const empty = !!current && !loading && !error && !choices.length;
   return (
     <DropdownFooter.Provider
       value={
-        paginated &&
-        current &&
-        !error &&
-        current.items.length < (current.totalElements ?? 0) ? (
+        current && current.nextPage * pageSize < current.totalElements ? (
           <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
             <Button
               fullWidth
               size="small"
-              disabled={loading}
+              disabled={loading || (!!error && error.action !== 'retry')}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                if (pagePending.current || current.page !== page) return;
-                pagePending.current = true;
-                setRequestedPage({ key, page: page + 1 });
-              }}
+              onClick={() =>
+                setPageRequest({
+                  key,
+                  page: current.nextPage,
+                  attempt: error ? attempt + 1 : 0,
+                })
+              }
             >
               {t(
                 loading
@@ -230,17 +253,58 @@ export function FilterPicker({
         ) : null
       }
     >
-      <Autocomplete<Choice>
+      <Autocomplete<Choice, boolean>
+        open={open}
+        multiple={multiple}
+        renderValue={
+          multiple
+            ? (selected, getItemProps) => (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexWrap: 'nowrap',
+                    overflowX: 'auto',
+                    minWidth: 0,
+                    maxWidth: 'calc(100% - 48px)',
+                  }}
+                >
+                  {(Array.isArray(selected) ? selected : []).map(
+                    (option, index) => {
+                      const itemProps = getItemProps({ index });
+                      return (
+                        <Chip
+                          key={option.id}
+                          label={option.label}
+                          size="small"
+                          className={itemProps.className}
+                          disabled={itemProps.disabled}
+                          tabIndex={itemProps.tabIndex}
+                          data-item-index={itemProps['data-item-index']}
+                          onDelete={itemProps.onDelete}
+                          sx={{ flexShrink: 0, maxWidth: 160 }}
+                        />
+                      );
+                    },
+                  )}
+                </Box>
+              )
+            : undefined
+        }
         size="small"
         options={choices}
-        value={value}
+        value={multiple ? value : (value[0] ?? null)}
         getOptionLabel={(option) => option.label}
         isOptionEqualToValue={(a, b) => a.id === b.id}
+        getOptionDisabled={(option) =>
+          multiple &&
+          value.length >= 100 &&
+          !value.some((item) => item.id === option.id)
+        }
         filterOptions={(options) => options}
         loading={loading}
         slots={{ paper: FilterDropdownPaper }}
         loadingText={t('productionFilters.loading')}
-        disabled={empty && !input.trim() && !value}
+        disabled={empty && !input.trim() && !value.length}
         onOpen={() => setOpen(true)}
         onClose={() => {
           setOpen(false);
@@ -248,9 +312,11 @@ export function FilterPicker({
         }}
         onInputChange={(_, text, reason) => {
           if (reason === 'input') setInput(text);
-          else if (reason === 'clear') setInput('');
+          else setInput('');
         }}
-        onChange={(_, choice) => onChange(choice)}
+        onChange={(_, choice) =>
+          onChange(Array.isArray(choice) ? choice : choice ? [choice] : [])
+        }
         noOptionsText={t('productionFilters.empty')}
         renderInput={(params) => (
           <TextField
@@ -268,7 +334,7 @@ export function FilterPicker({
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
                         setOpen(true);
-                        setAttempt((value) => value + 1);
+                        setPageRequest({ key, page, attempt: attempt + 1 });
                       }}
                     >
                       {t('startup.retry')}
@@ -299,7 +365,16 @@ export function FilterPicker({
             }}
           />
         )}
-        sx={{ minWidth: 180, flex: '1 1 180px' }}
+        sx={{
+          minWidth: 180,
+          flex: '1 1 180px',
+          ...(multiple && {
+            '& .MuiAutocomplete-inputRoot': { flexWrap: 'nowrap' },
+            '& .MuiAutocomplete-inputRoot:has(.MuiAutocomplete-tag)': {
+              height: 47,
+            },
+          }),
+        }}
       />
     </DropdownFooter.Provider>
   );
@@ -329,7 +404,7 @@ export function ProductionLotFilters({
   }, [onChange, stationNames]);
   useEffect(() => {
     const selection = JSON.parse(selectionKey) as ProductionFilterSelection;
-    if (!selection.styles || !selection.lots) return;
+    if (!selection.styles.length || !selection.lots.length) return;
     const controller = new AbortController();
     const queryFilters = productionFilterParams(selection);
     void (async () => {
@@ -382,7 +457,13 @@ export function ProductionLotFilters({
         <FilterPicker
           key={kind}
           kind={kind}
-          value={value[kind]}
+          value={
+            kind === 'styles' || kind === 'lots'
+              ? value[kind]
+              : value[kind]
+                ? [value[kind]]
+                : []
+          }
           filters={filters}
           loadOptions={loadOptions}
           failure={failure}
@@ -390,9 +471,12 @@ export function ProductionLotFilters({
           onChange={(choice) =>
             onChange({
               ...value,
-              [kind]: choice,
+              [kind]:
+                kind === 'styles' || kind === 'lots'
+                  ? choice
+                  : (choice[0] ?? null),
               ...(kind === 'styles'
-                ? { lots: null, stations: null, processes: null }
+                ? { lots: [], stations: null, processes: null }
                 : kind === 'lots'
                   ? { stations: null, processes: null }
                   : kind === 'stations'

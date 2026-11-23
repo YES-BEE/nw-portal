@@ -13,7 +13,7 @@ export type ReportKey =
   | 'operator-activity'
   | 'daily-production-summary';
 export type ReportFilter =
-  'styleId' | 'lotId' | 'stationId' | 'processId' | 'operatorId' | 'status';
+  'styleIds' | 'lotIds' | 'stationId' | 'processId' | 'operatorId' | 'status';
 export interface ReportCategory {
   id: string;
   key: ReportKey;
@@ -30,8 +30,10 @@ export interface ReportExportResponse {
   exportId?: string;
 }
 export interface ReportExportRequest extends Partial<
-  Record<ReportFilter, string>
+  Record<Exclude<ReportFilter, 'styleIds' | 'lotIds'>, string>
 > {
+  styleIds?: string[];
+  lotIds?: string[];
   format: ReportFormat;
   from: string;
   to: string;

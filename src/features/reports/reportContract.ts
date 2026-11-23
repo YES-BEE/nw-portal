@@ -7,8 +7,8 @@ import type {
 
 // Mirrors ReportModels.Type and ReportService.prepare in nw-track-api.
 const base: ReportFilter[] = [
-  'styleId',
-  'lotId',
+  'styleIds',
+  'lotIds',
   'stationId',
   'processId',
   'status',
@@ -18,20 +18,20 @@ export const reportFilterContract: Record<ReportKey, ReportFilter[]> = {
   'station-processing-time': [...base, 'operatorId'],
   'delay-bottleneck': [...base, 'operatorId'],
   'lot-movement-traceability': [
-    'styleId',
-    'lotId',
+    'styleIds',
+    'lotIds',
     'stationId',
     'operatorId',
     'status',
   ],
   'storage-waiting-time': [
-    'styleId',
-    'lotId',
+    'styleIds',
+    'lotIds',
     'stationId',
     'operatorId',
     'status',
   ],
-  'trolley-utilization': ['styleId', 'lotId', 'status'],
+  'trolley-utilization': ['styleIds', 'lotIds', 'status'],
   'operator-activity': [...base, 'operatorId'],
   'daily-production-summary': base,
 };
@@ -162,7 +162,18 @@ export function reportRequest(
     const filter = key as ReportFilter;
     const value = query[filter];
     if (value === undefined || value === '') continue;
-    if (typeof value !== 'string') fail(`Invalid ${key} filter.`);
+    if (filter === 'styleIds' || filter === 'lotIds') {
+      if (
+        !Array.isArray(value) ||
+        value.length > 100 ||
+        !value.every(isUuid) ||
+        new Set(value).size !== value.length
+      )
+        return fail(`Invalid ${key}: select up to 100 unique records.`);
+      if (value.length) request[filter] = value;
+      continue;
+    }
+    if (typeof value !== 'string') return fail(`Invalid ${key} filter.`);
     if (filter === 'status') {
       const normalized = value.trim().toUpperCase();
       if (!normalized) continue;

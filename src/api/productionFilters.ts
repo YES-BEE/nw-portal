@@ -2,8 +2,8 @@ import { readApiPage, type ApiPage, type ListQuery } from './collections';
 
 export type RouteScope = 'CURRENT' | 'ANY';
 export interface ProductionLotFilters {
-  lotId?: string;
-  styleId?: string;
+  lotIds?: string[];
+  styleIds?: string[];
   stationId?: string;
   processId?: string;
   status?: string;

@@ -21,7 +21,7 @@ import { LotRouteStepper } from './LotRouteStepper';
 import { styleProcesses, orderedStyleProcesses } from './styleData';
 import type {
   StyleMode,
-  StyleResponse,
+  StyleDetailsResponse,
   StyleRouteResponse,
   StyleProcessOption,
   StylesFailure,
@@ -30,7 +30,7 @@ type State =
   | { status: 'loading' }
   | {
       status: 'ready';
-      style: StyleResponse;
+      style: StyleDetailsResponse;
       route: StyleRouteResponse;
       options: StyleProcessOption[];
     }
@@ -132,11 +132,8 @@ function StyleDetails({
                 value: String(state.style.lot_count),
               },
               {
-                label: t('lots.quantityPerLot'),
-                value:
-                  state.style.lot_quantity == null
-                    ? t('lots.quantityUnset')
-                    : String(state.style.lot_quantity),
+                label: t('styles.totalQuantity'),
+                value: `${state.style.total_quantity} kg`,
               },
 
               {

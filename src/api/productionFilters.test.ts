@@ -16,7 +16,7 @@ const query: ProductionLotsQuery = {
   page: 0,
   size: 100,
   search: 'Wash',
-  styleId: 'style-id',
+  styleIds: ['style-id'],
   stationId: 'station-id',
   routeScope: 'CURRENT',
 };
@@ -37,7 +37,7 @@ const cases = [
 it.each(['dashboard', 'reports'] as const)(
   'loads all four %s option contracts with scoped backend filters',
   async (scope) => {
-    const get = vi.spyOn(apiClient, 'get');
+    const get = vi.spyOn(apiClient, 'post');
     const load =
       scope === 'dashboard'
         ? getDashboardFilterOptions
@@ -51,13 +51,14 @@ it.each(['dashboard', 'reports'] as const)(
       expect((await load(kind, query, signal)).items).toEqual([item]);
       expect(get).toHaveBeenLastCalledWith(
         `${scope}/filter-options/${kind}`,
-        expect.objectContaining({ params: query, signal }),
+        query,
+        expect.objectContaining({ signal }),
       );
     }
   },
 );
 it('validates the extra ANY-route option fields and accepts empty option pages', async () => {
-  const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+  const get = vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
     data: {
       items: [{ id: 's1', code: 'S1', name: 'Washing' }],
@@ -99,7 +100,7 @@ it.each([
   ['stations', { id: 'x', code: 'S1' }],
   ['processes', { id: 'x', name: 'Wash' }],
 ] as const)('rejects malformed ANY-route %s options', async (kind, item) => {
-  vi.spyOn(apiClient, 'get').mockResolvedValue({
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
     data: { items: [item], page: 0, size: 100, totalElements: 1 },
   });
@@ -113,7 +114,7 @@ it.each([
 it('passes all table filters without changing response values or deriving statuses', async () => {
   const params = {
     ...query,
-    lotId: dashboardLot.id,
+    lotIds: [dashboardLot.id],
     stationId: dashboardLot.current_station_id!,
     processId: dashboardLot.current_process_id!,
     status: dashboardLot.status,
@@ -121,12 +122,13 @@ it('passes all table filters without changing response values or deriving status
   };
   const page = { items: [dashboardLot], page: 0, size: 100, totalElements: 1 };
   const get = vi
-    .spyOn(apiClient, 'get')
+    .spyOn(apiClient, 'post')
     .mockResolvedValue({ status: 200, data: page });
   expect(await getDashboardLots(params)).toEqual(page);
   expect(get).toHaveBeenLastCalledWith(
     'dashboard/lots',
-    expect.objectContaining({ params }),
+    params,
+    expect.anything(),
   );
   get.mockResolvedValue({
     status: 200,
@@ -142,7 +144,7 @@ it('passes all table filters without changing response values or deriving status
 it.each(['dashboard', 'reports'] as const)(
   'handles %s option access failures',
   async (scope) => {
-    vi.spyOn(apiClient, 'get').mockResolvedValue({
+    vi.spyOn(apiClient, 'post').mockResolvedValue({
       status: 403,
       data: { detail: 'Missing module access' },
     });

@@ -43,27 +43,32 @@ beforeEach(() => {
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
     status: 200,
     data:
-      url === 'dashboard'
-        ? emptyDashboard
-        : url === 'ui/lookups'
-          ? {
-              tags: apiPage(storageTags, undefined, 20),
-              processes: apiPage(styleProcessOptions, undefined, 20),
-            }
-          : url === 'styles'
-            ? apiPage([styleResponse], undefined, 10)
-            : url.startsWith('styles/') && url.endsWith('/derived-route')
-              ? styleRouteResponse
-              : url.startsWith('styles/')
-                ? { ...styleResponse, id: url.slice('styles/'.length) }
-                : url.startsWith('storage-areas/')
-                  ? {
-                      ...storageAreaResponse,
-                      id: url.slice('storage-areas/'.length),
-                    }
-                  : url.startsWith('processes/')
-                    ? { ...processResponse, id: url.slice('processes/'.length) }
-                    : apiPage([], undefined, 10),
+      url === 'reports/catalog'
+        ? []
+        : url === 'dashboard'
+          ? emptyDashboard
+          : url === 'ui/lookups'
+            ? {
+                tags: apiPage(storageTags, undefined, 20),
+                processes: apiPage(styleProcessOptions, undefined, 20),
+              }
+            : url === 'styles'
+              ? apiPage([styleResponse], undefined, 10)
+              : url.startsWith('styles/') && url.endsWith('/derived-route')
+                ? styleRouteResponse
+                : url.startsWith('styles/')
+                  ? { ...styleResponse, id: url.slice('styles/'.length) }
+                  : url.startsWith('storage-areas/')
+                    ? {
+                        ...storageAreaResponse,
+                        id: url.slice('storage-areas/'.length),
+                      }
+                    : url.startsWith('processes/')
+                      ? {
+                          ...processResponse,
+                          id: url.slice('processes/'.length),
+                        }
+                      : apiPage([], undefined, 10),
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -89,6 +94,10 @@ describe('application routing', () => {
           ? dashboardResponse
           : apiPage([dashboardLot], undefined, 10),
     }));
+    vi.mocked(apiClient.post).mockResolvedValue({
+      status: 200,
+      data: apiPage([dashboardLot], undefined, 10),
+    });
     await router.navigate('/dashboard');
     renderWithProviders(<App />);
     expect(
@@ -101,11 +110,7 @@ describe('application routing', () => {
       screen.queryByRole('link', { name: 'View lot LOT-001' }),
     ).not.toBeInTheDocument();
     expect(
-      vi
-        .mocked(apiClient.get)
-        .mock.calls.every(
-          ([url]) => url === 'dashboard' || url === 'dashboard/lots',
-        ),
+      vi.mocked(apiClient.get).mock.calls.every(([url]) => url === 'dashboard'),
     ).toBe(true);
   });
 
@@ -572,9 +577,7 @@ describe('application routing', () => {
     ).toBeVisible();
     expect(screen.queryByText('STY-1001')).not.toBeInTheDocument();
     expect(window.location.pathname).toBe('/styles');
-    expect(
-      screen.queryByRole('button', { name: 'Edit OWN-100' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit OWN-100' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Create Style' })).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Release style OWN-100' }),
@@ -671,7 +674,10 @@ describe('application routing', () => {
       renderWithProviders(<App />);
       act(() => signIn(username, password));
       expect(
-        await screen.findByRole('heading', { level: 1, name: title }),
+        await screen.findByRole('heading', {
+          level: 1,
+          name: title,
+        }),
       ).toBeVisible();
       expect(readSession()?.user.username).toBe(username);
       expect(router.state.historyAction).toBe('REPLACE');
@@ -736,7 +742,10 @@ describe('application routing', () => {
       await router.navigate('/login');
       renderWithProviders(<App />);
       expect(
-        await screen.findByRole('heading', { level: 1, name: title }),
+        await screen.findByRole('heading', {
+          level: 1,
+          name: path === '/reports' ? 'Reports and Analysis' : title,
+        }),
       ).toBeVisible();
       expect(window.location.pathname).toBe(path);
       await user.click(
@@ -796,7 +805,10 @@ describe('application routing', () => {
     signIn('supervisor', 'Super@2026demo');
     await router.navigate('/reports');
     renderWithProviders(<App />);
-    await screen.findByRole('heading', { name: 'Reports/Analysis', level: 1 });
+    await screen.findByRole('heading', {
+      name: 'Reports and Analysis',
+      level: 1,
+    });
     const records = loadAccessData().records;
     records.roles.find((role) => role.name === 'Supervisor')!.modules = [];
     act(() => {
@@ -847,7 +859,10 @@ describe('application routing', () => {
       await router.navigate(path);
       renderWithProviders(<App />);
       expect(
-        await screen.findByRole('heading', { level: 1, name: title }),
+        await screen.findByRole('heading', {
+          level: 1,
+          name: path === '/reports' ? 'Reports and Analysis' : title,
+        }),
       ).toBeVisible();
       await user.click(
         screen.getByRole('button', { name: 'Open navigation menu' }),
@@ -927,7 +942,10 @@ describe('application routing', () => {
       await router.navigate(path);
       renderWithProviders(<App />);
       expect(
-        await screen.findByRole('heading', { level: 1, name: title }),
+        await screen.findByRole('heading', {
+          level: 1,
+          name: path === '/reports' ? 'Reports and Analysis' : title,
+        }),
       ).toBeVisible();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       await user.click(

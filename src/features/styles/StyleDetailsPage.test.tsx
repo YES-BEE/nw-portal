@@ -142,3 +142,31 @@ it('retries failed style loads', async () => {
     await screen.findByRole('heading', { level: 1, name: 'STY-1001' }),
   ).toBeVisible();
 });
+
+it.each([0, 24])(
+  'displays backend total quantity %s in kg instead of planned quantity per lot',
+  async (total) => {
+    const original = vi.mocked(apiClient.get).getMockImplementation()!;
+    vi.mocked(apiClient.get).mockImplementation((url, config) =>
+      url === `styles/${styleResponse.id}`
+        ? Promise.resolve({
+            status: 200,
+            data: {
+              ...styleResponse,
+              lot_count: 5,
+              lot_quantity: 100,
+              total_quantity: total,
+            },
+          })
+        : original(url, config),
+    );
+    setup();
+    const label = await screen.findByText('Total Quantity');
+    expect(label.nextElementSibling).toHaveTextContent(
+      new RegExp(`^${total} kg$`),
+    );
+    expect(
+      screen.queryByText('Garment Quantity per Lot'),
+    ).not.toBeInTheDocument();
+  },
+);

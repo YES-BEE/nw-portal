@@ -15,7 +15,7 @@ const report: ReportCategory = {
   description: 'Production totals by day.',
   displayOrder: 1,
   formats: ['pdf', 'xlsx'],
-  filters: ['styleId', 'lotId', 'stationId', 'processId', 'status'],
+  filters: ['styleIds', 'lotIds', 'stationId', 'processId', 'status'],
   requiredParameters: ['from', 'to', 'format'],
 };
 beforeEach(() => vi.restoreAllMocks());
@@ -48,6 +48,11 @@ it('uses catalog formats and generates a download with the selected parameters',
     data: url === 'reports/catalog' ? [report] : blob,
     headers: { 'content-disposition': 'attachment; filename="daily.pdf"' },
   }));
+  const post = vi.spyOn(apiClient, 'post').mockResolvedValue({
+    status: 200,
+    data: blob,
+    headers: { 'content-disposition': 'attachment; filename="daily.pdf"' },
+  });
   const objectUrl = vi.fn(() => 'blob:report');
   vi.stubGlobal(
     'URL',
@@ -72,13 +77,12 @@ it('uses catalog formats and generates a download with the selected parameters',
   await user.click(screen.getByRole('option', { name: 'PDF' }));
   await user.click(screen.getByRole('button', { name: 'Generate report' }));
   await screen.findByText('Report generated. Your download has started.');
-  expect(get).toHaveBeenLastCalledWith(
+  expect(post).toHaveBeenLastCalledWith(
     `reports/${report.id}/export`,
-    expect.objectContaining({
-      responseType: 'blob',
-      params: { from: '2026-11-01', to: '2026-11-18', format: 'pdf' },
-    }),
+    { from: '2026-11-01', to: '2026-11-18', format: 'pdf' },
+    expect.objectContaining({ responseType: 'blob' }),
   );
+  expect(get).toHaveBeenCalledTimes(1);
   expect(objectUrl).toHaveBeenCalledWith(blob);
   expect(click).toHaveBeenCalledOnce();
 });
@@ -103,7 +107,7 @@ it('handles binary error responses as access errors rather than downloading them
   Object.defineProperty(blob, 'text', {
     value: async () => JSON.stringify({ detail: 'Report denied' }),
   });
-  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 403, data: blob });
+  vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 403, data: blob });
   await expect(
     exportReport(report, {
       from: '2026-11-01',
@@ -166,6 +170,11 @@ it('prefills unique station and process options after selecting a style and lot'
         },
       };
     });
+  const post = vi
+    .spyOn(apiClient, 'post')
+    .mockImplementation((url, body, config) =>
+      get.getMockImplementation()!(url, { ...config, params: body }),
+    );
   const user = userEvent.setup();
   const { container } = renderWithProviders(<ReportsPage />);
   await screen.findByRole('combobox', { name: 'Format' });
@@ -182,19 +191,101 @@ it('prefills unique station and process options after selecting a style and lot'
     ),
   );
   expect(screen.getByRole('combobox', { name: 'Process' })).toHaveValue('Wash');
-  expect(get).toHaveBeenCalledWith(
+  expect(post).toHaveBeenCalledWith(
     'reports/filter-options/processes',
     expect.objectContaining({
-      params: expect.objectContaining({
-        styleId: ids[0],
-        lotId: ids[1],
-        stationId: ids[2],
-      }),
+      styleIds: [ids[0]],
+      lotIds: [ids[1]],
+      stationId: ids[2],
     }),
+    expect.anything(),
   );
   await user.click(screen.getByRole('combobox', { name: 'Status' }));
   expect(screen.getByRole('option', { name: 'COMPLETED' })).toBeVisible();
   expect(
     screen.queryByRole('option', { name: 'PAUSED' }),
   ).not.toBeInTheDocument();
+});
+
+it('exports multiple selected styles and lots with manual option pagination', async () => {
+  vi.stubEnv('VITE_FILTER_OPTIONS_PAGE_SIZE', '10');
+  const uuid = (index: number) =>
+    `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`;
+  vi.spyOn(apiClient, 'get').mockResolvedValue({ status: 200, data: [report] });
+  const blob = new Blob(['xlsx'], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const post = vi
+    .spyOn(apiClient, 'post')
+    .mockImplementation(async (url, body) => {
+      if (url.endsWith('/export')) return { status: 200, data: blob };
+      const query = body as ListQuery;
+      const kind = url.split('/').at(-1);
+      const rows =
+        kind === 'styles' || kind === 'lots'
+          ? Array.from({ length: 12 }, (_, index) => ({
+              id: uuid(index + (kind === 'styles' ? 2 : 22)),
+              style_number: `STYLE-${index}`,
+              ...(kind === 'lots'
+                ? { lot_number: `LOT-${index}`, style_id: uuid(index + 2) }
+                : {}),
+            }))
+          : [];
+      return {
+        status: 200,
+        data: {
+          items: rows.slice(
+            query.page * query.size,
+            (query.page + 1) * query.size,
+          ),
+          page: query.page,
+          size: query.size,
+          totalElements: rows.length,
+        },
+      };
+    });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  vi.stubGlobal(
+    'URL',
+    Object.assign(URL, {
+      createObjectURL: vi.fn(() => 'blob:report'),
+      revokeObjectURL: vi.fn(),
+    }),
+  );
+  const user = userEvent.setup();
+  renderWithProviders(<ReportsPage />);
+  await screen.findByRole('combobox', { name: 'Format' });
+  for (const label of ['Style', 'Lot Number']) {
+    await user.click(screen.getByRole('combobox', { name: label }));
+    await screen.findByRole('option', {
+      name: label === 'Style' ? 'STYLE-0' : 'LOT-0 / STYLE-0',
+    });
+    expect(screen.getAllByRole('option')).toHaveLength(10);
+    await user.click(
+      screen.getByRole('option', {
+        name: label === 'Style' ? 'STYLE-0' : 'LOT-0 / STYLE-0',
+      }),
+    );
+    await user.click(screen.getByRole('combobox', { name: label }));
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    await user.click(
+      await screen.findByRole('option', {
+        name: label === 'Style' ? 'STYLE-11' : 'LOT-11 / STYLE-11',
+      }),
+    );
+  }
+  await user.click(screen.getByRole('button', { name: 'Generate report' }));
+  expect(
+    await screen.findByText('Report generated. Your download has started.'),
+  ).toBeVisible();
+  expect(post).toHaveBeenCalledWith(
+    `reports/${report.id}/export`,
+    expect.objectContaining({
+      styleIds: [uuid(2), uuid(13)],
+      lotIds: [uuid(22), uuid(33)],
+      format: 'xlsx',
+    }),
+    expect.objectContaining({ responseType: 'blob' }),
+  );
+  vi.unstubAllEnvs();
 });

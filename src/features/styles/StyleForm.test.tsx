@@ -220,23 +220,38 @@ it('retries failed process lookups instead of showing an empty drag/drop area', 
     expect(screen.getByRole('button', { name: 'Save Style' })).toBeEnabled(),
   );
 });
-it('updates a draft using only process IDs without requiring a revision reason', async () => {
+it('updates draft description, planned lots, quantity and process IDs without a revision reason', async () => {
   const put = vi
     .spyOn(apiClient, 'put')
-    .mockResolvedValue({ status: 200, data: styleRouteResponse });
+    .mockResolvedValue({ status: 200, data: styleResponse });
   const { user, onSaved } = setup(styleResponse.id);
   await screen.findByRole('textbox', { name: /Style Number/ });
-  expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
-    'readonly',
-  );
+  const description = screen.getByRole('textbox', { name: 'Description' });
+  expect(description).not.toHaveAttribute('readonly');
   expect(
     screen.queryByRole('textbox', { name: /Reason for change/ }),
   ).not.toBeInTheDocument();
-  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  expect(screen.getByRole('spinbutton', { name: 'Planned Lots' })).toHaveValue(
+    styleResponse.lot_count,
+  );
+  await user.clear(description);
+  await user.type(description, 'Updated draft');
+  const count = screen.getByRole('spinbutton', { name: 'Planned Lots' });
+  await user.clear(count);
+  await user.type(count, '5');
+  await user.type(
+    screen.getByRole('spinbutton', { name: 'Garment Quantity per Lot' }),
+    '120',
+  );
   await user.click(screen.getByRole('button', { name: 'Save Style' }));
   expect(put).toHaveBeenCalledWith(
-    `styles/${styleResponse.id}/processes`,
-    [styleProcessOptions[0].id],
+    `styles/${styleResponse.id}`,
+    {
+      description: 'Updated draft',
+      processIds: [styleProcessOptions[0].id],
+      lotCount: 5,
+      quantity: 120,
+    },
     expect.anything(),
   );
   expect(apiClient.post).not.toHaveBeenCalled();

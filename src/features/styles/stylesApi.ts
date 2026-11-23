@@ -9,6 +9,8 @@ import {
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
 import type {
   StyleResponse,
+  StyleDetailsResponse,
+  UpdateDraftStyleRequest,
   CreateStyleRequest,
   StyleRouteEntry,
   StyleRouteProcess,
@@ -223,8 +225,8 @@ export async function getStyles(
 export async function getStyle(
   id: string,
   signal?: AbortSignal,
-): Promise<StyleResponse> {
-  return single(
+): Promise<StyleDetailsResponse> {
+  const style = single(
     await request(() =>
       apiClient.get<unknown>(
         `styles/${encodeURIComponent(id)}`,
@@ -233,6 +235,9 @@ export async function getStyle(
     ),
     id,
   );
+  if (!('total_quantity' in style) || !nonnegative(style.total_quantity))
+    return invalid();
+  return { ...style, total_quantity: style.total_quantity };
 }
 export async function createStyle(
   body: CreateStyleRequest,
@@ -242,6 +247,22 @@ export async function createStyle(
     await request(() =>
       apiClient.post<unknown>('styles', body, options(signal)),
     ),
+  );
+}
+export async function updateDraftStyle(
+  id: string,
+  body: UpdateDraftStyleRequest,
+  signal?: AbortSignal,
+): Promise<StyleResponse> {
+  return single(
+    await request(() =>
+      apiClient.put<unknown>(
+        `styles/${encodeURIComponent(id)}`,
+        body,
+        options(signal),
+      ),
+    ),
+    id,
   );
 }
 export async function getStyleRoute(

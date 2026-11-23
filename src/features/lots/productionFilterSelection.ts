@@ -5,15 +5,15 @@ export interface Choice {
   label: string;
 }
 export interface ProductionFilterSelection {
-  lots: Choice | null;
-  styles: Choice | null;
+  lots: Choice[];
+  styles: Choice[];
   stations: Choice | null;
   processes: Choice | null;
   status: string;
 }
 export const emptyProductionFilters: ProductionFilterSelection = {
-  lots: null,
-  styles: null,
+  lots: [],
+  styles: [],
   stations: null,
   processes: null,
   status: '',
@@ -32,8 +32,12 @@ export function productionFilterParams(
   selection: ProductionFilterSelection,
 ): Filters {
   return {
-    ...(selection.lots && { lotId: selection.lots.id }),
-    ...(selection.styles && { styleId: selection.styles.id }),
+    ...(selection.lots.length && {
+      lotIds: selection.lots.map((item) => item.id),
+    }),
+    ...(selection.styles.length && {
+      styleIds: selection.styles.map((item) => item.id),
+    }),
     ...(selection.stations && { stationId: selection.stations.id }),
     ...(selection.processes && { processId: selection.processes.id }),
     ...(selection.status && { status: selection.status }),

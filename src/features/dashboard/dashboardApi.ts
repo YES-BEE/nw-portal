@@ -335,10 +335,7 @@ export async function getDashboardLots(
 ): Promise<ApiPage<DashboardLot>> {
   const page = readApiPage(
     await request(() =>
-      apiClient.get<unknown>('dashboard/lots', {
-        ...options(signal),
-        params: query,
-      }),
+      apiClient.post<unknown>('dashboard/lots', query, options(signal)),
     ),
     query,
     isDashboardLot,
@@ -358,10 +355,11 @@ export async function getDashboardFilterOptions<K extends FilterOptionType>(
   return readFilterOptions(
     kind,
     await request(() =>
-      apiClient.get<unknown>(`dashboard/filter-options/${kind}`, {
-        ...options(signal),
-        params: query,
-      }),
+      apiClient.post<unknown>(
+        `dashboard/filter-options/${kind}`,
+        query,
+        options(signal),
+      ),
     ),
     query,
     invalid,

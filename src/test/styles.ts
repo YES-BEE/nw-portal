@@ -1,10 +1,10 @@
 import type {
-  StyleResponse,
+  StyleDetailsResponse,
   StyleRouteResponse,
   StyleProcessOption,
   StyleRevisionResponse,
 } from '../features/styles/types';
-export const styleResponse: StyleResponse = {
+export const styleResponse: StyleDetailsResponse = {
   id: '11111111-1111-4111-8111-111111111111',
   style_number: 'STY-1001',
   description: 'Denim wash style',
@@ -15,6 +15,7 @@ export const styleResponse: StyleResponse = {
   version: 0,
   lot_count: 0,
   lot_quantity: null,
+  total_quantity: 0,
 };
 export const styleProcessOptions: StyleProcessOption[] = [
   {

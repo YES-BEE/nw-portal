@@ -28,12 +28,12 @@ beforeEach(() => {
     refreshToken: refreshTokenResponse.refreshToken,
     refreshTokenExpiresAt: refreshTokenResponse.expiresAt,
   });
-  vi.spyOn(apiClient, 'get').mockImplementation(async (_url, config) => ({
+  vi.spyOn(apiClient, 'post').mockImplementation(async (_url, body) => ({
     status: 200,
     data: {
       items: [dashboardLot],
-      page: (config?.params as ListQuery).page,
-      size: (config?.params as ListQuery).size,
+      page: (body as ListQuery).page,
+      size: (body as ListQuery).size,
       totalElements: 60,
     },
   }));
@@ -51,8 +51,8 @@ it('restores all filters and the query on remount and sends them in the first re
   saveDashboardFilters('dashboard-user', {
     selection: {
       ...emptyProductionFilters,
-      styles: { id: 's1', label: 'STYLE-01' },
-      lots: { id: 'l1', label: 'LOT-01' },
+      styles: [{ id: 's1', label: 'STYLE-01' }],
+      lots: [{ id: 'l1', label: 'LOT-01' }],
       stations: { id: 'st1', label: 'Washing' },
       processes: { id: 'p1', label: 'Wash' },
       status: 'IN_PROCESS',
@@ -62,26 +62,27 @@ it('restores all filters and the query on remount and sends them in the first re
   const first = setup();
   await screen.findByText(dashboardLot.lot_number);
   for (const [label, value] of [
-    ['Style', 'STYLE-01'],
-    ['Lot Number', 'LOT-01'],
     ['Station', 'Washing'],
     ['Process', 'Wash'],
   ]) {
     expect(screen.getByRole('combobox', { name: label })).toHaveValue(value);
   }
+  expect(screen.getByText('STYLE-01')).toBeVisible();
+  expect(screen.getByText('LOT-01')).toBeVisible();
   const expected = {
     page: 1,
     size: 25,
     search: 'denim',
-    styleId: 's1',
-    lotId: 'l1',
+    styleIds: ['s1'],
+    lotIds: ['l1'],
     stationId: 'st1',
     processId: 'p1',
     status: 'IN_PROCESS',
   };
-  expect(apiClient.get).toHaveBeenLastCalledWith(
+  expect(apiClient.post).toHaveBeenLastCalledWith(
     'dashboard/lots',
-    expect.objectContaining({ params: expected }),
+    expected,
+    expect.anything(),
   );
   fireEvent.change(screen.getByRole('searchbox'), {
     target: { value: 'cotton' },
@@ -89,11 +90,10 @@ it('restores all filters and the query on remount and sends them in the first re
   first.unmount();
   setup();
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenLastCalledWith(
+    expect(apiClient.post).toHaveBeenLastCalledWith(
       'dashboard/lots',
-      expect.objectContaining({
-        params: { ...expected, page: 0, search: 'cotton' },
-      }),
+      { ...expected, page: 0, search: 'cotton' },
+      expect.anything(),
     ),
   );
   expect(screen.getByRole('searchbox')).toHaveValue('cotton');
@@ -117,9 +117,10 @@ it('persists clearing the structured filters when leaving and returning', async 
   first.unmount();
   setup();
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenLastCalledWith(
+    expect(apiClient.post).toHaveBeenLastCalledWith(
       'dashboard/lots',
-      expect.objectContaining({ params: { page: 0, size: 10, search: '' } }),
+      { page: 0, size: 10, search: '' },
+      expect.anything(),
     ),
   );
 });
@@ -127,8 +128,8 @@ it('persists clearing the structured filters when leaving and returning', async 
 it('preserves all other filters when status changes and persists the combined request', async () => {
   const selection = {
     ...emptyProductionFilters,
-    styles: { id: 's1', label: 'STYLE-01' },
-    lots: { id: 'l1', label: 'LOT-01' },
+    styles: [{ id: 's1', label: 'STYLE-01' }],
+    lots: [{ id: 'l1', label: 'LOT-01' }],
     stations: { id: 'st1', label: 'Washing' },
     processes: { id: 'p1', label: 'Wash' },
   };
@@ -142,21 +143,20 @@ it('preserves all other filters when status changes and persists the combined re
   await user.click(screen.getByRole('combobox', { name: 'Status' }));
   await user.click(screen.getByRole('option', { name: 'In Process' }));
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenLastCalledWith(
+    expect(apiClient.post).toHaveBeenLastCalledWith(
       'dashboard/lots',
-      expect.objectContaining({
-        params: {
-          page: 0,
-          size: 25,
-          search: 'denim',
-          styleId: 's1',
-          lotId: 'l1',
-          stationId: 'st1',
-          processId: 'p1',
+      {
+        page: 0,
+        size: 25,
+        search: 'denim',
+        styleIds: ['s1'],
+        lotIds: ['l1'],
+        stationId: 'st1',
+        processId: 'p1',
 
-          status: 'IN_PROCESS',
-        },
-      }),
+        status: 'IN_PROCESS',
+      },
+      expect.anything(),
     ),
   );
   expect(readDashboardFilters('dashboard-user').selection).toEqual({

@@ -22,11 +22,12 @@ import {
   getStyleRoute,
   getStyleProcessOptions,
   reviseStyle,
-  updateStyleProcesses,
+  updateDraftStyle,
   stylesFailure,
 } from './stylesApi';
 import { styleProcesses, orderedStyleProcesses } from './styleData';
 import { StyleFailureAlert } from './StyleFailureAlert';
+import { useSession } from '../auth/useSession';
 import type {
   StyleResponse,
   StyleProcessOption,
@@ -45,6 +46,7 @@ export function StyleForm({
   onReload: () => void;
 }) {
   const { t } = useTranslation('translation');
+  const configurator = useSession()?.user.role === 'STYLE_CONFIGURATOR';
   const [source, setSource] = useState<StyleResponse | null>(null);
   const [number, setNumber] = useState('');
   const [description, setDescription] = useState('');
@@ -76,6 +78,12 @@ export function StyleForm({
         setSource(record);
         setNumber(record?.style_number || '');
         setDescription(record?.description || '');
+        setLotCount(String(record?.lot_count ?? 0));
+        setQuantity(
+          record?.status === 'DRAFT' && record.lot_quantity != null
+            ? String(record.lot_quantity)
+            : '',
+        );
         setSteps(
           orderedStyleProcesses(route).map((processId) => ({
             id: crypto.randomUUID(),
@@ -99,7 +107,8 @@ export function StyleForm({
   const available = new Set(options.map((process) => process.id));
   const invalidSteps = selected.map((id) => !available.has(id));
   const draftEdit = !!styleId && source?.status === 'DRAFT';
-  const revisionEdit = !!styleId && !!source && !draftEdit;
+  const draftOnly = !!styleId && !!source && !draftEdit && configurator;
+  const revisionEdit = !!styleId && !!source && !draftEdit && !configurator;
   const quantityValue = Number(quantity);
   const validQuantity =
     !quantity.trim() ||
@@ -111,14 +120,14 @@ export function StyleForm({
     !lotCount.trim() ||
     (Number.isInteger(countValue) && countValue >= 0 && countValue <= 1000);
   async function save() {
-    if (pending.current || !loaded) return;
+    if (pending.current || !loaded || draftOnly) return;
     setSubmitted(true);
     if (
       !number.trim() ||
       !steps.length ||
       invalidSteps.some(Boolean) ||
       (revisionEdit && (!reason.trim() || !validQuantity)) ||
-      (!styleId && (!validPlanCount || !validQuantity))
+      ((!styleId || draftEdit) && (!validPlanCount || !validQuantity))
     )
       return;
     const controller = new AbortController();
@@ -127,7 +136,16 @@ export function StyleForm({
     setFailure(null);
     try {
       if (styleId && draftEdit) {
-        await updateStyleProcesses(styleId, selected, controller.signal);
+        await updateDraftStyle(
+          styleId,
+          {
+            description: description.trim(),
+            processIds: selected,
+            lotCount: countValue,
+            quantity: quantity.trim() ? quantityValue : null,
+          },
+          controller.signal,
+        );
         if (!controller.signal.aborted) onSaved(styleId);
       } else if (styleId) {
         await reviseStyle(
@@ -206,10 +224,15 @@ export function StyleForm({
       {loading && (
         <CircularProgress size={28} aria-label={t('common.loading')} />
       )}
+      {draftOnly && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {t('styles.draftOnly')}
+        </Alert>
+      )}
       {loaded && (
         <Box
           component="fieldset"
-          disabled={saving}
+          disabled={saving || draftOnly}
           sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
         >
           <Box
@@ -248,18 +271,15 @@ export function StyleForm({
               multiline
               minRows={3}
               value={description}
-              slotProps={{ htmlInput: { maxLength: 500, readOnly: draftEdit } }}
+              slotProps={{ htmlInput: { maxLength: 500 } }}
               error={!!failure?.fieldErrors?.description}
-              helperText={
-                failure?.fieldErrors?.description ||
-                (draftEdit ? t('styles.draftDescriptionHint') : undefined)
-              }
+              helperText={failure?.fieldErrors?.description}
               onChange={(event) => setDescription(event.target.value)}
               sx={{ gridColumn: '1 / -1' }}
             />
           </Box>
 
-          {!styleId && (
+          {(!styleId || draftEdit) && (
             <Box
               sx={{
                 display: 'grid',
@@ -406,7 +426,11 @@ export function StyleForm({
         spacing={1.5}
         sx={{ justifyContent: 'flex-end', mt: 3 }}
       >
-        <Button variant="outlined" disabled={saving} onClick={onClose}>
+        <Button
+          variant="outlined"
+          disabled={saving || draftOnly}
+          onClick={onClose}
+        >
           {t('access.cancel')}
         </Button>
         <Button
@@ -416,6 +440,7 @@ export function StyleForm({
             !loaded ||
             loading ||
             saving ||
+            draftOnly ||
             !options.length ||
             failure?.action === 'signIn' ||
             failure?.action === 'reload' ||

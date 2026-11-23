@@ -30,6 +30,12 @@ beforeEach(() => {
       },
     };
   });
+  vi.spyOn(apiClient, 'post').mockImplementation((url, body, config) =>
+    vi.mocked(apiClient.get).getMockImplementation()!(url, {
+      ...config,
+      params: body,
+    }),
+  );
 });
 afterEach(() => {
   vi.useRealTimers();

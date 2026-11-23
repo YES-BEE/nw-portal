@@ -130,11 +130,11 @@ export async function exportReport(
   const data = await request(async () => {
     let response: AxiosResponse<unknown>;
     try {
-      response = await apiClient.get<Blob>(
+      response = await apiClient.post<Blob>(
         `reports/${encodeURIComponent(report.id)}/export`,
+        query,
         {
           signal,
-          params: query,
           responseType: 'blob',
           timeout: 120000,
           headers: {
@@ -208,10 +208,11 @@ export async function getReportFilterOptions<K extends FilterOptionType>(
   return readFilterOptions(
     kind,
     await request(() =>
-      apiClient.get<unknown>(`reports/filter-options/${kind}`, {
-        ...options(signal),
-        params: query,
-      }),
+      apiClient.post<unknown>(
+        `reports/filter-options/${kind}`,
+        query,
+        options(signal),
+      ),
     ),
     query,
     invalid,

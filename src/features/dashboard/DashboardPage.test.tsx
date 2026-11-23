@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import { apiPage } from '../../test/apiPage';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -20,8 +21,23 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+const request =
+  vi.fn<
+    (
+      url: string,
+      config?: AxiosRequestConfig,
+    ) => Promise<{ status: number; data: unknown }>
+  >();
+
 beforeEach(() => {
-  vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
+  request.mockReset();
+  vi.spyOn(apiClient, 'get').mockImplementation((url, config) =>
+    request(url, config),
+  );
+  vi.spyOn(apiClient, 'post').mockImplementation((url, body, config) =>
+    request(url, { ...config, params: body }),
+  );
+  request.mockImplementation(async (url, config) => {
     if (url === 'dashboard') return { status: 200, data: dashboardResponse };
     const query = config?.params as ListQuery & { status?: string };
     return {
@@ -51,22 +67,20 @@ function setup() {
 }
 it('keeps table filters during polling without applying them to dashboard summary requests', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  const original = vi.mocked(apiClient.get).getMockImplementation()!;
-  const get = vi
-    .mocked(apiClient.get)
-    .mockImplementation(async (url, config) =>
-      url === 'dashboard/filter-options/styles'
-        ? {
-            status: 200,
-            data: {
-              items: [{ id: 'style-id', style_number: 'FILTER-STYLE' }],
-              page: 0,
-              size: 20,
-              totalElements: 1,
-            },
-          }
-        : original(url, config),
-    );
+  const original = request.getMockImplementation()!;
+  const get = vi.mocked(request).mockImplementation(async (url, config) =>
+    url === 'dashboard/filter-options/styles'
+      ? {
+          status: 200,
+          data: {
+            items: [{ id: 'style-id', style_number: 'FILTER-STYLE' }],
+            page: 0,
+            size: config?.params.size,
+            totalElements: 1,
+          },
+        }
+      : original(url, config),
+  );
   const { user, unmount } = setup();
   await user.click(await screen.findByRole('combobox', { name: 'Style' }));
   await user.click(await screen.findByRole('option', { name: 'FILTER-STYLE' }));
@@ -74,7 +88,7 @@ it('keeps table filters during polling without applying them to dashboard summar
     expect(get).toHaveBeenLastCalledWith(
       'dashboard/lots',
       expect.objectContaining({
-        params: { page: 0, size: 10, search: '', styleId: 'style-id' },
+        params: { page: 0, size: 10, search: '', styleIds: ['style-id'] },
       }),
     ),
   );
@@ -84,20 +98,18 @@ it('keeps table filters during polling without applying them to dashboard summar
   expect(
     get.mock.calls
       .filter(([url]) => url === 'dashboard')
-      .every(([, config]) => !('styleId' in (config?.params as ListQuery))),
+      .every(([, config]) => !('styleIds' in (config?.params as ListQuery))),
   ).toBe(true);
   expect(get).toHaveBeenCalledWith(
     'dashboard/lots',
     expect.objectContaining({
-      params: { page: 0, size: 10, search: '', styleId: 'style-id' },
+      params: { page: 0, size: 10, search: '', styleIds: ['style-id'] },
     }),
   );
   expect(
     within(screen.getByRole('region', { name: 'Total Lots' })).getByText('9'),
   ).toBeVisible();
-  expect(screen.getByRole('combobox', { name: 'Style' })).toHaveValue(
-    'FILTER-STYLE',
-  );
+  expect(screen.getByText('FILTER-STYLE')).toBeVisible();
   unmount();
 });
 it('renders server summary metrics, station WIP, and live lot data', async () => {
@@ -166,8 +178,8 @@ it.each(['summary', 'lots'])(
     const { unmount } = setup();
     await screen.findByText('Live updates');
     const timestamp = screen.getByText(/^Updated /).textContent;
-    const original = vi.mocked(apiClient.get).getMockImplementation()!;
-    vi.mocked(apiClient.get).mockImplementation((url, config) =>
+    const original = request.getMockImplementation()!;
+    request.mockImplementation((url, config) =>
       (target === 'summary' ? url === 'dashboard' : url === 'dashboard/lots')
         ? Promise.resolve({
             status: 503,
@@ -186,7 +198,7 @@ it.each(['summary', 'lots'])(
       within(screen.getByRole('region', { name: 'Total Lots' })).getByText('9'),
     ).toBeVisible();
     expect(screen.getByRole('rowheader', { name: 'LOT-001' })).toBeVisible();
-    vi.mocked(apiClient.get).mockImplementation(original);
+    request.mockImplementation(original);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000);
     });
@@ -199,7 +211,7 @@ it('filters lots through the status dropdown and the backend status query', asyn
   await user.click(await screen.findByRole('combobox', { name: 'Status' }));
   await user.click(screen.getByRole('option', { name: 'In Process' }));
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       'dashboard/lots',
       expect.objectContaining({
         params: { page: 0, size: 10, search: '', status: 'IN_PROCESS' },
@@ -209,15 +221,15 @@ it('filters lots through the status dropdown and the backend status query', asyn
   await user.click(screen.getByRole('combobox', { name: 'Status' }));
   await user.click(screen.getByRole('option', { name: 'All statuses' }));
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenLastCalledWith(
+    expect(request).toHaveBeenLastCalledWith(
       'dashboard/lots',
       expect.objectContaining({ params: { page: 0, size: 10, search: '' } }),
     ),
   );
 });
 it('sends search, page size and page changes to the backend', async () => {
-  const get = vi.mocked(apiClient.get).getMockImplementation()!;
-  vi.mocked(apiClient.get).mockImplementation(async (url, config) =>
+  const get = request.getMockImplementation()!;
+  request.mockImplementation(async (url, config) =>
     url === 'dashboard'
       ? get(url, config)
       : {
@@ -233,7 +245,7 @@ it('sends search, page size and page changes to the backend', async () => {
   await screen.findByRole('rowheader', { name: 'LOT-001' });
   await user.click(screen.getByRole('button', { name: 'Go to next page' }));
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       'dashboard/lots',
       expect.objectContaining({ params: { page: 1, size: 10, search: '' } }),
     ),
@@ -243,14 +255,14 @@ it('sends search, page size and page changes to the backend', async () => {
   );
   await user.click(screen.getByRole('option', { name: '25' }));
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       'dashboard/lots',
       expect.objectContaining({ params: { page: 0, size: 25, search: '' } }),
     ),
   );
   await user.type(screen.getByRole('searchbox'), 'Washing');
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       'dashboard/lots',
       expect.objectContaining({
         params: { page: 0, size: 25, search: 'Washing' },
@@ -259,7 +271,7 @@ it('sends search, page size and page changes to the backend', async () => {
   );
 });
 it('handles empty successful data with zero metrics and no table pagination', async () => {
-  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+  request.mockImplementation(async (url) => ({
     status: 200,
     data: url === 'dashboard' ? emptyDashboard : apiPage([], undefined, 10),
   }));
@@ -280,9 +292,9 @@ it('handles empty successful data with zero metrics and no table pagination', as
   expect(screen.queryByText(/unexpected response/)).not.toBeInTheDocument();
 });
 it('keeps lots available when summary fails and supports a summary retry', async () => {
-  const get = vi.mocked(apiClient.get).getMockImplementation()!;
+  const get = request.getMockImplementation()!;
   let failed = true;
-  vi.mocked(apiClient.get).mockImplementation(async (url, config) =>
+  request.mockImplementation(async (url, config) =>
     url === 'dashboard' && failed
       ? { status: 503, data: { detail: 'Summary temporarily unavailable' } }
       : get(url, config),
@@ -302,7 +314,7 @@ it('keeps lots available when summary fails and supports a summary retry', async
   ).toBeVisible();
 });
 it('keeps summary metrics visible when the lot request is forbidden', async () => {
-  vi.mocked(apiClient.get).mockImplementation(async (url) => ({
+  request.mockImplementation(async (url) => ({
     status: url === 'dashboard' ? 200 : 403,
     data:
       url === 'dashboard'
@@ -330,24 +342,24 @@ it('polls both APIs using only the backend interval', async () => {
     await screen.findByRole('rowheader', { name: 'LOT-001' }),
   ).toBeVisible();
   await screen.findByRole('region', { name: 'Total Lots' });
-  const before = vi.mocked(apiClient.get).mock.calls.length;
+  const before = request.mock.calls.length;
   expect(
     screen.queryByRole('button', { name: 'Refresh' }),
   ).not.toBeInTheDocument();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(4999);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before);
+  expect(request).toHaveBeenCalledTimes(before);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(request).toHaveBeenCalledTimes(before + 2);
   expect(screen.getByRole('rowheader', { name: 'LOT-001' })).toBeVisible();
   unmount();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(10000);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(request).toHaveBeenCalledTimes(before + 2);
 });
 it('retains search filters while polling and uses the response interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
@@ -355,22 +367,19 @@ it('retains search filters while polling and uses the response interval', async 
   await screen.findByRole('rowheader', { name: 'LOT-001' });
   await user.type(screen.getByRole('searchbox'), 'LOT');
   await waitFor(() =>
-    expect(apiClient.get).toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       'dashboard/lots',
       expect.objectContaining({ params: { page: 0, size: 10, search: 'LOT' } }),
     ),
   );
-  const before = vi.mocked(apiClient.get).mock.calls.length;
+  const before = request.mock.calls.length;
   await act(async () => {
     await vi.advanceTimersByTimeAsync(5000);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(request).toHaveBeenCalledTimes(before + 2);
   expect(screen.getByRole('searchbox')).toHaveValue('LOT');
   expect(
-    vi
-      .mocked(apiClient.get)
-      .mock.calls.filter(([url]) => url === 'dashboard/lots')
-      .at(-1),
+    request.mock.calls.filter(([url]) => url === 'dashboard/lots').at(-1),
   ).toEqual([
     'dashboard/lots',
     expect.objectContaining({ params: { page: 0, size: 10, search: 'LOT' } }),
@@ -378,18 +387,18 @@ it('retains search filters while polling and uses the response interval', async 
 });
 it('does not start polling until the response provides an interval', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+  request.mockReturnValue(new Promise(() => {}));
   setup();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(30000);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(2);
+  expect(request).toHaveBeenCalledTimes(2);
 });
 it('reschedules summary and lot polling when the response interval changes', async () => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  const original = vi.mocked(apiClient.get).getMockImplementation()!;
+  const original = request.getMockImplementation()!;
   let seconds = 5;
-  vi.mocked(apiClient.get).mockImplementation(async (url, config) =>
+  request.mockImplementation(async (url, config) =>
     url === 'dashboard'
       ? {
           status: 200,
@@ -399,30 +408,28 @@ it('reschedules summary and lot polling when the response interval changes', asy
   );
   setup();
   await screen.findByText('Live updates');
-  const before = vi.mocked(apiClient.get).mock.calls.length;
+  const before = request.mock.calls.length;
   seconds = 2;
   await act(async () => {
     await vi.advanceTimersByTimeAsync(5000);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(request).toHaveBeenCalledTimes(before + 2);
   expect(
     screen.queryByText(/Updates every \d+ seconds/),
   ).not.toBeInTheDocument();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1999);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 2);
+  expect(request).toHaveBeenCalledTimes(before + 2);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1);
   });
-  expect(apiClient.get).toHaveBeenCalledTimes(before + 4);
+  expect(request).toHaveBeenCalledTimes(before + 4);
 });
 it('aborts summary and lot requests on unmount', () => {
-  vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
+  request.mockReturnValue(new Promise(() => {}));
   const { unmount } = setup();
-  const signals = vi
-    .mocked(apiClient.get)
-    .mock.calls.map((call) => call[1]?.signal);
+  const signals = vi.mocked(request).mock.calls.map((call) => call[1]?.signal);
   unmount();
   expect(signals).toHaveLength(2);
   expect(signals.every((signal) => signal?.aborted)).toBe(true);

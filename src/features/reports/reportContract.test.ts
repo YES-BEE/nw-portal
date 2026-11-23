@@ -12,7 +12,7 @@ const report: ReportCategory = {
   description: null,
   displayOrder: 1,
   formats: ['csv', 'pdf', 'xlsx'],
-  filters: ['styleId', 'lotId', 'status'],
+  filters: ['styleIds', 'lotIds', 'status'],
   requiredParameters: ['from', 'to', 'format'],
 };
 const query: ReportExportRequest = {
@@ -40,14 +40,14 @@ it.each([
 it.each([
   { ...query, from: '2026-02-30' },
   { ...query, from: '2026-12-01' },
-  { ...query, styleId: 'invalid' },
+  { ...query, styleIds: ['invalid'] },
   { ...query, processId: report.id },
   { ...query, status: 'COMPLETED' },
   { ...query, unexpected: 'value' },
 ])(
   'blocks unsupported or invalid requests before calling the backend',
   async (params) => {
-    const get = vi.spyOn(apiClient, 'get');
+    const get = vi.spyOn(apiClient, 'post');
     await expect(exportReport(report, params)).rejects.toMatchObject({
       failure: { kind: 'invalidRequest' },
     });
@@ -57,7 +57,7 @@ it.each([
 
 it('normalizes optional status values and excludes blank parameters', () => {
   expect(
-    reportRequest(report, { ...query, status: ' in_use ', lotId: '' }),
+    reportRequest(report, { ...query, status: ' in_use ', lotIds: [] }),
   ).toEqual({ ...query, status: 'IN_USE' });
 });
 
@@ -66,11 +66,25 @@ it('rejects daily CSV exports', async () => {
     ...report,
     key: 'daily-production-summary',
     formats: ['xlsx', 'pdf'],
-    filters: ['styleId', 'lotId', 'stationId', 'processId', 'status'],
+    filters: ['styleIds', 'lotIds', 'stationId', 'processId', 'status'],
   };
   await expect(
     exportReport(daily, { ...query, format: 'csv' }),
   ).rejects.toMatchObject({ failure: { kind: 'invalidRequest' } });
+});
+it.each([
+  [report.id, report.id],
+  ['invalid'],
+  Array.from(
+    { length: 101 },
+    (_, index) => `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
+  ),
+])('rejects duplicate, invalid or oversized ID arrays', async (...ids) => {
+  const post = vi.spyOn(apiClient, 'post');
+  await expect(
+    exportReport(report, { ...query, styleIds: ids as string[] }),
+  ).rejects.toMatchObject({ failure: { kind: 'invalidRequest' } });
+  expect(post).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -79,7 +93,7 @@ it.each([
   'application/octet-stream',
   'text/csv',
 ])('rejects unexpected successful export content (%s)', async (type) => {
-  vi.spyOn(apiClient, 'get').mockResolvedValue({
+  vi.spyOn(apiClient, 'post').mockResolvedValue({
     status: 200,
     data: new Blob(['payload'], { type }),
   });
@@ -99,7 +113,7 @@ it.each([400, 401, 403, 404, 409, 500])(
           code: 'REPORT_ERROR',
         }),
     });
-    vi.spyOn(apiClient, 'get').mockResolvedValue({ status, data });
+    vi.spyOn(apiClient, 'post').mockResolvedValue({ status, data });
     await expect(exportReport(report, query)).rejects.toMatchObject({
       failure: {
         status,
@@ -113,7 +127,7 @@ it.each([400, 401, 403, 404, 409, 500])(
 it('validates exposed export IDs and supplies a filename when response headers are not exposed', async () => {
   const data = new Blob(['pdf'], { type: 'application/pdf' });
   const get = vi
-    .spyOn(apiClient, 'get')
+    .spyOn(apiClient, 'post')
     .mockResolvedValue({ status: 200, data });
   await expect(exportReport(report, query)).resolves.toMatchObject({
     filename: 'nw-track_trolley-utilization_2026-11-01_to_2026-11-18.pdf',
@@ -130,7 +144,7 @@ it('validates exposed export IDs and supplies a filename when response headers a
 });
 
 it('propagates cancellation without reporting a network failure', async () => {
-  vi.spyOn(apiClient, 'get').mockRejectedValue(new CanceledError());
+  vi.spyOn(apiClient, 'post').mockRejectedValue(new CanceledError());
   await expect(exportReport(report, query)).rejects.toBeInstanceOf(
     CanceledError,
   );

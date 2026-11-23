@@ -11,8 +11,14 @@ it('stores every selection and list query separately for each user', () => {
   const value = {
     selection: {
       ...emptyProductionFilters,
-      styles: { id: 's1', label: 'STYLE-01' },
-      lots: { id: 'l1', label: 'LOT-01' },
+      styles: [
+        { id: 's1', label: 'STYLE-01' },
+        { id: 's2', label: 'STYLE-02' },
+      ],
+      lots: [
+        { id: 'l1', label: 'LOT-01' },
+        { id: 'l2', label: 'LOT-02' },
+      ],
       stations: { id: 'st1', label: 'Washing' },
       processes: { id: 'p1', label: 'Wash' },
       status: 'IN_PROCESS',
@@ -56,6 +62,24 @@ it('keeps storage failures from breaking filtering', () => {
   expect(() =>
     saveDashboardFilters('user-1', readDashboardFilters()),
   ).not.toThrow();
+});
+it('migrates previously saved single style and lot selections', () => {
+  sessionStorage.setItem(
+    dashboardFilterKey('user-1'),
+    JSON.stringify({
+      selection: {
+        ...emptyProductionFilters,
+        styles: { id: 's1', label: 'Style' },
+        lots: { id: 'l1', label: 'Lot' },
+      },
+      query: { page: 0, size: 10, search: '' },
+    }),
+  );
+  expect(readDashboardFilters('user-1').selection).toEqual({
+    ...emptyProductionFilters,
+    styles: [{ id: 's1', label: 'Style' }],
+    lots: [{ id: 'l1', label: 'Lot' }],
+  });
 });
 
 it('ignores a previously saved route scope while preserving the remaining filters', () => {

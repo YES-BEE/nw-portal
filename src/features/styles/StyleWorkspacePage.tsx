@@ -185,6 +185,7 @@ export function StyleWorkspacePage({ mode }: { mode: StyleMode }) {
                         </Tooltip>
                         {((!own && !configurator) ||
                           (configurator &&
+                            session?.modules.includes('newstyle') &&
                             record.status === 'DRAFT' &&
                             record.created_by === session?.user.id)) && (
                           <Tooltip title={t('access.edit')}>
