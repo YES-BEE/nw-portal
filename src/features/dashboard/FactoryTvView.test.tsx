@@ -46,7 +46,7 @@ it('switches the dashboard to display APIs and exits back to the dashboard', asy
   const user = userEvent.setup();
   renderWithProviders(<DashboardPage />);
   await user.click(screen.getByRole('button', { name: 'TV view' }));
-  await screen.findByRole('heading', { name: 'Factory production · TV' });
+  await screen.findByRole('heading', { name: 'Factory production' });
   await screen.findByText('TV-LOT-0');
   expect(apiClient.get).toHaveBeenCalledWith(
     'displays/factory-summary',
@@ -59,7 +59,7 @@ it('switches the dashboard to display APIs and exits back to the dashboard', asy
   await user.click(screen.getByRole('button', { name: 'Exit TV view' }));
   expect(screen.getByRole('button', { name: 'TV view' })).toBeVisible();
   expect(
-    screen.queryByRole('heading', { name: 'Factory production · TV' }),
+    screen.queryByRole('heading', { name: 'Factory production' }),
   ).not.toBeInTheDocument();
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { keyframes } from '@emotion/react';
 import {
   Alert,
   Box,
@@ -17,6 +18,12 @@ import {
   Typography,
 } from '@mui/material';
 import FullscreenOutlinedIcon from '@mui/icons-material/FullscreenOutlined';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
+import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import { useTranslation } from 'react-i18next';
 import type { ApiPage } from '../../api/collections';
 import { formatDateTime } from '../../utils/formatDateTime';
@@ -29,6 +36,54 @@ import { DashboardFailureAlert } from './DashboardFailureAlert';
 import type { DashboardFailure, DashboardLot, DashboardSummary } from './types';
 
 const rotationMs = 15000;
+const pageEnter = keyframes`
+  from { opacity: 0.25; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+const rotationCountdown = keyframes`
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+`;
+const pageMotion = {
+  animation: `${pageEnter} 480ms ease-out`,
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+};
+const tones = {
+  blue: { solid: '#1d4ed8', surface: '#eff6ff' },
+  violet: { solid: '#6d28d9', surface: '#f5f3ff' },
+  green: { solid: '#047857', surface: '#ecfdf5' },
+  amber: { solid: '#b45309', surface: '#fffbeb' },
+  cyan: { solid: '#0e7490', surface: '#ecfeff' },
+  rose: { solid: '#be185d', surface: '#fff1f2' },
+  slate: { solid: '#475569', surface: '#f1f5f9' },
+};
+const metricAppearance = {
+  totalLots: { tone: tones.blue, Icon: Inventory2OutlinedIcon },
+  openLots: { tone: tones.violet, Icon: PendingActionsOutlinedIcon },
+  completedLots: { tone: tones.green, Icon: TaskAltOutlinedIcon },
+  inTransit: { tone: tones.amber, Icon: LocalShippingOutlinedIcon },
+  storageOccupancies: { tone: tones.cyan, Icon: WarehouseOutlinedIcon },
+  availableTrolleys: { tone: tones.rose, Icon: ShoppingCartOutlinedIcon },
+};
+const statusTones: Record<string, (typeof tones)[keyof typeof tones]> = {
+  READY: tones.slate,
+  DISPATCHED: tones.amber,
+  AT_STATION: tones.cyan,
+  IN_PROCESS: tones.blue,
+  READY_FOR_DISPATCH: tones.violet,
+  IN_STORAGE: tones.cyan,
+  AT_QC: tones.violet,
+  COMPLETED: tones.green,
+  CANCELLED: tones.rose,
+};
+const stationTones = [
+  tones.blue,
+  tones.violet,
+  tones.cyan,
+  tones.amber,
+  tones.rose,
+  tones.green,
+];
 export function FactoryTvView({ onExit }: { onExit: () => void }) {
   const { t } = useTranslation('translation');
   const root = useRef<HTMLDivElement>(null);
@@ -149,6 +204,9 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
     (stationPage %
       Math.max(1, Math.ceil((summary?.stations.length ?? 0) / 6))) *
     6;
+  const rotationKey = `${lots?.totalElements ?? 0}:${summary?.stations.length ?? 0}`;
+  const rotating =
+    (lots?.totalElements ?? 0) > 6 || (summary?.stations.length ?? 0) > 6;
   return (
     <Dialog
       fullScreen
@@ -158,11 +216,18 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
       slotProps={{
         paper: {
           ref: root,
-          sx: { bgcolor: '#f5f7fb', p: { xs: 2, lg: 3 }, overflow: 'auto' },
+          sx: {
+            bgcolor: '#091a30',
+            backgroundImage: 'linear-gradient(135deg, #091a30, #163555)',
+            color: '#f8fafc',
+            p: 2,
+            overflow: 'auto',
+            fontVariantNumeric: 'tabular-nums',
+          },
         },
       }}
     >
-      <Stack spacing={2}>
+      <Stack spacing={1.5} sx={{ width: '100%', maxWidth: 2200, mx: 'auto' }}>
         <Stack
           direction="row"
           sx={{
@@ -176,18 +241,47 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
             <Typography
               component="h1"
               id="factory-tv-title"
-              sx={{ fontSize: { xs: 26, lg: 36 }, fontWeight: 750 }}
+              sx={{
+                fontSize: { xs: 28, lg: 38 },
+                fontWeight: 800,
+                letterSpacing: '-0.03em',
+              }}
             >
-              Factory production · TV
+              Factory production
             </Typography>
-            <Typography color="text.secondary">
+            <Typography
+              sx={{ color: '#cbd5e1', fontSize: { xs: 14, lg: 17 }, mt: 0.5 }}
+            >
               {summary
                 ? `Updated ${formatDateTime(summary.snapshotAt, { timeZone: summary.productionTrend.timezone })}`
-                : 'Connecting to factory display…'}
+                : 'Connecting to factory display...'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <Chip
+              sx={{
+                height: 38,
+                fontSize: 16,
+                fontWeight: 750,
+                bgcolor: stale
+                  ? '#fef3c7'
+                  : summary && lots
+                    ? '#d1fae5'
+                    : '#e2e8f0',
+                color: stale
+                  ? '#92400e'
+                  : summary && lots
+                    ? '#065f46'
+                    : '#334155',
+                '&::before': {
+                  content: '""',
+                  width: 9,
+                  height: 9,
+                  borderRadius: '50%',
+                  bgcolor: 'currentColor',
+                  ml: 1.5,
+                },
+              }}
               label={
                 stale
                   ? 'Updates interrupted'
@@ -200,6 +294,12 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
               }
             />
             <Button
+              sx={{
+                color: '#e2e8f0',
+                fontSize: 15,
+                minHeight: 40,
+                '&:hover': { bgcolor: '#ffffff14' },
+              }}
               startIcon={<FullscreenOutlinedIcon />}
               onClick={async () => {
                 try {
@@ -213,7 +313,17 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
             >
               Fullscreen
             </Button>
-            <Button variant="outlined" onClick={() => void exit()}>
+            <Button
+              variant="outlined"
+              onClick={() => void exit()}
+              sx={{
+                color: '#fff',
+                borderColor: '#64748b',
+                fontSize: 15,
+                minHeight: 40,
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#ffffff14' },
+              }}
+            >
               Exit TV view
             </Button>
           </Stack>
@@ -248,29 +358,55 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
             gap: 2,
           }}
         >
-          {metrics.map(([key, value]) => (
-            <Paper key={key} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Typography
-                sx={{ fontSize: { xs: 14, lg: 18 }, color: 'text.secondary' }}
-              >
-                {t(`dashboard.${key}`)}
-              </Typography>
-              <Typography
+          {metrics.map(([key, value]) => {
+            const { tone, Icon } = metricAppearance[key];
+            return (
+              <Paper
+                key={key}
+                elevation={0}
                 sx={{
-                  fontSize: { xs: 32, lg: 48 },
-                  fontWeight: 750,
-                  color: 'primary.main',
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: tone.solid,
+                  color: '#fff',
+                  boxShadow: '0 8px 24px #00000020',
+                  minWidth: 0,
                 }}
               >
-                {value.toLocaleString()}
-              </Typography>
-            </Paper>
-          ))}
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 1,
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: { xs: 14, lg: 18 }, fontWeight: 650 }}
+                  >
+                    {t(`dashboard.${key}`)}
+                  </Typography>
+                  <Icon sx={{ fontSize: 28, opacity: 0.8, flexShrink: 0 }} />
+                </Stack>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 38, lg: 56 },
+                    fontWeight: 800,
+                    lineHeight: 1.1,
+                    mt: 1,
+                    letterSpacing: '-0.04em',
+                  }}
+                >
+                  {value.toLocaleString()}
+                </Typography>
+              </Paper>
+            );
+          })}
         </Box>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3 }}>
           <Typography
             component="h2"
-            sx={{ fontSize: 22, fontWeight: 700, mb: 1 }}
+            sx={{ fontSize: { xs: 22, lg: 25 }, fontWeight: 800, mb: 1.5 }}
           >
             Station workload
           </Typography>
@@ -278,6 +414,7 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
             <Typography>No station workload available.</Typography>
           )}
           <Box
+            key={stationStart}
             sx={{
               display: 'grid',
               gridTemplateColumns: {
@@ -286,44 +423,116 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
                 xl: 'repeat(6, minmax(0, 1fr))',
               },
               gap: 2,
+              ...pageMotion,
             }}
           >
             {summary?.stations
               .slice(stationStart, stationStart + 6)
-              .map((station) => (
-                <Box
-                  key={station.id}
-                  sx={{ bgcolor: '#edf4ff', p: 1.5, borderRadius: 1 }}
-                >
-                  <Typography sx={{ fontSize: 18, fontWeight: 600 }}>
-                    {station.name || station.code}
-                  </Typography>
-                  <Typography sx={{ fontSize: 30, fontWeight: 700 }}>
-                    {station.wip}{' '}
-                    <Box
-                      component="span"
-                      sx={{ fontSize: 15, fontWeight: 400 }}
+              .map((station, index) => {
+                const tone =
+                  stationTones[(stationStart + index) % stationTones.length];
+                return (
+                  <Box
+                    key={station.id}
+                    sx={{
+                      bgcolor: tone.surface,
+                      borderTop: `4px solid ${tone.solid}`,
+                      p: 1.5,
+                      borderRadius: 2,
+                      minWidth: 0,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: { xs: 17, lg: 20 },
+                        fontWeight: 700,
+                        lineHeight: 1.3,
+                        overflowWrap: 'anywhere',
+                      }}
                     >
-                      lots
-                    </Box>
-                  </Typography>
-                </Box>
-              ))}
+                      {station.name || station.code}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: { xs: 32, lg: 36 },
+                        fontWeight: 800,
+                        color: tone.solid,
+                        mt: 0.5,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {station.wip}{' '}
+                      <Box
+                        component="span"
+                        sx={{ fontSize: 17, fontWeight: 600, color: '#475569' }}
+                      >
+                        lots
+                      </Box>
+                    </Typography>
+                  </Box>
+                );
+              })}
           </Box>
         </Paper>
-        <Paper
-          variant="outlined"
-          sx={{ p: 2, borderRadius: 2, overflowX: 'auto' }}
-        >
-          <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
-            <Typography component="h2" sx={{ fontSize: 22, fontWeight: 700 }}>
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, overflowX: 'auto' }}>
+          <Stack
+            direction="row"
+            sx={{
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 1,
+              mb: 1.5,
+            }}
+          >
+            <Typography
+              component="h2"
+              sx={{ fontSize: { xs: 22, lg: 25 }, fontWeight: 800 }}
+            >
               Production lots
             </Typography>
-            <Typography color="text.secondary">
-              Page {(lots?.page ?? 0) + 1} of{' '}
-              {Math.max(1, Math.ceil((lots?.totalElements ?? 0) / 6))} · rotates
-              every 15 seconds
-            </Typography>
+            <Box sx={{ minWidth: { xs: 0, sm: 260 } }}>
+              <Typography
+                sx={{
+                  color: '#475569',
+                  bgcolor: '#f1f5f9',
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: 2,
+                  fontSize: 15,
+                  fontWeight: 600,
+                }}
+              >
+                Page {(lots?.page ?? 0) + 1} of{' '}
+                {Math.max(1, Math.ceil((lots?.totalElements ?? 0) / 6))} /
+                rotates every 15 seconds
+              </Typography>
+              {rotating && (
+                <Box
+                  aria-hidden="true"
+                  sx={{
+                    mt: 0.75,
+                    height: 4,
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    bgcolor: '#e2e8f0',
+                    '@media (prefers-reduced-motion: reduce)': {
+                      display: 'none',
+                    },
+                  }}
+                >
+                  <Box
+                    key={rotationKey}
+                    sx={{
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #1d4ed8, #06b6d4)',
+                      transformOrigin: 'left',
+                      animation: `${rotationCountdown} ${rotationMs}ms linear infinite`,
+                    }}
+                  />
+                </Box>
+              )}
+            </Box>
           </Stack>
           {!lots && !failure ? (
             <CircularProgress aria-label="Loading TV lots" />
@@ -333,7 +542,15 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
               sx={{
                 '& .MuiTableCell-root': {
                   fontSize: { xs: 16, lg: 20 },
-                  py: 1.5,
+                  py: 1,
+                  borderColor: '#e2e8f0',
+                },
+                '& .MuiTableHead-root .MuiTableCell-root': {
+                  bgcolor: '#163555',
+                  color: '#f8fafc',
+                  fontWeight: 700,
+                  fontSize: { xs: 15, lg: 18 },
+                  whiteSpace: 'nowrap',
                 },
               }}
             >
@@ -350,36 +567,91 @@ export function FactoryTvView({ onExit }: { onExit: () => void }) {
                   ))}
                 </TableRow>
               </TableHead>
-              <TableBody>
-                {lots?.items.map((lot) => (
-                  <TableRow key={lot.id}>
-                    <TableCell>
-                      <Typography sx={{ fontSize: 'inherit', fontWeight: 700 }}>
-                        {lot.style_number}
-                      </Typography>
-                      {lot.lot_number}
-                    </TableCell>
-                    <TableCell>{lot.quantity ?? '—'}</TableCell>
-                    <TableCell>
-                      {lot.current_station || '—'}
-                      <Typography sx={{ fontSize: 16 }} color="text.secondary">
-                        {lot.current_process || '—'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{lot.status.replaceAll('_', ' ')}</TableCell>
-                    <TableCell sx={{ minWidth: 170 }}>
-                      <Typography sx={{ fontSize: 'inherit', fontWeight: 700 }}>
-                        {lot.progress_percent}%
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={lot.progress_percent}
-                        aria-label={`Progress for ${lot.lot_number}`}
-                        sx={{ height: 10, borderRadius: 1 }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+              <TableBody key={lots?.page ?? 'loading'} sx={pageMotion}>
+                {lots?.items.map((lot, index) => {
+                  const tone = statusTones[lot.status] ?? tones.slate;
+                  return (
+                    <TableRow
+                      key={lot.id}
+                      sx={{ bgcolor: index % 2 === 0 ? '#fff' : '#f8fafc' }}
+                    >
+                      <TableCell sx={{ borderLeft: `4px solid ${tone.solid}` }}>
+                        <Typography
+                          sx={{
+                            fontSize: { xs: 14, lg: 16 },
+                            fontWeight: 600,
+                            color: '#475569',
+                          }}
+                        >
+                          {lot.style_number}
+                        </Typography>
+                        <Typography
+                          sx={{ fontSize: 'inherit', fontWeight: 800 }}
+                        >
+                          {lot.lot_number}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>
+                        {lot.quantity ?? '\u2014'}
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          sx={{ fontSize: 'inherit', fontWeight: 700 }}
+                        >
+                          {lot.current_station || '\u2014'}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: { xs: 15, lg: 17 },
+                            color: '#475569',
+                          }}
+                        >
+                          {lot.current_process || '\u2014'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={lot.status.replaceAll('_', ' ')}
+                          sx={{
+                            bgcolor: tone.surface,
+                            color: tone.solid,
+                            border: `1px solid ${tone.solid}40`,
+                            fontWeight: 800,
+                            fontSize: { xs: 13, lg: 16 },
+                            height: 36,
+                            whiteSpace: 'nowrap',
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ minWidth: 170 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 'inherit',
+                            fontWeight: 800,
+                            color: tone.solid,
+                            mb: 0.5,
+                          }}
+                        >
+                          {lot.progress_percent}%
+                        </Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={lot.progress_percent}
+                          aria-label={`Progress for ${lot.lot_number}`}
+                          sx={{
+                            height: 12,
+                            borderRadius: 2,
+                            bgcolor: '#e2e8f0',
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: tone.solid,
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {lots?.items.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5}>
