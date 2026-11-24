@@ -32,6 +32,7 @@ const manager = {
 beforeEach(() => {
   vi.mocked(getAccessRoleOptions).mockResolvedValue([
     { code: 'PROCESS_MANAGER', name: 'Process Manager' },
+    { code: 'SUPERVISOR', name: 'Supervisor' },
     { code: 'NW', name: 'NW' },
   ]);
   vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
@@ -59,7 +60,7 @@ async function chooseRole(
   await user.click(role);
   await user.click(screen.getByRole('option', { name }));
 }
-async function createManager() {
+async function createManager(roleName = 'Process Manager') {
   const user = userEvent.setup();
   const view = renderWithProviders(
     <UserForm onClose={vi.fn()} onCreate={createUser} />,
@@ -70,7 +71,7 @@ async function createManager() {
     'Manager',
   );
   await user.type(screen.getByLabelText(/Initial Password/), 'Password123!');
-  await chooseRole(user, 'Process Manager');
+  await chooseRole(user, roleName);
   await waitFor(() =>
     expect(
       screen.getByRole('combobox', { name: 'Assigned Processes' }),
@@ -89,28 +90,38 @@ async function selectProcesses(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}');
 }
 describe('user process assignments', () => {
-  it('creates a Process Manager with multiple selected processes and chip labels', async () => {
-    const { user } = await createManager();
-    await selectProcesses(user);
-    expect(
-      screen.getByRole('button', { name: 'Washing (Station 03)' }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Drying (Station 04)' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Save User' }));
-    expect(apiClient.post).toHaveBeenCalledWith(
-      'users',
-      expect.objectContaining({
-        role: 'PROCESS_MANAGER',
-        processAssignments: [
-          { processId: 'wash', activeOnShift: true },
-          { processId: 'dry', activeOnShift: true },
-        ],
-      }),
-      expect.anything(),
-    );
-  });
+  it.each([
+    ['Process Manager', 'PROCESS_MANAGER'],
+    ['Supervisor', 'SUPERVISOR'],
+  ])(
+    'creates a %s with multiple selected processes and chip labels',
+    async (roleName, role) => {
+      vi.mocked(apiClient.post).mockResolvedValue({
+        status: 200,
+        data: { ...manager, role },
+      });
+      const { user } = await createManager(roleName);
+      await selectProcesses(user);
+      expect(
+        screen.getByRole('button', { name: 'Washing (Station 03)' }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole('button', { name: 'Drying (Station 04)' }),
+      ).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Save User' }));
+      expect(apiClient.post).toHaveBeenCalledWith(
+        'users',
+        expect.objectContaining({
+          role,
+          processAssignments: [
+            { processId: 'wash', activeOnShift: true },
+            { processId: 'dry', activeOnShift: true },
+          ],
+        }),
+        expect.anything(),
+      );
+    },
+  );
 
   it('clears hidden assignments when changing to a different role', async () => {
     const { user } = await createManager();
@@ -127,40 +138,78 @@ describe('user process assignments', () => {
     );
   });
 
-  it('prefills assignments, removes one chip, preserves shift flags, and saves through the editor', async () => {
-    const user = userEvent.setup(),
-      updated = vi.fn();
-    renderWithProviders(
-      <UserEditor
-        userId={manager.id}
-        onClose={vi.fn()}
-        onReload={vi.fn()}
-        onUpdated={updated}
-      />,
-    );
-    await screen.findByRole('button', { name: 'Drying (Station 04)' });
+  it('keeps process selection available when switching from Process Manager to Supervisor', async () => {
+    const { user } = await createManager();
+    await selectProcesses(user);
+    await chooseRole(user, 'Supervisor');
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Save User' })).toBeEnabled(),
     );
-    const chip = screen.getByRole('button', { name: 'Drying (Station 04)' });
-    await user.click(within(chip).getByTestId('CancelIcon'));
     expect(
-      screen.queryByRole('button', { name: 'Drying (Station 04)' }),
+      screen.queryByRole('button', { name: 'Washing (Station 03)' }),
     ).not.toBeInTheDocument();
+    await selectProcesses(user);
     await user.click(screen.getByRole('button', { name: 'Save User' }));
-    expect(apiClient.put).toHaveBeenCalledWith(
-      `users/${manager.id}`,
-      {
-        username: manager.username,
-        displayName: manager.display_name,
-        status: manager.enabled ? 'ACTIVE' : 'INACTIVE',
-        role: 'PROCESS_MANAGER',
-        processAssignments: [{ processId: 'wash', activeOnShift: false }],
-      },
+    expect(apiClient.post).toHaveBeenCalledWith(
+      'users',
+      expect.objectContaining({
+        role: 'SUPERVISOR',
+        processAssignments: [
+          { processId: 'wash', activeOnShift: true },
+          { processId: 'dry', activeOnShift: true },
+        ],
+      }),
       expect.anything(),
     );
-    expect(updated).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['PROCESS_MANAGER', 'SUPERVISOR'])(
+    'prefills %s assignments, removes one chip, preserves shift flags, and saves through the editor',
+    async (role) => {
+      const original = vi.mocked(apiClient.get).getMockImplementation()!;
+      vi.mocked(apiClient.get).mockImplementation((url, config) =>
+        url === 'ui/lookups'
+          ? original(url, config)
+          : Promise.resolve({ status: 200, data: { ...manager, role } }),
+      );
+      vi.mocked(apiClient.put).mockResolvedValue({
+        status: 200,
+        data: { ...manager, role },
+      });
+      const user = userEvent.setup(),
+        updated = vi.fn();
+      renderWithProviders(
+        <UserEditor
+          userId={manager.id}
+          onClose={vi.fn()}
+          onReload={vi.fn()}
+          onUpdated={updated}
+        />,
+      );
+      await screen.findByRole('button', { name: 'Drying (Station 04)' });
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Save User' })).toBeEnabled(),
+      );
+      const chip = screen.getByRole('button', { name: 'Drying (Station 04)' });
+      await user.click(within(chip).getByTestId('CancelIcon'));
+      expect(
+        screen.queryByRole('button', { name: 'Drying (Station 04)' }),
+      ).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Save User' }));
+      expect(apiClient.put).toHaveBeenCalledWith(
+        `users/${manager.id}`,
+        {
+          username: manager.username,
+          displayName: manager.display_name,
+          status: manager.enabled ? 'ACTIVE' : 'INACTIVE',
+          role,
+          processAssignments: [{ processId: 'wash', activeOnShift: false }],
+        },
+        expect.anything(),
+      );
+      expect(updated).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('keeps selected processes and shows a backend update error without its HTTP code', async () => {
     vi.mocked(apiClient.put).mockResolvedValue({

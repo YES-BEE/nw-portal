@@ -365,7 +365,7 @@
       "processes": "Assigned Processes",
       "selectProcesses": "Select processes",
       "loadingProcesses": "Loading processes...",
-      "processesHint": "Select the processes this user will manage.",
+      "processesHint": "Select the processes this user will manage or supervise.",
       "processOption": "{{name}} (Station {{station}})",
       "unavailableProcess": "Unavailable process",
       "unavailableProcessesHint": "Some assigned processes are no longer available. Remove them before saving.",

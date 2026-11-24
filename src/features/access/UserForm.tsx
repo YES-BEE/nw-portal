@@ -63,7 +63,9 @@ export function UserForm({
     active: initial?.enabled ?? true,
   });
   const [processesReady, setProcessesReady] = useState(false);
-  const isProcessManager = draft.role === 'PROCESS_MANAGER';
+  const supportsProcessAssignments = ['PROCESS_MANAGER', 'SUPERVISOR'].includes(
+    draft.role,
+  );
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<UsersFailure | null>(null);
@@ -127,7 +129,11 @@ export function UserForm({
         noValidate
         onSubmit={async (event) => {
           event.preventDefault();
-          if (pending.current || (isProcessManager && !processesReady)) return;
+          if (
+            pending.current ||
+            (supportsProcessAssignments && !processesReady)
+          )
+            return;
           setSubmitted(true);
           if (Object.values(requiredErrors).some(Boolean)) return;
           const controller = new AbortController();
@@ -196,8 +202,9 @@ export function UserForm({
             errorMessage={fieldError('role')}
           />
         </Stack>
-        {isProcessManager && (
+        {supportsProcessAssignments && (
           <UserProcessSelect
+            key={draft.role}
             value={draft.processAssignments}
             initial={initial?.processAssignments}
             disabled={saving}
@@ -292,11 +299,12 @@ export function UserForm({
             </AlertTitle>
             {failure.message ||
               t(`access.users.failures.${failure.kind}.description`)}
-            {!isProcessManager && failure.fieldErrors?.processAssignments && (
-              <Typography variant="body2">
-                {failure.fieldErrors.processAssignments}
-              </Typography>
-            )}
+            {!supportsProcessAssignments &&
+              failure.fieldErrors?.processAssignments && (
+                <Typography variant="body2">
+                  {failure.fieldErrors.processAssignments}
+                </Typography>
+              )}
             {!failure.message && failure.status !== undefined && (
               <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
                 {t('access.users.failureStatus', { status: failure.status })}
@@ -315,7 +323,7 @@ export function UserForm({
           <Button
             type="submit"
             variant="contained"
-            disabled={saving || (isProcessManager && !processesReady)}
+            disabled={saving || (supportsProcessAssignments && !processesReady)}
           >
             {t(
               saving
