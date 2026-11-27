@@ -40,7 +40,7 @@ src/
     dashboard/        # Live production metrics and lot status
     reports/          # Paginated style and lot progress reports
     processes/        # Backend process list, editor, and validation
-    storages/         # Backend storage area list, editor, and validation
+    storages/         # Backend storage area/unit lists, editors, and validation
     styles/           # Shared style list, editor, ordered process route, and details
     tags/             # Tag management, assignment lookup, validation
   layouts/            # Responsive configuration shell and collapsible navigation
@@ -105,9 +105,9 @@ Records persist in browser storage under `nw-track-process-config-v4`. Missing d
 
 ## Storage configurations
 
-`/configurations/storages` provides the existing-storage table and add/edit form with Storage Number, Description, and a compact NFC Tag ID dropdown. It follows the shared outlined-field theme, static labels, MUI icon actions, title-case headings, and delete confirmations. There is no demo-reset button or table subtitle.
+`/configurations/storages` lists areas from `GET /storage-areas` and units from `GET /storage-locations`. Area creation selects an active station from paginated `GET /stations` and sends its `stationId`, `storageNumber`, optional `name`/`description`, and a required registered `tagId` to `POST /storage-areas`. Areas require exactly one NFC tag. Saving opens unit creation under the new area; each active area also has an Add unit action. Unit creation selects an existing active storage area and submits `code`, `name`, and optional registered `nfcUids` to `POST /storage-areas/{areaId}/units`. The station is inherited from the parent area. NFC choices come from `/ui/lookups` and exclude already assigned tags.
 
-Storage numbers must be unique regardless of case, and NFC tags must be registered and unused by another storage, process, or device. Deleting a storage releases its tag for other configurations. Changes persist in browser storage under `nw-track-storages-v2`. Failed writes keep existing records and the editor intact; malformed records show an empty list with a warning. No backend is connected.
+Unit edits submit only `code` and `name` to `PUT /storage-units/{id}`; the backend does not update NFC assignments or the parent area through this operation. Unit details and status responses use the joined `/storage-locations/{id}` projection. Activation and deactivation use `PATCH /storage-locations/{id}/status`; this screen does not delete storage areas. Units accept zero or multiple NFC tags. Backend validation, NFC conflicts, missing records, access failures, and service errors retain their Problem Detail messages, with field errors shown beside the applicable inputs.
 
 ## Tag management
 

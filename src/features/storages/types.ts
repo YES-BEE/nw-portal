@@ -1,37 +1,54 @@
-// AssetAdministrationController.AREA_SELECT and areaView aliases.
-export interface StorageAreaResponse {
+// AssetAdministrationController.UnitCommand and unit(id).
+export interface StorageUnitRecord {
+  id: string;
+  station_id: string;
+  storage_area_id: string;
+  code: string;
+  name: string;
+  active: boolean;
+  version: number;
+}
+// MasterDataController.STORAGE_SELECT (storage-locations list/detail/status).
+export interface StorageUnitResponse extends StorageUnitRecord {
+  station_code: string;
+  storage_area_code: string;
+}
+export interface StorageUnitRequest {
+  code: string;
+  name: string;
+  nfcUids?: string[];
+}
+export type UpdateStorageUnitRequest = Pick<
+  StorageUnitRequest,
+  'code' | 'name'
+>;
+export interface StorageUnitStatusRequest {
+  active: boolean;
+}
+export interface StorageAreaOptionResponse {
   id: string;
   station_id: string;
   station_code: string;
   code: string;
   name: string;
-  description: string | null;
   active: boolean;
+}
+export interface StorageAreaResponse extends StorageAreaOptionResponse {
+  description: string | null;
   version: number;
-  storage_number: string;
-  station_number: string;
   nfc_uid: string | null;
-  storageNumber: string;
-  stationNumber: string;
-  nfcUid: string | null;
 }
-// AreaCommand supports station reference or UUID, and registered tag UID or UUID.
 export interface StorageAreaRequest {
+  stationId: string;
   storageNumber: string;
-  stationNumber?: string | null;
-  stationId?: string | null;
-  name?: string | null;
-  description?: string | null;
-  nfcUid?: string | null;
-  tagId?: string | null;
-  nfcUids?: string[] | null;
+  name?: string;
+  description?: string;
+  tagId: string;
 }
-export type CreateStorageAreaResponse = StorageAreaResponse;
-export type UpdateStorageAreaResponse = StorageAreaResponse;
-export interface DeleteStorageAreaResponse extends StorageAreaResponse {
-  active: false;
-}
-export interface StorageAreaStatusRequest {
+export interface StorageStationOption {
+  id: string;
+  code: string;
+  name: string;
   active: boolean;
 }
 export interface StorageTagOptionResponse {
@@ -58,5 +75,19 @@ export interface StorageFailure {
   message?: string;
   status?: number;
   code?: string;
-  fieldErrors?: Partial<Record<keyof StorageAreaRequest, string>>;
+  fieldErrors?: Partial<
+    Record<
+      | 'code'
+      | 'name'
+      | 'nfcUids'
+      | 'storageAreaId'
+      | 'stationId'
+      | 'stationNumber'
+      | 'storageNumber'
+      | 'description'
+      | 'tagId'
+      | 'nfcUid',
+      string
+    >
+  >;
 }

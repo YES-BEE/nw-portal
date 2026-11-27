@@ -8,20 +8,16 @@ import {
   DialogContentText,
   DialogTitle,
 } from '@mui/material';
-import {
-  deleteStorageArea,
-  setStorageAreaStatus,
-  storageFailure,
-} from './storagesApi';
+import { setStorageUnitStatus, storageFailure } from './storagesApi';
 import { StorageFailureAlert } from './StorageFailureAlert';
-import type { StorageAreaResponse, StorageFailure } from './types';
+import type { StorageUnitResponse, StorageFailure } from './types';
 export function StorageStatusDialog({
   record,
   onClose,
   onSaved,
   onReload,
 }: {
-  record: StorageAreaResponse;
+  record: StorageUnitResponse;
   onClose: () => void;
   onSaved: () => void;
   onReload: () => void;
@@ -38,13 +34,11 @@ export function StorageStatusDialog({
     setSaving(true);
     setFailure(null);
     try {
-      if (record.active) await deleteStorageArea(record.id, controller.signal);
-      else
-        await setStorageAreaStatus(
-          record.id,
-          { active: true },
-          controller.signal,
-        );
+      await setStorageUnitStatus(
+        record.id,
+        { active: !record.active },
+        controller.signal,
+      );
       if (!controller.signal.aborted) onSaved();
     } catch (error: unknown) {
       if (!controller.signal.aborted) setFailure(storageFailure(error));
@@ -70,7 +64,7 @@ export function StorageStatusDialog({
             record.active
               ? 'storages.deleteMessage'
               : 'storages.restoreMessage',
-            { number: record.storageNumber },
+            { number: record.code },
           )}
         </DialogContentText>
         {failure && (

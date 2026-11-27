@@ -4,7 +4,11 @@ import {
   styleRouteResponse,
   styleProcessOptions,
 } from '../test/styles';
-import { storageAreaResponse, storageTags } from '../test/storages';
+import {
+  storageAreaResponse,
+  storageUnitResponse,
+  storageTags,
+} from '../test/storages';
 import {
   lotResponse,
   lotEvent,
@@ -40,7 +44,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
-  vi.spyOn(apiClient, 'get').mockImplementation(async (url) => ({
+  vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => ({
     status: 200,
     data:
       url === 'reports/catalog'
@@ -58,17 +62,19 @@ beforeEach(() => {
                 ? styleRouteResponse
                 : url.startsWith('styles/')
                   ? { ...styleResponse, id: url.slice('styles/'.length) }
-                  : url.startsWith('storage-areas/')
-                    ? {
-                        ...storageAreaResponse,
-                        id: url.slice('storage-areas/'.length),
-                      }
-                    : url.startsWith('processes/')
+                  : url === 'storage-areas'
+                    ? apiPage([storageAreaResponse], config?.params, 100)
+                    : url.startsWith('storage-locations/')
                       ? {
-                          ...processResponse,
-                          id: url.slice('processes/'.length),
+                          ...storageUnitResponse,
+                          id: url.slice('storage-locations/'.length),
                         }
-                      : apiPage([], undefined, 10),
+                      : url.startsWith('processes/')
+                        ? {
+                            ...processResponse,
+                            id: url.slice('processes/'.length),
+                          }
+                        : apiPage([], undefined, 10),
   }));
   vi.spyOn(apiClient, 'post').mockResolvedValue({ status: 204, data: null });
   seedTestData();
@@ -878,7 +884,7 @@ describe('application routing', () => {
   it.each([
     {
       path: '/configurations/storages',
-      action: 'Add New Storage',
+      action: 'Add Storage Unit',
       label: /NFC Tag/,
     },
   ])(

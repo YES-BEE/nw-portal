@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
   Box,
   Button,
+  Checkbox,
+  Chip,
   CircularProgress,
   IconButton,
   MenuItem,
@@ -13,39 +16,44 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import {
-  createStorageArea,
-  getStorageArea,
+  createStorageUnit,
+  getStorageUnit,
+  getStorageAreaOptions,
   getStorageTags,
   storageFailure,
-  updateStorageArea,
+  updateStorageUnit,
 } from './storagesApi';
 import { StorageFailureAlert } from './StorageFailureAlert';
 import type {
-  StorageAreaResponse,
+  StorageUnitResponse,
+  StorageAreaOptionResponse,
   StorageFailure,
   StorageTagOptionResponse,
 } from './types';
 
 export function StorageForm({
   storageId,
+  initialAreaId,
   onClose,
   onSaved,
   onReload,
 }: {
   storageId?: string;
+  initialAreaId?: string;
   onClose: () => void;
   onSaved: () => void;
   onReload: () => void;
 }) {
   const { t } = useTranslation('translation');
-  const [source, setSource] = useState<StorageAreaResponse | null>(null);
+  const [source, setSource] = useState<StorageUnitResponse | null>(null);
+  const [areas, setAreas] = useState<StorageAreaOptionResponse[]>([]);
   const [tags, setTags] = useState<StorageTagOptionResponse[]>([]);
-  const [number, setNumber] = useState('');
-  const [station, setStation] = useState('');
-  const [description, setDescription] = useState('');
-  const [selected, setSelected] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [areaId, setAreaId] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [failure, setFailure] = useState<StorageFailure | null>(null);
@@ -57,26 +65,24 @@ export function StorageForm({
     const controller = new AbortController();
     void Promise.all([
       storageId
-        ? getStorageArea(storageId, controller.signal)
+        ? getStorageUnit(storageId, controller.signal)
         : Promise.resolve(null),
-      getStorageTags(controller.signal),
+      storageId
+        ? Promise.resolve([])
+        : getStorageAreaOptions(controller.signal),
+      storageId ? Promise.resolve([]) : getStorageTags(controller.signal),
     ]).then(
-      ([record, options]) => {
+      ([record, areaOptions, tagOptions]) => {
         if (controller.signal.aborted) return;
         setSource(record);
-        setTags(options);
-        setNumber(record?.storageNumber || '');
-        setStation(record?.stationNumber || '');
-        setDescription(record?.description || '');
-        setSelected(
-          record?.nfcUid
-            ? options.find(
-                (tag) => tag.uid.toUpperCase() === record.nfcUid!.toUpperCase(),
-              )?.id || 'current'
-            : '',
-        );
-        setLoading(false);
+        setAreas(areaOptions);
+        setTags(tagOptions);
+        setCode(record?.code ?? '');
+        setName(record?.name ?? '');
+        setAreaId(record?.storage_area_id ?? initialAreaId ?? '');
+        setSelectedTags([]);
         setLoaded(true);
+        setLoading(false);
       },
       (error) => {
         if (!controller.signal.aborted) {
@@ -86,54 +92,52 @@ export function StorageForm({
       },
     );
     return () => controller.abort();
-  }, [storageId, attempt]);
+  }, [storageId, initialAreaId, attempt]);
   useEffect(() => () => pending.current?.abort(), []);
   const available = tags.filter(
-    (tag) =>
-      tag.status === 'ACTIVE' &&
-      (!tag.assigned ||
-        tag.uid.toUpperCase() === source?.nfcUid?.toUpperCase()),
+    (tag) => tag.status === 'ACTIVE' && !tag.assigned,
   );
-  const numberError =
-    failure?.fieldErrors?.storageNumber ||
-    (submitted && !number.trim()
+  const area = areas.find((item) => item.id === areaId);
+  const codeError =
+    failure?.fieldErrors?.code ||
+    (submitted && !code.trim()
       ? t('storages.errors.numberRequired')
       : undefined);
-  const stationError =
-    failure?.fieldErrors?.stationNumber ||
+  const nameError =
+    failure?.fieldErrors?.name ||
+    (submitted && !name.trim() ? t('storages.errors.nameRequired') : undefined);
+  const areaError =
+    failure?.fieldErrors?.storageAreaId ||
     failure?.fieldErrors?.stationId ||
-    (submitted && !station.trim()
-      ? t('storages.errors.stationRequired')
+    (submitted && !storageId && !area
+      ? t('storages.errors.areaRequired')
       : undefined);
-  const tagError =
-    failure?.fieldErrors?.tagId ||
-    failure?.fieldErrors?.nfcUid ||
-    failure?.fieldErrors?.nfcUids ||
-    (submitted && !selected ? t('storages.errors.tagRequired') : undefined);
   function edited() {
     setFailure(null);
   }
   async function save() {
     if (pending.current || !loaded) return;
     setSubmitted(true);
-    if (!number.trim() || !station.trim() || !selected) return;
+    if (!code.trim() || !name.trim() || (!storageId && !area)) return;
     const controller = new AbortController();
     pending.current = controller;
     setSaving(true);
     setFailure(null);
-    const body = {
-      storageNumber: number.trim(),
-      stationNumber: station.trim(),
-      description: description.trim(),
-      ...(source ? { name: source.name } : {}),
-      ...(selected === 'current' && source?.nfcUid
-        ? { nfcUid: source.nfcUid }
-        : { tagId: selected }),
-    };
     try {
+      const body = { code: code.trim(), name: name.trim() };
       if (storageId)
-        await updateStorageArea(storageId, body, controller.signal);
-      else await createStorageArea(body, controller.signal);
+        await updateStorageUnit(storageId, body, controller.signal);
+      else
+        await createStorageUnit(
+          areaId,
+          {
+            ...body,
+            nfcUids: selectedTags.map(
+              (id) => available.find((tag) => tag.id === id)!.uid,
+            ),
+          },
+          controller.signal,
+        );
       if (!controller.signal.aborted) onSaved();
     } catch (error: unknown) {
       if (!controller.signal.aborted) setFailure(storageFailure(error));
@@ -170,14 +174,17 @@ export function StorageForm({
             {t(storageId ? 'storages.edit' : 'storages.add')}
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 0.5 }}>
-            {t('storages.formDescription')}
+            {t(
+              storageId
+                ? 'storages.editDescription'
+                : 'storages.formDescription',
+            )}
           </Typography>
         </Box>
         <IconButton
-          size="small"
           disabled={saving}
-          aria-label={t('storages.close')}
           onClick={onClose}
+          aria-label={t('storages.close')}
         >
           <CloseIcon fontSize="small" />
         </IconButton>
@@ -200,7 +207,7 @@ export function StorageForm({
                   ? () => {
                       setFailure(null);
                       setLoading(true);
-                      setAttempt((v) => v + 1);
+                      setAttempt((value) => value + 1);
                     }
                   : undefined
               }
@@ -210,93 +217,151 @@ export function StorageForm({
             <CircularProgress size={28} aria-label={t('common.loading')} />
           )}
           {loaded && (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                gap: 2.5,
-              }}
-            >
-              <TextField
-                required
-                autoFocus
-                label={t('storages.number')}
-                placeholder={t('storages.numberPlaceholder')}
-                value={number}
-                disabled={saving}
-                error={!!numberError}
-                helperText={numberError}
-                slotProps={{ htmlInput: { maxLength: 80 } }}
-                onChange={(e) => {
-                  setNumber(e.target.value);
-                  edited();
-                }}
-              />
-              <TextField
-                required
-                label={t('storages.station')}
-                placeholder={t('storages.stationPlaceholder')}
-                value={station}
-                disabled={saving}
-                error={!!stationError}
-                helperText={stationError}
-                slotProps={{ htmlInput: { maxLength: 50 } }}
-                onChange={(e) => {
-                  setStation(e.target.value);
-                  edited();
-                }}
-              />
-              <TextField
-                required
-                select
-                label={t('storages.tag')}
-                value={selected}
-                disabled={
-                  saving || (!available.length && selected !== 'current')
-                }
-                error={!!tagError}
-                helperText={
-                  !available.length && selected !== 'current'
-                    ? t('storages.noTags')
-                    : tagError
-                }
-                slotProps={{
-                  inputLabel: { shrink: true },
-                  select: { displayEmpty: true },
-                }}
-                onChange={(e) => {
-                  setSelected(e.target.value);
-                  edited();
+            <>
+              {!storageId && !areas.length && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  {t('storages.noAreas')}
+                </Alert>
+              )}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                  gap: 2.5,
                 }}
               >
-                <MenuItem value="">{t('storages.selectTag')}</MenuItem>
-                {selected === 'current' && (
-                  <MenuItem value="current">
-                    {t('storages.currentTag')}
-                  </MenuItem>
+                <TextField
+                  required
+                  autoFocus
+                  label={t('storages.number')}
+                  placeholder={t('storages.numberPlaceholder')}
+                  value={code}
+                  disabled={saving}
+                  error={!!codeError}
+                  helperText={codeError}
+                  slotProps={{ htmlInput: { maxLength: 80 } }}
+                  onChange={(event) => {
+                    setCode(event.target.value);
+                    edited();
+                  }}
+                />
+                <TextField
+                  required
+                  label={t('storages.name')}
+                  value={name}
+                  disabled={saving}
+                  error={!!nameError}
+                  helperText={nameError}
+                  slotProps={{ htmlInput: { maxLength: 150 } }}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    edited();
+                  }}
+                />
+                {storageId ? (
+                  <TextField
+                    label={t('storages.area')}
+                    value={source?.storage_area_code ?? ''}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                ) : (
+                  <TextField
+                    select
+                    required
+                    label={t('storages.area')}
+                    value={areaId}
+                    disabled={saving || !areas.length}
+                    error={!!areaError}
+                    helperText={areaError}
+                    slotProps={{
+                      inputLabel: { shrink: true },
+                      select: { displayEmpty: true },
+                    }}
+                    onChange={(event) => {
+                      setAreaId(event.target.value);
+                      edited();
+                    }}
+                  >
+                    <MenuItem value="">{t('storages.selectArea')}</MenuItem>
+                    {areas.map((item) => (
+                      <MenuItem key={item.id} value={item.id}>
+                        {item.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 )}
-                {available.map((tag) => (
-                  <MenuItem key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                label={t('storages.description')}
-                placeholder={t('storages.descriptionPlaceholder')}
-                multiline
-                minRows={3}
-                value={description}
-                disabled={saving}
-                error={!!failure?.fieldErrors?.description}
-                helperText={failure?.fieldErrors?.description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  edited();
-                }}
-                sx={{ gridColumn: '1 / -1' }}
-              />
-            </Box>
+                <TextField
+                  label={t('storages.station')}
+                  value={source?.station_code ?? area?.station_code ?? ''}
+                  helperText={t('storages.stationDerived')}
+                  slotProps={{ input: { readOnly: true } }}
+                />
+                {!storageId && (
+                  <TextField
+                    select
+                    fullWidth
+                    label={t('storages.tag')}
+                    value={selectedTags}
+                    disabled={saving || !available.length}
+                    error={!!failure?.fieldErrors?.nfcUids}
+                    helperText={
+                      failure?.fieldErrors?.nfcUids ||
+                      (!available.length
+                        ? t('storages.noTags')
+                        : t('storages.tagsOptional'))
+                    }
+                    sx={{ gridColumn: '1 / -1', width: '100%', maxWidth: 420 }}
+                    slotProps={{
+                      inputLabel: { shrink: true },
+                      select: {
+                        multiple: true,
+                        displayEmpty: true,
+                        renderValue: () =>
+                          selectedTags.length ? (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 0.5,
+                              }}
+                            >
+                              {selectedTags.map((id) => (
+                                <Chip
+                                  key={id}
+                                  size="small"
+                                  label={
+                                    available.find((tag) => tag.id === id)?.name
+                                  }
+                                />
+                              ))}
+                            </Box>
+                          ) : (
+                            t('storages.selectTag')
+                          ),
+                      },
+                    }}
+                    onChange={(event) => {
+                      setSelectedTags(
+                        typeof event.target.value === 'string'
+                          ? event.target.value.split(',')
+                          : (event.target.value as string[]),
+                      );
+                      edited();
+                    }}
+                  >
+                    {available.map((tag) => (
+                      <MenuItem key={tag.id} value={tag.id}>
+                        <Checkbox
+                          size="small"
+                          checked={selectedTags.includes(tag.id)}
+                        />
+                        {tag.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              </Box>
+            </>
           )}
         </Box>
         <Stack
@@ -320,7 +385,7 @@ export function StorageForm({
               loading ||
               !loaded ||
               saving ||
-              (!available.length && selected !== 'current') ||
+              (!storageId && !areas.length) ||
               failure?.action === 'signIn' ||
               failure?.action === 'reload' ||
               failure?.kind === 'access'

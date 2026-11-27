@@ -5,31 +5,35 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { apiClient } from '../../api/client';
 import { renderWithProviders } from '../../test/render';
-import { storageAreaResponse as area, storageTags } from '../../test/storages';
-import type { StorageAreaResponse } from './types';
+import {
+  storageAreaResponse as area,
+  storageUnitResponse as unit,
+  storageTags,
+} from '../../test/storages';
+import type { StorageUnitResponse } from './types';
 import { StorageConfigurationsPage } from './StorageConfigurationsPage';
-let records: StorageAreaResponse[];
+let records: StorageUnitResponse[];
 beforeEach(() => {
-  records = [area];
+  records = [unit];
   vi.spyOn(apiClient, 'get').mockImplementation(async (url, config) => {
     if (url === 'ui/lookups')
       return {
         status: 200,
         data: { tags: apiPage(storageTags, config?.params, 20) },
       };
-    if (url !== 'storage-areas')
+    if (url === 'storage-areas')
+      return { status: 200, data: apiPage([area], config?.params, 100) };
+    if (url !== 'storage-locations')
       return {
         status: 200,
-        data: records.find((record) => url === 'storage-areas/' + record.id),
+        data: records.find((item) => url === 'storage-locations/' + item.id),
       };
     const query = config!.params as {
       page: number;
       size: number;
       search: string;
     };
-    const matches = records.filter((record) =>
-      record.storageNumber.includes(query.search),
-    );
+    const matches = records.filter((item) => item.code.includes(query.search));
     return {
       status: 200,
       data: {
@@ -53,137 +57,157 @@ function setup() {
     ),
   };
 }
-it('lists API storage areas and tag names without reading or writing browser-local storage records', async () => {
-  localStorage.setItem(
-    'nw-track-storages-v2',
-    JSON.stringify([{ id: 'old', number: 'Local only' }]),
-  );
+it('lists backend units and their parent areas without depending on tag lookups', async () => {
   setup();
   const row = (
-    await screen.findByRole('rowheader', { name: 'ST-001' })
+    await screen.findByRole('rowheader', { name: unit.code })
   ).closest('tr')!;
+  expect(within(row).getByText(unit.name)).toBeVisible();
+  expect(within(row).getByText(unit.storage_area_code)).toBeVisible();
   expect(within(row).getByText('03')).toBeVisible();
-  expect(await within(row).findByText('Holding Area Tag')).toBeVisible();
-  expect(screen.queryByText('PRIVATE-STORAGE-UID')).not.toBeInTheDocument();
-  expect(screen.queryByText('Local only')).not.toBeInTheDocument();
   expect(
-    screen.getByRole('link', { name: 'View storage ST-001' }),
-  ).toHaveAttribute('href', '/configurations/storages/area-1');
+    screen.getByRole('link', { name: 'View storage unit ST-001' }),
+  ).toHaveAttribute('href', '/configurations/storages/unit-1');
   expect(apiClient.get).toHaveBeenCalledWith(
-    'storage-areas',
+    'storage-locations',
     expect.objectContaining({ params: { page: 0, size: 10, search: '' } }),
   );
 });
-it('opens backend creation and loads a fresh edit record', async () => {
+it('opens unit creation and loads fresh details for unit editing', async () => {
   const { user } = setup();
-  await screen.findByRole('rowheader', { name: 'ST-001' });
-  await user.click(screen.getByRole('button', { name: 'Add New Storage' }));
-  await screen.findByRole('textbox', { name: /Station Number/ });
+  await screen.findByRole('rowheader', { name: unit.code });
+  await user.click(screen.getByRole('button', { name: 'Add Storage Unit' }));
+  expect(
+    await screen.findByRole('combobox', { name: /Storage Area/ }),
+  ).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
-  await user.click(screen.getByRole('button', { name: 'Edit storage ST-001' }));
+  await user.click(
+    screen.getByRole('button', { name: 'Edit storage unit ST-001' }),
+  );
   await waitFor(() =>
-    expect(screen.getByRole('textbox', { name: /Storage Number/ })).toHaveValue(
-      'ST-001',
-    ),
+    expect(
+      screen.getByRole('textbox', { name: /Storage Unit Code/ }),
+    ).toHaveValue(unit.code),
   );
   expect(apiClient.get).toHaveBeenCalledWith(
-    'storage-areas/area-1',
-    expect.any(Object),
+    'storage-locations/unit-1',
+    expect.anything(),
   );
 });
-it('confirms DELETE, releases tags according to the backend response, and restores using PATCH', async () => {
-  const remove = vi.spyOn(apiClient, 'delete').mockImplementation(async () => {
-    records = [{ ...area, active: false, nfcUid: null, nfc_uid: null }];
-    return { status: 200, data: records[0] };
-  });
-  const patch = vi.spyOn(apiClient, 'patch').mockImplementation(async () => {
-    records = [{ ...records[0], active: true }];
-    return { status: 200, data: records[0] };
-  });
+it('deactivates and activates a unit using PATCH without deleting its area', async () => {
+  const patch = vi
+    .spyOn(apiClient, 'patch')
+    .mockImplementation(async (_, body) => {
+      records = [{ ...unit, active: (body as { active: boolean }).active }];
+      return { status: 200, data: records[0] };
+    });
+  const remove = vi.spyOn(apiClient, 'delete');
   const { user } = setup();
   await user.click(
-    await screen.findByRole('button', { name: 'Delete storage ST-001' }),
+    await screen.findByRole('button', {
+      name: 'Deactivate storage unit ST-001',
+    }),
+  );
+  expect(patch).not.toHaveBeenCalled();
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Deactivate',
+    }),
+  );
+  await user.click(
+    await screen.findByRole('button', { name: 'Activate storage unit ST-001' }),
+  );
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Activate',
+    }),
+  );
+  await screen.findByRole('button', { name: 'Deactivate storage unit ST-001' });
+  expect(patch).toHaveBeenNthCalledWith(
+    1,
+    'storage-locations/unit-1/status',
+    { active: false },
+    expect.anything(),
+  );
+  expect(patch).toHaveBeenNthCalledWith(
+    2,
+    'storage-locations/unit-1/status',
+    { active: true },
+    expect.anything(),
   );
   expect(remove).not.toHaveBeenCalled();
-  expect(screen.getByRole('dialog')).toHaveTextContent(
-    'its units will become inactive',
-  );
-  await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
-  );
-  await user.click(
-    await screen.findByRole('button', { name: 'Restore storage ST-001' }),
-  );
-  await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Restore' }),
-  );
-  await screen.findByRole('button', { name: 'Delete storage ST-001' });
-  expect(remove).toHaveBeenCalledWith(
-    'storage-areas/area-1',
-    expect.any(Object),
-  );
-  expect(patch).toHaveBeenCalledWith(
-    'storage-areas/area-1/status',
-    { active: true },
-    expect.any(Object),
-  );
 });
-it('preserves an in-use deletion failure and shows the backend explanation without HTTP codes', async () => {
-  vi.spyOn(apiClient, 'delete').mockResolvedValue({
+it('preserves backend activation errors and keeps the confirmation open', async () => {
+  vi.spyOn(apiClient, 'patch').mockResolvedValue({
     status: 409,
     data: {
-      code: 'STORAGE_AREA_IN_USE',
-      detail: 'Retrieve all lots before deleting the storage area',
+      code: 'DATA_CONFLICT',
+      detail:
+        'The operation violates a uniqueness, reference, or state constraint',
     },
   });
   const { user } = setup();
   await user.click(
-    await screen.findByRole('button', { name: 'Delete storage ST-001' }),
+    await screen.findByRole('button', {
+      name: 'Deactivate storage unit ST-001',
+    }),
   );
   await user.click(
-    within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Deactivate',
+    }),
   );
   expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Retrieve all lots before deleting the storage area',
+    'The operation violates a uniqueness, reference, or state constraint',
   );
-  expect(screen.getByRole('alert')).not.toHaveTextContent('HTTP');
   expect(screen.getByRole('dialog')).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Cancel' }));
-  expect(screen.getByRole('rowheader', { name: 'ST-001' })).toBeVisible();
 });
-it('uses server paging, page size and debounced search', async () => {
+it('uses backend unit paging and debounced search', async () => {
   records = Array.from({ length: 12 }, (_, index) => ({
-    ...area,
-    id: 'area-' + index,
-    code: 'ST-' + String(index).padStart(3, '0'),
-    storageNumber: 'ST-' + String(index).padStart(3, '0'),
-    storage_number: 'ST-' + String(index).padStart(3, '0'),
+    ...unit,
+    id: `unit-${index}`,
+    code: `ST-${String(index).padStart(3, '0')}`,
   }));
   const { user } = setup();
   await screen.findByRole('rowheader', { name: 'ST-000' });
-  await user.click(screen.getByRole('button', { name: 'Go to next page' }));
+  const units = within(screen.getByRole('region', { name: 'Storage Units' }));
+  await user.click(units.getByRole('button', { name: 'Go to next page' }));
   await screen.findByRole('rowheader', { name: 'ST-011' });
-  expect(screen.getAllByRole('rowheader')).toHaveLength(2);
-  await user.type(screen.getByRole('searchbox'), 'ST-003');
+  expect(units.getAllByRole('rowheader')).toHaveLength(2);
+  await user.type(units.getByRole('searchbox'), 'ST-003');
   await screen.findByRole('rowheader', { name: 'ST-003' });
   expect(apiClient.get).toHaveBeenCalledWith(
-    'storage-areas',
+    'storage-locations',
     expect.objectContaining({
       params: { page: 0, size: 10, search: 'ST-003' },
     }),
   );
 });
-it('hides pagination on an empty collection and retries a failed list request', async () => {
+it('retries failed unit collections and handles empty results', async () => {
   records = [];
   vi.mocked(apiClient.get).mockResolvedValueOnce({
     status: 503,
     data: { detail: 'Maintenance in progress' },
   });
   const { user } = setup();
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Maintenance in progress',
-  );
+  await screen.findByRole('alert');
   await user.click(screen.getByRole('button', { name: 'Try again' }));
-  expect(await screen.findByText('No storages configured')).toBeVisible();
-  expect(screen.queryByText('Rows per page:')).not.toBeInTheDocument();
+  expect(await screen.findByText('No storage units configured')).toBeVisible();
+  expect(
+    within(screen.getByRole('region', { name: 'Storage Units' })).queryByText(
+      'Rows per page:',
+    ),
+  ).not.toBeInTheDocument();
+});
+it('starts unit creation under the selected area with its inherited station', async () => {
+  const { user } = setup();
+  await user.click(
+    await screen.findByRole('button', { name: 'Add unit under area AREA-001' }),
+  );
+  expect(
+    await screen.findByRole('combobox', { name: /Storage Area/ }),
+  ).toHaveTextContent('Holding Area');
+  expect(screen.getByRole('textbox', { name: /Station Number/ })).toHaveValue(
+    '03',
+  );
 });

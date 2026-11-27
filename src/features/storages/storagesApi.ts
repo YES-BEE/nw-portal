@@ -8,14 +8,17 @@ import {
 } from '../../api/collections';
 import { readProblemDetails, safeApiText } from '../../api/problemDetails';
 import type {
-  StorageAreaResponse,
-  StorageAreaRequest,
-  StorageAreaStatusRequest,
-  CreateStorageAreaResponse,
-  UpdateStorageAreaResponse,
-  DeleteStorageAreaResponse,
-  StorageFailure,
+  StorageUnitRecord,
+  StorageUnitResponse,
+  StorageUnitRequest,
+  UpdateStorageUnitRequest,
+  StorageUnitStatusRequest,
+  StorageAreaOptionResponse,
   StorageTagOptionResponse,
+  StorageFailure,
+  StorageAreaRequest,
+  StorageAreaResponse,
+  StorageStationOption,
 } from './types';
 
 export class StorageError extends Error {
@@ -41,20 +44,30 @@ export function parseStorageFailure(
   const fields = problem?.fieldErrors;
   if (fields && typeof fields === 'object' && !Array.isArray(fields)) {
     for (const field of [
-      'storageNumber',
-      'stationNumber',
-      'stationId',
+      'code',
       'name',
-      'description',
-      'nfcUid',
-      'tagId',
       'nfcUids',
+      'storageAreaId',
+      'stationId',
+      'stationNumber',
+      'storageNumber',
+      'description',
+      'tagId',
+      'nfcUid',
     ] as const) {
-      const text = safeApiText((fields as Record<string, unknown>)[field]);
-      if (text) fieldErrors[field] = text;
+      const value = safeApiText((fields as Record<string, unknown>)[field]);
+      if (value) fieldErrors[field] = value;
     }
+    const tagErrors = Object.entries(fields)
+      .filter(([key]) => /^nfcUids\[\d+\]/.test(key))
+      .map(([, value]) => safeApiText(value))
+      .filter((value): value is string => !!value);
+    if (!fieldErrors.nfcUids && tagErrors.length)
+      fieldErrors.nfcUids = [...new Set(tagErrors)].join(' ');
   }
-  if (code === 'STORAGE_NUMBER_EXISTS' && message)
+  if (message && ['NFC_ALREADY_ASSIGNED', 'NFC_DISABLED'].includes(code ?? ''))
+    fieldErrors.nfcUids = message;
+  if (message && code === 'STORAGE_NUMBER_EXISTS')
     fieldErrors.storageNumber = message;
   const kind: StorageFailure['kind'] =
     status === 401
@@ -109,34 +122,28 @@ async function request(
     throw new StorageError(parseStorageFailure(response.data, response.status));
   return response.data;
 }
-export function isStorageArea(value: unknown): value is StorageAreaResponse {
+const text = (value: unknown): value is string =>
+  typeof value === 'string' && !!value.trim();
+function isUnitRecord(value: unknown): value is StorageUnitRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
   return (
-    [
-      'id',
-      'station_id',
-      'station_code',
-      'code',
-      'name',
-      'storage_number',
-      'station_number',
-      'storageNumber',
-      'stationNumber',
-    ].every((key) => typeof row[key] === 'string' && !!row[key].trim()) &&
-    (row.description === null || typeof row.description === 'string') &&
-    [row.nfc_uid, row.nfcUid].every(
-      (uid) => uid === null || (typeof uid === 'string' && !!uid.trim()),
+    ['id', 'station_id', 'storage_area_id', 'code', 'name'].every((key) =>
+      text(row[key]),
     ) &&
     typeof row.active === 'boolean' &&
     typeof row.version === 'number' &&
     Number.isSafeInteger(row.version) &&
-    row.version >= 0 &&
-    row.storageNumber === row.code &&
-    row.storage_number === row.code &&
-    row.stationNumber === row.station_code &&
-    row.station_number === row.station_code &&
-    row.nfcUid === row.nfc_uid
+    row.version >= 0
+  );
+}
+export function isStorageUnit(value: unknown): value is StorageUnitResponse {
+  return (
+    isUnitRecord(value) &&
+    'station_code' in value &&
+    text(value.station_code) &&
+    'storage_area_code' in value &&
+    text(value.storage_area_code)
   );
 }
 function invalid(): never {
@@ -147,18 +154,142 @@ const options = (signal?: AbortSignal) => ({
   timeout: 10000,
   validateStatus: () => true,
 });
-function single(data: unknown, id?: string): StorageAreaResponse {
-  if (
-    !isStorageArea(data) ||
-    (id && data.id.toLowerCase() !== id.toLowerCase())
-  )
+function unitRecord(data: unknown, id?: string): StorageUnitRecord {
+  if (!isUnitRecord(data) || (id && data.id.toLowerCase() !== id.toLowerCase()))
     return invalid();
   return data;
+}
+function single(data: unknown, id: string): StorageUnitResponse {
+  if (!isStorageUnit(data) || data.id.toLowerCase() !== id.toLowerCase())
+    return invalid();
+  return data;
+}
+export async function getStorageUnits(
+  query: ListQuery,
+  signal?: AbortSignal,
+): Promise<ApiPage<StorageUnitResponse>> {
+  return readApiPage(
+    await request(() =>
+      apiClient.get<unknown>('storage-locations', {
+        ...options(signal),
+        params: query,
+      }),
+    ),
+    query,
+    isStorageUnit,
+    (row) => row.id,
+    invalid,
+  );
+}
+export async function getStorageUnit(
+  id: string,
+  signal?: AbortSignal,
+): Promise<StorageUnitResponse> {
+  return single(
+    await request(() =>
+      apiClient.get<unknown>(
+        `storage-locations/${encodeURIComponent(id)}`,
+        options(signal),
+      ),
+    ),
+    id,
+  );
+}
+export async function createStorageUnit(
+  areaId: string,
+  body: StorageUnitRequest,
+  signal?: AbortSignal,
+): Promise<StorageUnitRecord> {
+  const value = unitRecord(
+    await request(() =>
+      apiClient.post<unknown>(
+        `storage-areas/${encodeURIComponent(areaId)}/units`,
+        body,
+        options(signal),
+      ),
+    ),
+  );
+  if (value.storage_area_id.toLowerCase() !== areaId.toLowerCase())
+    return invalid();
+  return value;
+}
+export async function updateStorageUnit(
+  id: string,
+  body: UpdateStorageUnitRequest,
+  signal?: AbortSignal,
+): Promise<StorageUnitRecord> {
+  return unitRecord(
+    await request(() =>
+      apiClient.put<unknown>(
+        `storage-units/${encodeURIComponent(id)}`,
+        body,
+        options(signal),
+      ),
+    ),
+    id,
+  );
+}
+export async function setStorageUnitStatus(
+  id: string,
+  body: StorageUnitStatusRequest,
+  signal?: AbortSignal,
+): Promise<StorageUnitResponse> {
+  const value = single(
+    await request(() =>
+      apiClient.patch<unknown>(
+        `storage-locations/${encodeURIComponent(id)}/status`,
+        body,
+        options(signal),
+      ),
+    ),
+    id,
+  );
+  if (value.active !== body.active) return invalid();
+  return value;
+}
+export async function getStorageAreaOptions(
+  signal?: AbortSignal,
+): Promise<StorageAreaOptionResponse[]> {
+  const areas = await collectApiItems(
+    (page) =>
+      request(() =>
+        apiClient.get<unknown>('storage-areas', {
+          ...options(signal),
+          params: {
+            page: page?.page ?? 0,
+            size: page?.size ?? 100,
+            search: '',
+          },
+        }),
+      ),
+    (value): value is StorageAreaOptionResponse => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+      const row = value as Record<string, unknown>;
+      return (
+        ['id', 'station_id', 'station_code', 'code', 'name'].every((key) =>
+          text(row[key]),
+        ) && typeof row.active === 'boolean'
+      );
+    },
+    (row) => row.id,
+    invalid,
+  );
+  return areas.filter((area) => area.active);
+}
+function isStorageArea(value: unknown): value is StorageAreaOptionResponse {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    ['id', 'station_id', 'station_code', 'code', 'name'].every((key) =>
+      text(row[key]),
+    ) && typeof row.active === 'boolean'
+  );
 }
 export async function getStorageAreas(
   query: ListQuery,
   signal?: AbortSignal,
-): Promise<ApiPage<StorageAreaResponse>> {
+): Promise<ApiPage<StorageAreaOptionResponse>> {
   return readApiPage(
     await request(() =>
       apiClient.get<unknown>('storage-areas', {
@@ -172,78 +303,22 @@ export async function getStorageAreas(
     invalid,
   );
 }
-export async function getStorageArea(
-  id: string,
-  signal?: AbortSignal,
-): Promise<StorageAreaResponse> {
-  return single(
-    await request(() =>
-      apiClient.get<unknown>(
-        `storage-areas/${encodeURIComponent(id)}`,
-        options(signal),
-      ),
-    ),
-    id,
-  );
-}
 export async function createStorageArea(
   body: StorageAreaRequest,
   signal?: AbortSignal,
-): Promise<CreateStorageAreaResponse> {
-  return single(
-    await request(() =>
-      apiClient.post<unknown>('storage-areas', body, options(signal)),
-    ),
-  );
-}
-export async function updateStorageArea(
-  id: string,
-  body: StorageAreaRequest,
-  signal?: AbortSignal,
-): Promise<UpdateStorageAreaResponse> {
-  return single(
-    await request(() =>
-      apiClient.put<unknown>(
-        `storage-areas/${encodeURIComponent(id)}`,
-        body,
-        options(signal),
-      ),
-    ),
-    id,
-  );
-}
-export async function deleteStorageArea(
-  id: string,
-  signal?: AbortSignal,
-): Promise<DeleteStorageAreaResponse> {
-  const row = single(
-    await request(() =>
-      apiClient.delete<unknown>(
-        `storage-areas/${encodeURIComponent(id)}`,
-        options(signal),
-      ),
-    ),
-    id,
-  );
-  if (row.active !== false) return invalid();
-  return { ...row, active: false };
-}
-export async function setStorageAreaStatus(
-  id: string,
-  body: StorageAreaStatusRequest,
-  signal?: AbortSignal,
 ): Promise<StorageAreaResponse> {
-  const row = single(
-    await request(() =>
-      apiClient.patch<unknown>(
-        `storage-areas/${encodeURIComponent(id)}/status`,
-        body,
-        options(signal),
-      ),
-    ),
-    id,
+  const data = await request(() =>
+    apiClient.post<unknown>('storage-areas', body, options(signal)),
   );
-  if (row.active !== body.active) return invalid();
+  if (!isStorageArea(data)) return invalid();
+  const row = data as StorageAreaResponse;
+  if (
+    !Number.isSafeInteger(row.version) ||
+    row.version < 0 ||
+    (row.description !== null && typeof row.description !== 'string') ||
+    !text(row.nfc_uid)
+  )
+    return invalid();
   return row;
 }
 export async function getStorageTags(
@@ -276,4 +351,29 @@ export async function getStorageTags(
     (tag) => tag.id,
     invalid,
   );
+}
+export async function getStorageStations(
+  signal?: AbortSignal,
+): Promise<StorageStationOption[]> {
+  const stations = await collectApiItems(
+    (page) =>
+      request(() =>
+        apiClient.get<unknown>('stations', {
+          ...options(signal),
+          params: { page: page?.page ?? 0, size: page?.size ?? 10, search: '' },
+        }),
+      ),
+    (value): value is StorageStationOption => {
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        return false;
+      const row = value as Record<string, unknown>;
+      return (
+        ['id', 'code', 'name'].every((key) => text(row[key])) &&
+        typeof row.active === 'boolean'
+      );
+    },
+    (row) => row.id,
+    invalid,
+  );
+  return stations.filter((station) => station.active);
 }

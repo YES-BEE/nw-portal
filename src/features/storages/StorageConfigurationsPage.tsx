@@ -23,30 +23,33 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import RestoreIcon from '@mui/icons-material/Restore';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { usePagedList } from '../../api/usePagedList';
 import { ListPagination } from '../../api/ListPagination';
 import { usePageMetadata } from '../../app/usePageMetadata';
-import { getStorageAreas, storageFailure } from './storagesApi';
+import { getStorageUnits, storageFailure } from './storagesApi';
 import { StorageFailureAlert } from './StorageFailureAlert';
 import { StorageForm } from './StorageForm';
+import { StorageAreaForm } from './StorageAreaForm';
+import { StorageAreasPanel } from './StorageAreasPanel';
 import { StorageStatusDialog } from './StorageStatusDialog';
-import { useStorageTagName } from './useStorageTagName';
-import type { StorageAreaResponse } from './types';
+import type { StorageUnitResponse } from './types';
 
 export function StorageConfigurationsPage() {
   const { t } = useTranslation('translation');
-  const list = usePagedList(getStorageAreas);
-  const [form, setForm] = useState<{ id?: string } | null>(null);
+  const list = usePagedList(getStorageUnits);
+  const [form, setForm] = useState<{
+    id?: string;
+    areaId?: string;
+    kind?: 'area';
+  } | null>(null);
+  const [areasVersion, setAreasVersion] = useState(0);
   const [pendingStatus, setPendingStatus] =
-    useState<StorageAreaResponse | null>(null);
+    useState<StorageUnitResponse | null>(null);
   const [toast, setToast] = useState(false);
-  const tagName = useStorageTagName(
-    list.state.status === 'ready' &&
-      list.state.data.items.some((record) => !!record.nfcUid),
-  );
+  const [areaSaved, setAreaSaved] = useState(false);
   usePageMetadata(t('storages.pageTitle'), t('storages.pageDescription'));
   const items = list.state.status === 'ready' ? list.state.data.items : [];
   const busy = !!form || !!pendingStatus;
@@ -56,6 +59,7 @@ export function StorageConfigurationsPage() {
     list.reload();
   }
   function saved() {
+    setAreaSaved(false);
     setToast(true);
     reload();
   }
@@ -89,18 +93,39 @@ export function StorageConfigurationsPage() {
             {t('storages.pageDescription')}
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          disabled={busy}
-          onClick={() => {
-            setToast(false);
-            setForm({});
-          }}
-        >
-          {t('storages.add')}
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            disabled={busy}
+            onClick={() => {
+              setToast(false);
+              setForm({ kind: 'area' });
+            }}
+          >
+            {t('storages.areas.add')}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            disabled={busy}
+            onClick={() => {
+              setToast(false);
+              setForm({});
+            }}
+          >
+            {t('storages.add')}
+          </Button>
+        </Stack>
       </Stack>
+      <StorageAreasPanel
+        key={areasVersion}
+        busy={busy}
+        onAddUnit={(areaId) => {
+          setToast(false);
+          setForm({ areaId });
+        }}
+      />
       {list.state.status === 'error' && (
         <StorageFailureAlert
           failure={storageFailure(list.state.error)}
@@ -146,9 +171,9 @@ export function StorageConfigurationsPage() {
                 {(
                   [
                     'number',
+                    'name',
+                    'area',
                     'station',
-                    'description',
-                    'tag',
                     'status',
                     'actions',
                   ] as const
@@ -175,13 +200,11 @@ export function StorageConfigurationsPage() {
                     scope="row"
                     sx={{ fontWeight: 600 }}
                   >
-                    {record.storageNumber}
+                    {record.code}
                   </TableCell>
-                  <TableCell>{record.stationNumber}</TableCell>
-                  <TableCell>
-                    {record.description || t('common.notProvided')}
-                  </TableCell>
-                  <TableCell>{tagName(record.nfcUid)}</TableCell>
+                  <TableCell>{record.name}</TableCell>
+                  <TableCell>{record.storage_area_code}</TableCell>
+                  <TableCell>{record.station_code}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -202,7 +225,7 @@ export function StorageConfigurationsPage() {
                           component={RouterLink}
                           to={`/configurations/storages/${encodeURIComponent(record.id)}`}
                           aria-label={t('storages.viewNamed', {
-                            number: record.storageNumber,
+                            number: record.code,
                           })}
                         >
                           <VisibilityOutlinedIcon fontSize="small" />
@@ -219,7 +242,7 @@ export function StorageConfigurationsPage() {
                               setForm({ id: record.id });
                             }}
                             aria-label={t('storages.editNamed', {
-                              number: record.storageNumber,
+                              number: record.code,
                             })}
                           >
                             <EditOutlinedIcon fontSize="small" />
@@ -236,7 +259,7 @@ export function StorageConfigurationsPage() {
                         <Box component="span">
                           <IconButton
                             size="small"
-                            color={record.active ? 'error' : 'primary'}
+                            color={record.active ? 'warning' : 'primary'}
                             disabled={busy}
                             onClick={() => {
                               setToast(false);
@@ -246,11 +269,11 @@ export function StorageConfigurationsPage() {
                               record.active
                                 ? 'storages.deleteNamed'
                                 : 'storages.restoreNamed',
-                              { number: record.storageNumber },
+                              { number: record.code },
                             )}
                           >
                             {record.active ? (
-                              <DeleteOutlinedIcon fontSize="small" />
+                              <BlockOutlinedIcon fontSize="small" />
                             ) : (
                               <RestoreIcon fontSize="small" />
                             )}
@@ -284,10 +307,23 @@ export function StorageConfigurationsPage() {
           />
         )}
       </Paper>
-      {form && (
+      {form?.kind === 'area' && (
+        <StorageAreaForm
+          onClose={() => setForm(null)}
+          onReload={reload}
+          onSaved={(area) => {
+            setAreasVersion((value) => value + 1);
+            setAreaSaved(true);
+            setToast(true);
+            setForm({ areaId: area.id });
+          }}
+        />
+      )}
+      {form && form.kind !== 'area' && (
         <StorageForm
-          key={form.id || 'create'}
+          key={form.id || form.areaId || 'create'}
           storageId={form.id}
+          initialAreaId={form.areaId}
           onClose={() => setForm(null)}
           onSaved={saved}
           onReload={reload}
@@ -305,7 +341,7 @@ export function StorageConfigurationsPage() {
         open={toast}
         autoHideDuration={3500}
         onClose={() => setToast(false)}
-        message={t('storages.saved')}
+        message={t(areaSaved ? 'storages.areas.saved' : 'storages.saved')}
       />
     </>
   );

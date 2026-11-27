@@ -1,27 +1,31 @@
 import type {
-  StorageAreaResponse,
+  StorageAreaOptionResponse,
+  StorageUnitResponse,
   StorageTagOptionResponse,
 } from '../features/storages/types';
-export const storageAreaResponse: StorageAreaResponse = {
+export const storageAreaResponse: StorageAreaOptionResponse = {
   id: 'area-1',
   station_id: 'station-1',
   station_code: '03',
-  code: 'ST-001',
+  code: 'AREA-001',
   name: 'Holding Area',
-  description: 'Intermediate holding area',
+  active: true,
+};
+export const storageUnitResponse: StorageUnitResponse = {
+  id: 'unit-1',
+  station_id: 'station-1',
+  station_code: '03',
+  storage_area_id: 'area-1',
+  storage_area_code: 'AREA-001',
+  code: 'ST-001',
+  name: 'Holding Unit',
   active: true,
   version: 0,
-  storage_number: 'ST-001',
-  station_number: '03',
-  nfc_uid: 'PRIVATE-STORAGE-UID',
-  storageNumber: 'ST-001',
-  stationNumber: '03',
-  nfcUid: 'PRIVATE-STORAGE-UID',
 };
 export const storageTags: StorageTagOptionResponse[] = [
   {
     id: 'current-tag',
-    name: 'Holding Area Tag',
+    name: 'Holding Unit Tag',
     uid: 'PRIVATE-STORAGE-UID',
     status: 'ACTIVE',
     assigned: true,

@@ -6,20 +6,15 @@ import {
   ConfigurationDetailHeader,
   ConfigurationDetails,
 } from '../configurations/ConfigurationDetails';
-import { getStorageArea, getStorageTags, storageFailure } from './storagesApi';
+import { getStorageUnit, storageFailure } from './storagesApi';
 import { StorageFailureAlert } from './StorageFailureAlert';
-import type {
-  StorageAreaResponse,
-  StorageFailure,
-  StorageTagOptionResponse,
-} from './types';
+import type { StorageUnitResponse, StorageFailure } from './types';
 import { usePageMetadata } from '../../app/usePageMetadata';
 type State =
   | { status: 'loading' }
   | {
       status: 'ready';
-      record: StorageAreaResponse;
-      tags: StorageTagOptionResponse[];
+      record: StorageUnitResponse;
     }
   | { status: 'error'; failure: StorageFailure };
 export function StorageDetailsPage() {
@@ -44,13 +39,9 @@ function StorageDetails({ storageId }: { storageId?: string }) {
   useEffect(() => {
     const controller = new AbortController();
     if (storageId)
-      void Promise.all([
-        getStorageArea(storageId, controller.signal),
-        getStorageTags(controller.signal),
-      ]).then(
-        ([record, tags]) => {
-          if (!controller.signal.aborted)
-            setState({ status: 'ready', record, tags });
+      void getStorageUnit(storageId, controller.signal).then(
+        (record) => {
+          if (!controller.signal.aborted) setState({ status: 'ready', record });
         },
         (error) => {
           if (!controller.signal.aborted)
@@ -67,7 +58,7 @@ function StorageDetails({ storageId }: { storageId?: string }) {
   return (
     <>
       <ConfigurationDetailHeader
-        title={record?.storageNumber || t('storages.detailsTitle')}
+        title={record?.code || t('storages.detailsTitle')}
         listTitle={t('storages.title')}
         listPath="/configurations/storages"
         backLabel={t('storages.backToList')}
@@ -87,21 +78,12 @@ function StorageDetails({ storageId }: { storageId?: string }) {
       {state.status === 'ready' && (
         <ConfigurationDetails
           fields={[
-            { label: t('storages.number'), value: state.record.storageNumber },
-            { label: t('storages.station'), value: state.record.stationNumber },
+            { label: t('storages.number'), value: state.record.code },
+            { label: t('storages.station'), value: state.record.station_code },
+            { label: t('storages.name'), value: state.record.name },
             {
-              label: t('storages.description'),
-              value: state.record.description || '',
-            },
-            {
-              label: t('storages.tag'),
-              value: state.record.nfcUid
-                ? state.tags.find(
-                    (tag) =>
-                      tag.uid.toUpperCase() ===
-                      state.record.nfcUid!.toUpperCase(),
-                  )?.name || t('tags.nameUnavailable')
-                : t('storages.noTag'),
+              label: t('storages.area'),
+              value: state.record.storage_area_code,
             },
             {
               label: t('storages.status'),
